@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.RoyalScepter" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/royal_purple</item>
+        <item name="colorPrimaryVariant">@color/royal_purple_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/royal_gold</item>
+        <item name="android:statusBarColor">@color/royal_purple_dark</item>
+        <item name="android:navigationBarColor">@color/royal_surface</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>
