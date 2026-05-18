@@ -99,17 +99,28 @@ function templateFiles(project: BotProject): Record<string, string> {
     handler: { kind: "static_response" as const, ephemeral: true, content: "Pong." },
   }];
   const commandImports = commands.map((command) => `import { ${commandExportName(command.name)} } from "./commands/${sanitizeCommandFile(command.name)}.js";`).join("\n");
+  const commandTestImports = commands.map((command) => `import { ${commandExportName(command.name)} } from "./${sanitizeCommandFile(command.name)}.js";`).join("\n");
   const commandArray = commands.map((command) => commandExportName(command.name)).join(", ");
   const files: Record<string, string> = {
     "package.json": JSON.stringify({
+      name: project.slug,
+      version: "0.1.0",
+      private: true,
+      type: "module",
       scripts: { build: "tsc -p tsconfig.json", start: "node dist/index.js", test: "node --test dist/**/*.test.js" },
       dependencies: { "discord.js": "^14.15.3" },
       devDependencies: { typescript: "^5.4.5" },
     }, null, 2) + "\n",
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", outDir: "dist", rootDir: "src", strict: true, skipLibCheck: true }, include: ["src/**/*.ts"] }, null, 2) + "\n",
-    "README.md": `# ${project.name}\n\nGenerated bot project for royalScepter. Configure DISCORD_TOKEN through a secret reference; no secret values are written here.\n`,
+    "Dockerfile": `FROM node:22-alpine AS deps\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev || npm install --omit=dev\n\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci || npm install\nCOPY tsconfig.json ./\nCOPY src ./src\nRUN npm run build\n\nFROM node:22-alpine AS runtime\nWORKDIR /app\nENV NODE_ENV=production\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY --from=build /app/dist ./dist\nCOPY package.json ./package.json\nCMD ["node", "dist/index.js"]\n`,
+    ".dockerignore": "node_modules\ndist\n.env\n*.log\n",
+    "README.md": `# ${project.name}\n\nGenerated bot project for royalScepter. Configure DISCORD_TOKEN through a secret reference or your local shell environment; no secret values are written here.\n\n## Run manually\n\n\`\`\`bash\nnpm install\nnpm run build\nDISCORD_TOKEN=<placeholder-from-secret-manager> npm start\n\`\`\`\n\n## Validate config\n\n\`npm test\` includes a config validation test that confirms the bot fails clearly when DISCORD_TOKEN is missing.\n`,
     ".env.example": "DISCORD_TOKEN=<secret reference resolved at runtime>\n",
-    "src/index.ts": `${commandImports}\nimport { Client, GatewayIntentBits } from "discord.js";\n\nconst commands = [${commandArray}];\n\nconst token = process.env.DISCORD_TOKEN;\nif (!token) {\n  throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef on the project.");\n}\n\nconst client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });\nclient.once("ready", () => {\n  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);\n});\nclient.login(token);\n`,
+    "src/node-env.d.ts": `declare const process: { env: Record<string, string | undefined> };\n\ndeclare namespace NodeJS {\n  interface ProcessEnv {\n    [key: string]: string | undefined;\n  }\n}\n\ndeclare module "node:test" {\n  const test: (name: string, fn: () => void | Promise<void>) => void;\n  export default test;\n}\n\ndeclare module "node:assert/strict" {\n  const assert: {\n    ok(value: unknown, message?: string): void;\n    throws(fn: () => unknown, expected?: RegExp): void;\n  };\n  export default assert;\n}\n`,
+    "src/config.ts": `export interface BotConfig {\n  discordToken: string;\n}\n\nexport function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {\n  const discordToken = env.DISCORD_TOKEN;\n  if (!discordToken) {\n    throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef in royalScepter or set DISCORD_TOKEN before starting the bot.");\n  }\n  return { discordToken };\n}\n`,
+    "src/config.test.ts": `import test from "node:test";\nimport assert from "node:assert/strict";\nimport { loadConfig } from "./config.js";\n\ntest("config validation fails without required env vars", () => {\n  assert.throws(() => loadConfig({}), /DISCORD_TOKEN is required/);\n});\n`,
+    "src/commands/load.test.ts": `${commandTestImports}\nimport test from "node:test";\nimport assert from "node:assert/strict";\n\nconst commands = [${commandArray}];\n\ntest("command modules load", () => {\n  assert.ok(commands.length > 0);\n  assert.ok(commands.every((command) => command.data.name));\n});\n`,
+    "src/index.ts": `${commandImports}\nimport { Client, GatewayIntentBits } from "discord.js";\nimport { loadConfig } from "./config.js";\n\nconst commands = [${commandArray}];\nconst config = loadConfig();\n\nconst client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });\nclient.once("ready", () => {\n  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);\n});\nclient.login(config.discordToken);\n`,
   };
   for (const command of commands) files[`src/commands/${sanitizeCommandFile(command.name)}.ts`] = commandFile(command);
   return files;
@@ -156,5 +167,5 @@ function sanitizeId(value: string): string {
 }
 
 function isGeneratedPath(relativePath: string): boolean {
-  return ["package.json", "tsconfig.json", "README.md", ".env.example"].includes(normalizeRelativePath(relativePath)) || normalizeRelativePath(relativePath).startsWith("src/");
+  return ["package.json", "tsconfig.json", "README.md", ".env.example", "Dockerfile", ".dockerignore"].includes(normalizeRelativePath(relativePath)) || normalizeRelativePath(relativePath).startsWith("src/");
 }

@@ -13,3 +13,13 @@ test("redactSecrets removes common token patterns", () => {
   const discordToken = "ABCDEFGHIJKLMNOPQRSTUVW.XYZabc.superSecretDiscordTokenPart";
   assert.equal(redactSecrets(`token ${discordToken}`).includes(discordToken), false);
 });
+
+import { redactMetadata } from "../services/auditService.js";
+
+test("audit metadata redaction removes stored secrets", () => {
+  const secret = "audit-metadata-super-secret";
+  registerSecretValue(secret);
+  const metadata = redactMetadata({ safe: "ok", nested: { token: secret } });
+  assert.equal(JSON.stringify(metadata).includes(secret), false);
+  unregisterSecretValue(secret);
+});
