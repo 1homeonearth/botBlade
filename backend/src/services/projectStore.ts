@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { BotCommand, BotEvent, BotProject, CommandRegistration } from "../models/project.js";
+import { parseCommandDefinition, validateCommands } from "./commandDefinitions.js";
 
 export const DEFAULT_TEMPLATE_ID = "template_blank_discord_ts";
 
@@ -15,6 +16,7 @@ export interface CreateProjectInput {
   commands?: BotCommand[];
   events?: BotEvent[];
   deployment?: Partial<BotProject["deployment"]>;
+  github?: Partial<BotProject["github"]>;
 }
 
 export interface UpdateProjectInput {
@@ -27,6 +29,7 @@ export interface UpdateProjectInput {
   commands?: BotCommand[];
   events?: BotEvent[];
   deployment?: Partial<BotProject["deployment"]>;
+  github?: Partial<BotProject["github"]>;
 }
 
 export interface ValidationProblem {
@@ -53,6 +56,8 @@ export function parseCreateProjectInput(value: unknown): CreateProjectInput {
   if (language !== "typescript") problems.push({ field: "language", message: "Language must be typescript." });
   if (runtime !== "node22") problems.push({ field: "runtime", message: "Runtime must be node22." });
   if (problems.length > 0) throw new RequestValidationError(problems);
+  const commands = Array.isArray(object.commands) ? object.commands.map((command) => parseCommandDefinition(command)) : [];
+  validateCommands(commands);
   return {
     name: name!,
     slug: stringField(object, "slug", false),
@@ -62,18 +67,21 @@ export function parseCreateProjectInput(value: unknown): CreateProjectInput {
     runtime: "node22",
     discord: parseDiscord(object),
     permissions: parsePermissions(object),
-    commands: Array.isArray(object.commands) ? object.commands as BotCommand[] : [],
+    commands,
     events: Array.isArray(object.events) ? object.events as BotEvent[] : [],
     deployment: parseDeployment(object),
+    github: parseGithub(object),
   };
 }
 
 export function parseUpdateProjectInput(value: unknown): UpdateProjectInput {
   const object = asRecord(value);
-  const allowed = new Set(["name", "slug", "description", "templateId", "discord", "permissions", "commands", "events", "deployment"]);
+  const allowed = new Set(["name", "slug", "description", "templateId", "discord", "permissions", "commands", "events", "deployment", "github"]);
   const problems = Object.keys(object).filter((key) => !allowed.has(key)).map((key) => ({ field: key, message: "Field is not patchable." }));
   const commandRegistration = optionalNestedString(object, "discord", "commandRegistration");
   if (commandRegistration && !["guild", "global"].includes(commandRegistration)) problems.push({ field: "discord.commandRegistration", message: "Command registration must be guild or global." });
+  const commands = Array.isArray(object.commands) ? object.commands.map((command) => parseCommandDefinition(command)) : undefined;
+  if (commands) validateCommands(commands);
   if (problems.length > 0) throw new RequestValidationError(problems);
   return {
     name: stringField(object, "name", false),
@@ -82,9 +90,10 @@ export function parseUpdateProjectInput(value: unknown): UpdateProjectInput {
     templateId: stringField(object, "templateId", false),
     discord: parseDiscord(object),
     permissions: parsePermissions(object),
-    commands: Array.isArray(object.commands) ? object.commands as BotCommand[] : undefined,
+    commands,
     events: Array.isArray(object.events) ? object.events as BotEvent[] : undefined,
     deployment: parseDeployment(object),
+    github: parseGithub(object),
   };
 }
 
@@ -139,6 +148,7 @@ export class ProjectStore {
       commands: input.commands ?? [],
       events: input.events ?? [],
       deployment: { targetId: input.deployment?.targetId ?? null, lastDeploymentId: input.deployment?.lastDeploymentId ?? null },
+      github: { owner: input.github?.owner ?? null, repo: input.github?.repo ?? null, defaultBranch: input.github?.defaultBranch ?? "main", lastPushedAt: input.github?.lastPushedAt ?? null },
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -161,6 +171,7 @@ export class ProjectStore {
       discord: { ...existing.discord, ...withoutUndefined(input.discord ?? {}) },
       permissions: { ...existing.permissions, ...withoutUndefined(input.permissions ?? {}) },
       deployment: { ...existing.deployment, ...withoutUndefined(input.deployment ?? {}) },
+      github: { owner: null, repo: null, defaultBranch: "main", lastPushedAt: null, ...(existing.github ?? {}), ...withoutUndefined(input.github ?? {}) },
       updatedAt: new Date().toISOString(),
     };
     this.projects.set(projectId, updated);
@@ -244,4 +255,15 @@ function parseDeployment(object: Record<string, unknown>): Partial<BotProject["d
 
 function withoutUndefined<T extends Record<string, unknown>>(object: T): T {
   return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined)) as T;
+}
+
+function parseGithub(object: Record<string, unknown>): Partial<BotProject["github"]> | undefined {
+  const github = asRecord(object.github);
+  if (Object.keys(github).length === 0) return undefined;
+  return {
+    owner: stringField(github, "owner", false) ?? null,
+    repo: stringField(github, "repo", false) ?? null,
+    defaultBranch: stringField(github, "defaultBranch", false) ?? "main",
+    lastPushedAt: stringField(github, "lastPushedAt", false) ?? null,
+  };
 }

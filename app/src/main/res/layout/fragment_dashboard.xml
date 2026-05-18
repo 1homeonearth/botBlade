@@ -68,13 +68,34 @@
                         android:text="@string/refresh_status" />
 
                     <Button
-                        android:id="@+id/toggle_bot_button"
+                        android:id="@+id/start_bot_button"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:text="@string/toggle_bot" />
+                        android:text="@string/start_runtime" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/stop_bot_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stop_runtime" />
+
+                <Button
+                    android:id="@+id/restart_bot_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/restart_runtime" />
+
+                <Button
+                    android:id="@+id/view_runtime_logs_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/view_logs" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>

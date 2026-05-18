@@ -17,6 +17,13 @@ import com.princess.royalscepter.data.model.ProjectFileSummary
 import com.princess.royalscepter.data.model.ProjectFileContent
 import com.princess.royalscepter.data.model.BuildSummary
 import com.princess.royalscepter.data.model.BuildRequest
+import com.princess.royalscepter.data.model.RuntimeStatusResponse
+import com.princess.royalscepter.data.model.DeploymentTargetSummary
+import com.princess.royalscepter.data.model.DeploymentTargetCreateRequest
+import com.princess.royalscepter.data.model.DeploymentTargetTestResponse
+import com.princess.royalscepter.data.model.DeploymentJobSummary
+import com.princess.royalscepter.data.model.DeploymentCreateRequest
+import com.princess.royalscepter.data.model.GitHubStatusResponse
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -191,6 +198,63 @@ class RoyalScepterApiClient(
         return body.asJsonOrNull()?.optionalString("logs") ?: body
     }
 
+
+    @Throws(IOException::class)
+    fun getProjectRuntimeStatus(projectId: String): RuntimeStatusResponse =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/runtime/status", method = "GET").toRuntimeStatusResponse()
+
+    @Throws(IOException::class)
+    fun runtimeAction(projectId: String, action: String): RuntimeStatusResponse =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/runtime/$action", method = "POST", requestBody = "{}").toRuntimeStatusResponse()
+
+    @Throws(IOException::class)
+    fun getProjectRuntimeLogs(projectId: String): String {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/runtime/logs", method = "GET")
+        return body.asJsonOrNull()?.optionalString("logs") ?: body
+    }
+
+    @Throws(IOException::class)
+    fun listDeploymentTargets(): List<DeploymentTargetSummary> {
+        val body = request(path = "/api/deployment-targets", method = "GET")
+        val targets = requireNotNull(body.asJsonOrNull()) { "Invalid deployment targets response." }.optJSONArray("targets") ?: JSONArray()
+        return (0 until targets.length()).map { index -> targets.getJSONObject(index).toDeploymentTargetSummary() }
+    }
+
+    @Throws(IOException::class)
+    fun createDeploymentTarget(request: DeploymentTargetCreateRequest): DeploymentTargetSummary {
+        val payload = JSONObject().put("name", request.name).put("type", request.type).put("config", JSONObject()).put("secretRefs", JSONArray()).toString()
+        return this.request(path = "/api/deployment-targets", method = "POST", requestBody = payload).toDeploymentTargetSummary()
+    }
+
+    @Throws(IOException::class)
+    fun testDeploymentTarget(targetId: String): DeploymentTargetTestResponse =
+        request(path = "/api/deployment-targets/${targetId.urlPathSegment()}/test", method = "POST", requestBody = "{}").toDeploymentTargetTestResponse()
+
+    @Throws(IOException::class)
+    fun createDeployment(projectId: String, request: DeploymentCreateRequest): DeploymentJobSummary {
+        val payload = JSONObject().put("targetId", request.targetId).put("buildId", request.buildId).toString()
+        return this.request(path = "/api/projects/${projectId.urlPathSegment()}/deployments", method = "POST", requestBody = payload).toDeploymentJobSummary()
+    }
+
+    @Throws(IOException::class)
+    fun listDeployments(projectId: String): List<DeploymentJobSummary> {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/deployments", method = "GET")
+        val deployments = requireNotNull(body.asJsonOrNull()) { "Invalid deployments response." }.optJSONArray("deployments") ?: JSONArray()
+        return (0 until deployments.length()).map { index -> deployments.getJSONObject(index).toDeploymentJobSummary() }
+    }
+
+    @Throws(IOException::class)
+    fun getDeploymentLogs(projectId: String, deploymentId: String): String {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/deployments/${deploymentId.urlPathSegment()}/logs", method = "GET")
+        return body.asJsonOrNull()?.optionalString("logs") ?: body
+    }
+
+    @Throws(IOException::class)
+    fun getGitHubStatus(): GitHubStatusResponse {
+        val json = requireNotNull(request(path = "/api/github/status", method = "GET").asJsonOrNull()) { "Invalid GitHub status response." }
+        return GitHubStatusResponse(json.optBoolean("connected"), json.optionalString("tokenSecretRef"), json.optionalString("message"))
+    }
+
     @Throws(IOException::class)
     private fun request(
         path: String,
@@ -320,6 +384,45 @@ class RoyalScepterApiClient(
         logUrl = optionalString("logUrl"),
         auditEventId = optionalString("auditEventId"),
         startedAt = optionalString("startedAt"),
+        finishedAt = optionalString("finishedAt"),
+        errorMessage = optionalString("errorMessage"),
+    )
+
+
+    private fun String.toRuntimeStatusResponse(): RuntimeStatusResponse {
+        val json = requireNotNull(asJsonOrNull()) { "Invalid runtime status response." }
+        return RuntimeStatusResponse(
+            projectId = json.optString("projectId"),
+            status = json.optionalString("status") ?: "unknown",
+            running = json.optBoolean("running"),
+            message = json.optionalString("message"),
+        )
+    }
+
+    private fun String.toDeploymentTargetSummary(): DeploymentTargetSummary = requireNotNull(asJsonOrNull()) { "Invalid deployment target response." }.toDeploymentTargetSummary()
+
+    private fun JSONObject.toDeploymentTargetSummary(): DeploymentTargetSummary = DeploymentTargetSummary(
+        id = optString("id"),
+        name = optString("name"),
+        type = optString("type"),
+        createdAt = optionalString("createdAt"),
+        updatedAt = optionalString("updatedAt"),
+    )
+
+    private fun String.toDeploymentTargetTestResponse(): DeploymentTargetTestResponse {
+        val json = requireNotNull(asJsonOrNull()) { "Invalid deployment target test response." }
+        return DeploymentTargetTestResponse(json.optBoolean("ok"), json.optString("status"), json.optString("message"))
+    }
+
+    private fun String.toDeploymentJobSummary(): DeploymentJobSummary = requireNotNull(asJsonOrNull()) { "Invalid deployment response." }.toDeploymentJobSummary()
+
+    private fun JSONObject.toDeploymentJobSummary(): DeploymentJobSummary = DeploymentJobSummary(
+        deploymentId = optString("deploymentId"),
+        projectId = optString("projectId"),
+        targetId = optString("targetId"),
+        buildId = optString("buildId"),
+        status = optString("status"),
+        createdAt = optionalString("createdAt"),
         finishedAt = optionalString("finishedAt"),
         errorMessage = optionalString("errorMessage"),
     )

@@ -26,11 +26,24 @@ export interface BotCommandOption {
   required?: boolean;
 }
 
+export type BotCommandType = "chat_input";
+export type BotCommandHandlerKind = "static_response" | "custom_typescript_placeholder";
+
 export interface BotCommand {
+  id?: string;
   name: string;
   description: string;
+  type?: BotCommandType;
   options?: BotCommandOption[];
-  handler?: string;
+  permissions?: {
+    defaultMemberPermissions: string | null;
+    dmPermission: boolean;
+  };
+  handler?: string | {
+    kind: BotCommandHandlerKind;
+    ephemeral?: boolean;
+    content?: string;
+  };
 }
 
 export interface BotEvent {
@@ -41,6 +54,13 @@ export interface BotEvent {
 export interface DeploymentConfig {
   targetId: string | null;
   lastDeploymentId: string | null;
+}
+
+export interface GitHubProjectConfig {
+  owner: string | null;
+  repo: string | null;
+  defaultBranch: string;
+  lastPushedAt: string | null;
 }
 
 export interface BotProject {
@@ -56,6 +76,7 @@ export interface BotProject {
   commands: BotCommand[];
   events: BotEvent[];
   deployment: DeploymentConfig;
+  github?: GitHubProjectConfig;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
