@@ -2,7 +2,7 @@
 
 ## 2026-05-18T07:05:04Z — Android SDK unavailable in current shell
 
-- **Status:** Incomplete — environment limitation; repository changes include documentation and preflight automation, but this shell does not expose an Android SDK through `ANDROID_HOME`.
+- **Status:** Complete — Android SDK command-line tools and required package directories are now available under `/root/android-sdk`, and the repo-local untracked `local.properties` points Gradle at that SDK root.
 - **Context:** The session requested Android SDK bootstrap guidance, a CI preflight check for `platforms/android-35` and `build-tools/35.0.0`, and build verification in an SDK-enabled environment.
 - **Observed details:** `ANDROID_HOME` was empty when checked in the current shell; using the placeholder `/path/to/android-sdk` also failed because no SDK exists at that path in this environment.
 - **Troubleshooting steps taken:**
@@ -14,7 +14,7 @@
   - `ANDROID_HOME=`
   - `ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin` failed with `SDK location not found`.
   - `ANDROID_HOME=/path/to/android-sdk gradle :app:assembleDebug` failed with `SDK location not found`.
-- **Resolution notes:** Run `ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin` and `ANDROID_HOME=/path/to/android-sdk gradle :app:assembleDebug` in an SDK-enabled environment.
+- **Resolution notes:** Resolved on 2026-05-18T09:49:01Z by installing the required SDK under `/root/android-sdk`, writing untracked `local.properties`, and passing `./scripts/android-sdk-preflight.sh`.
 - **Repeat occurrence 2026-05-18T08:07:51Z:** Android client configuration changed for API authentication, but this shell still cannot run Android compilation because `ANDROID_HOME` is unset.
   - Command: `./scripts/android-sdk-preflight.sh`
   - Result: `Android SDK preflight failed: ANDROID_HOME is not set.`
@@ -31,6 +31,10 @@
   - Command: `./scripts/android-sdk-preflight.sh`
   - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
   - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
+- **Repeat occurrence 2026-05-18T09:49:01Z:** Pre-session unresolved issue review repeated the Android SDK preflight before Android backup hardening work, then retried the bootstrap now that Android SDK downloads were reachable.
+  - Commands: `./scripts/android-sdk-preflight.sh`, `./scripts/android-sdk-bootstrap.sh`, `sdkmanager --sdk_root=/root/android-sdk "platform-tools" "platforms;android-35" "build-tools;35.0.0"`, `printf 'sdk.dir=/root/android-sdk\n' > local.properties`, `./scripts/android-sdk-preflight.sh`.
+  - Result: Android command-line tools and required SDK package directories were installed under `/root/android-sdk`, and the repo-local untracked `local.properties` points Gradle at that SDK root.
+  - Status: Complete — Android SDK preflight now passes in this environment.
 - **Repeat occurrence 2026-05-18T09:48:44Z:** Pre-session unresolved issue review repeated the Android SDK preflight before backend URL configuration work.
   - Command: `./scripts/android-sdk-preflight.sh`
   - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
