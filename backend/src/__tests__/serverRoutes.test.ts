@@ -2,16 +2,26 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
+process.env.ROYALSCEPTER_AUTH_TOKENS = JSON.stringify([
+  { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
+  { token: "scoped-token", actorId: "scoped_user", roles: ["member"], projectIds: ["project_allowed"] },
+]);
+process.env.ROYALSCEPTER_SESSION_TOKENS = JSON.stringify([{ token: "session-token", actorId: "session_user", roles: ["admin"], projectIds: ["*"] }]);
 const { createRequestListener } = await import("../server.js");
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 
-async function request(method: Method, url: string, body?: unknown) {
+async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean } = {}) {
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
+  const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${Math.random().toString(16).slice(2)}` };
+  if (!options.unauthenticated) {
+    if (options.sessionToken) headers.cookie = `royalScepterSession=${encodeURIComponent(options.sessionToken)}`;
+    else headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
+  }
   const req = {
     method,
     url,
-    headers: { host: "localhost", "x-request-id": `req_test_${Math.random().toString(16).slice(2)}` },
+    headers,
     async *[Symbol.asyncIterator]() { for (const chunk of chunks) yield chunk; },
   };
   const res = {
@@ -29,6 +39,37 @@ test("health route returns ok", async () => {
   const response = await request("GET", "/api/health");
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.ok, true);
+});
+
+
+
+test("protected routes reject unauthenticated requests", async () => {
+  const response = await request("GET", "/api/projects", undefined, { unauthenticated: true });
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.error.code, "AUTHENTICATION_REQUIRED");
+});
+
+test("project routes reject actors without project authorization", async () => {
+  const created = await request("POST", "/api/projects", { name: "Authorization Denied" });
+  const response = await request("GET", `/api/projects/${created.body.id}`, undefined, { token: "scoped-token" });
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.error.code, "PROJECT_ACCESS_DENIED");
+});
+
+test("project routes allow authorized bearer and session actors", async () => {
+  const created = await request("POST", "/api/projects", { name: "Authorization Allowed" });
+  process.env.ROYALSCEPTER_AUTH_TOKENS = JSON.stringify([
+    { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
+    { token: "scoped-token", actorId: "scoped_user", roles: ["member"], projectIds: [created.body.id] },
+  ]);
+
+  const scoped = await request("GET", `/api/projects/${created.body.id}`, undefined, { token: "scoped-token" });
+  assert.equal(scoped.statusCode, 200);
+  assert.equal(scoped.body.id, created.body.id);
+
+  const session = await request("GET", "/api/projects", undefined, { sessionToken: "session-token" });
+  assert.equal(session.statusCode, 200);
+  assert.ok(session.body.projects.some((project: { id: string }) => project.id === created.body.id));
 });
 
 test("legacy bot status route returns expected shape", async () => {
@@ -69,6 +110,7 @@ test("project CRUD works and project create records audit event", async () => {
 
   const events = await request("GET", `/api/projects/${projectId}/audit-events`);
   assert.ok(events.body.auditEvents.some((event: { action: string }) => event.action === "project.create"));
+  assert.ok(events.body.auditEvents.some((event: { action: string; actorId: string }) => event.action === "project.create" && event.actorId === "admin_user"));
 });
 
 test("secret create/rotate/delete audit and never return secret value", async () => {

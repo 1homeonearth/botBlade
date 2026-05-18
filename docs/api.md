@@ -2,6 +2,30 @@
 
 Base URL in local development: `http://localhost:8000`.
 
+## Authentication and authorization
+
+Every endpoint except `GET /api/health` and `GET /api/version` requires an authenticated actor. Send either a bearer token:
+
+```http
+Authorization: Bearer <token>
+```
+
+or a session credential via `Cookie: royalScepterSession=<session-token>` or `x-session-token: <session-token>`.
+
+Configure backend credentials with one of these environment variables before starting the API:
+
+- `ROYALSCEPTER_AUTH_TOKENS`: JSON credential or array of credentials for bearer tokens.
+- `ROYALSCEPTER_SESSION_TOKENS`: JSON credential or array of credentials for session credentials.
+- `ROYALSCEPTER_API_TOKEN` / `ROYALSCEPTER_API_TOKENS`: comma-separated legacy bearer token fallback; these tokens receive admin access.
+
+Credential objects support `token`, `actorId` (or `userId`), `tokenId`, `roles`, and `projectIds`. Use `roles: ["admin"]` or `projectIds: ["*"]` for all-project administrative access; otherwise list specific project IDs in `projectIds`. Project-scoped tokens can access only authorized `/api/projects/:projectId/*` resources and project-owned secrets. Global resources such as `/api/audit-events`, `/api/github/*`, and `/api/deployment-targets` require admin/all-project access.
+
+Example:
+
+```bash
+export ROYALSCEPTER_AUTH_TOKENS='[{"token":"dev-admin-token","actorId":"local_admin","roles":["admin"],"projectIds":["*"]}]'
+```
+
 Errors use:
 
 ```json
@@ -43,13 +67,13 @@ Body: `{ "action": "start" }` or `{ "action": "stop" }`. Uses the first project.
 
 ### `GET /api/audit-events`
 
-Returns `{ "auditEvents": AuditEvent[] }`.
+Requires admin/all-project access. Returns `{ "auditEvents": AuditEvent[] }`.
 
 ### `GET /api/projects/:projectId/audit-events`
 
-Returns events for one project.
+Requires access to `projectId`. Returns events for one project.
 
-Audit event shape:
+Audit event shape includes `actorId`, which is populated from the authenticated bearer/session credential:
 
 ```json
 {
@@ -143,7 +167,7 @@ Body: `{ "content": "..." }`. Writes and returns file metadata plus content.
 
 ### `GET /api/secrets`
 
-Returns `{ "secrets": SecretSummary[] }`.
+Returns `{ "secrets": SecretSummary[] }` filtered to secrets whose `projectId` the actor can access. Admin/all-project actors can also see global (`projectId: null`) secrets.
 
 ### `POST /api/secrets`
 
@@ -201,7 +225,7 @@ Returns `{ "logs": "..." }` with redaction applied.
 
 ### `GET /api/deployment-targets`
 
-Returns `{ "targets": DeploymentTarget[] }`.
+Requires admin/all-project access. Returns `{ "targets": DeploymentTarget[] }`.
 
 ### `POST /api/deployment-targets`
 

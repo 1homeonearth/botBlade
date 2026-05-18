@@ -28,13 +28,13 @@ export class DeploymentJobStore {
   private readonly jobs = new Map<string, DeploymentJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => void) {}
+  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void) {}
 
   list(projectId: string): DeploymentJob[] { return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   get(projectId: string, deploymentId: string): DeploymentJob | undefined { return this.jobs.get(projectId)?.find((job) => job.deploymentId === deploymentId); }
   getLogs(projectId: string, deploymentId: string): string | undefined { return this.get(projectId, deploymentId) ? this.logs.get(deploymentId) ?? "" : undefined; }
 
-  async create(project: BotProject, request: unknown, auditEventId = `audit_${randomUUID()}`, requestId = "system"): Promise<DeploymentJob> {
+  async create(project: BotProject, request: unknown, auditEventId = `audit_${randomUUID()}`, requestId = "system", actorId?: string): Promise<DeploymentJob> {
     const body = asRecord(request);
     const targetId = stringField(body, "targetId");
     const buildId = stringField(body, "buildId");
@@ -48,7 +48,7 @@ export class DeploymentJobStore {
     const job: DeploymentJob = { deploymentId: `deployment_${randomUUID()}`, projectId: project.id, targetId, buildId, status: "queued", createdAt: now, updatedAt: now, finishedAt: null, errorMessage: null, logUrl: `/api/projects/${project.id}/deployments/deployment_${randomUUID()}/logs`, auditEventId };
     job.logUrl = `/api/projects/${project.id}/deployments/${job.deploymentId}/logs`;
     this.jobs.set(project.id, [job, ...(this.jobs.get(project.id) ?? [])]);
-    await this.run(project, job, requestId);
+    await this.run(project, job, requestId, actorId);
     return job;
   }
 
@@ -58,7 +58,7 @@ export class DeploymentJobStore {
     throw { statusCode: 400, code: "ROLLBACK_UNSUPPORTED", message: "Rollback is not supported by the selected deployment adapter yet.", details: { deploymentId } };
   }
 
-  private async run(project: BotProject, job: DeploymentJob, requestId: string): Promise<void> {
+  private async run(project: BotProject, job: DeploymentJob, requestId: string, actorId?: string): Promise<void> {
     const append = (line: string) => this.logs.set(job.deploymentId, `${this.logs.get(job.deploymentId) ?? ""}${redactSecrets(line)}\n`);
     try {
       const target = this.targetStore.get(job.targetId);
@@ -88,6 +88,7 @@ export class DeploymentJobStore {
         resourceId: job.deploymentId,
         metadata: { status: job.status, targetId: job.targetId, buildId: job.buildId, errorMessage: job.errorMessage },
         requestId,
+        actorId,
       });
     }
   }

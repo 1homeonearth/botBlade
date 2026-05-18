@@ -40,6 +40,8 @@ import org.json.JSONObject
 
 class RoyalScepterApiClient(
     private val baseUrl: String = ApiConfig.DEFAULT_BASE_URL,
+    private val bearerToken: String = ApiConfig.DEFAULT_BEARER_TOKEN,
+    private val sessionToken: String = ApiConfig.DEFAULT_SESSION_TOKEN,
 ) {
     @Throws(IOException::class)
     fun getHealth(): HealthResponse {
@@ -319,6 +321,10 @@ class RoyalScepterApiClient(
         connection.readTimeout = 2_000
         connection.doInput = true
         connection.setRequestProperty("Accept", "application/json")
+        when {
+            bearerToken.isNotBlank() -> connection.setRequestProperty("Authorization", "Bearer $bearerToken")
+            sessionToken.isNotBlank() -> connection.setRequestProperty("Cookie", "royalScepterSession=${sessionToken.cookieValue()}")
+        }
 
         if (requestBody != null) {
             connection.doOutput = true
@@ -542,6 +548,8 @@ class RoyalScepterApiClient(
     private fun String.urlPathSegment(): String = replace("/", "")
 
     private fun String.urlFilePath(): String = split("/").joinToString("/") { it.urlPathSegment() }
+
+    private fun String.cookieValue(): String = replace(";", "").replace("\r", "").replace("\n", "")
 
     private fun String.normalizePlainStatus(): String = replace(Regex("[{}\\\"]"), "")
         .replace(',', ' ')
