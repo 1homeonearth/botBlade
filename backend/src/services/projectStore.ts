@@ -242,41 +242,48 @@ function optionalNestedString(object: Record<string, unknown>, parent: string, f
 function parseDiscord(object: Record<string, unknown>): Partial<BotProject["discord"]> | undefined {
   const discord = asRecord(object.discord);
   if (Object.keys(discord).length === 0) return undefined;
-  return {
-    applicationId: stringField(discord, "applicationId", false) ?? null,
-    clientId: stringField(discord, "clientId", false) ?? null,
-    defaultGuildId: stringField(discord, "defaultGuildId", false) ?? null,
-    tokenSecretRef: stringField(discord, "tokenSecretRef", false) ?? null,
-    commandRegistration: (stringField(discord, "commandRegistration", false) as CommandRegistration | undefined) ?? "guild",
-  };
+  const parsed: Partial<BotProject["discord"]> = {};
+  if (hasOwn(discord, "applicationId")) parsed.applicationId = stringField(discord, "applicationId", false) ?? null;
+  if (hasOwn(discord, "clientId")) parsed.clientId = stringField(discord, "clientId", false) ?? null;
+  if (hasOwn(discord, "defaultGuildId")) parsed.defaultGuildId = stringField(discord, "defaultGuildId", false) ?? null;
+  if (hasOwn(discord, "tokenSecretRef")) parsed.tokenSecretRef = stringField(discord, "tokenSecretRef", false) ?? null;
+  if (hasOwn(discord, "commandRegistration")) parsed.commandRegistration = stringField(discord, "commandRegistration", false) as CommandRegistration | undefined;
+  return withoutUndefined(parsed);
 }
 
 function parsePermissions(object: Record<string, unknown>): Partial<BotProject["permissions"]> | undefined {
   const permissions = asRecord(object.permissions);
   if (Object.keys(permissions).length === 0) return undefined;
-  return {
-    intents: Array.isArray(permissions.intents) ? permissions.intents.filter((item): item is string => typeof item === "string") : [],
-    botPermissions: Array.isArray(permissions.botPermissions) ? permissions.botPermissions.filter((item): item is string => typeof item === "string") : [],
-  };
+  const parsed: Partial<BotProject["permissions"]> = {};
+  if (hasOwn(permissions, "intents")) parsed.intents = Array.isArray(permissions.intents) ? permissions.intents.filter((item): item is string => typeof item === "string") : [];
+  if (hasOwn(permissions, "botPermissions")) parsed.botPermissions = Array.isArray(permissions.botPermissions) ? permissions.botPermissions.filter((item): item is string => typeof item === "string") : [];
+  return parsed;
 }
 
 function parseDeployment(object: Record<string, unknown>): Partial<BotProject["deployment"]> | undefined {
   const deployment = asRecord(object.deployment);
   if (Object.keys(deployment).length === 0) return undefined;
-  return { targetId: stringField(deployment, "targetId", false) ?? null, lastDeploymentId: stringField(deployment, "lastDeploymentId", false) ?? null };
+  const parsed: Partial<BotProject["deployment"]> = {};
+  if (hasOwn(deployment, "targetId")) parsed.targetId = stringField(deployment, "targetId", false) ?? null;
+  if (hasOwn(deployment, "lastDeploymentId")) parsed.lastDeploymentId = stringField(deployment, "lastDeploymentId", false) ?? null;
+  return parsed;
+}
+
+function hasOwn(object: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(object, field);
 }
 
 function withoutUndefined<T extends Record<string, unknown>>(object: T): T {
   return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined)) as T;
 }
 
-function parseGithub(object: Record<string, unknown>): Partial<BotProject["github"]> | undefined {
+function parseGithub(object: Record<string, unknown>): Partial<NonNullable<BotProject["github"]>> | undefined {
   const github = asRecord(object.github);
   if (Object.keys(github).length === 0) return undefined;
-  return {
-    owner: stringField(github, "owner", false) ?? null,
-    repo: stringField(github, "repo", false) ?? null,
-    defaultBranch: stringField(github, "defaultBranch", false) ?? "main",
-    lastPushedAt: stringField(github, "lastPushedAt", false) ?? null,
-  };
+  const parsed: Partial<NonNullable<BotProject["github"]>> = {};
+  if (hasOwn(github, "owner")) parsed.owner = stringField(github, "owner", false) ?? null;
+  if (hasOwn(github, "repo")) parsed.repo = stringField(github, "repo", false) ?? null;
+  if (hasOwn(github, "defaultBranch")) parsed.defaultBranch = stringField(github, "defaultBranch", false);
+  if (hasOwn(github, "lastPushedAt")) parsed.lastPushedAt = stringField(github, "lastPushedAt", false) ?? null;
+  return withoutUndefined(parsed);
 }
