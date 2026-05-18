@@ -35,6 +35,20 @@
   - Commands: `./scripts/android-sdk-preflight.sh`, `./scripts/android-sdk-bootstrap.sh`, `sdkmanager --sdk_root=/root/android-sdk "platform-tools" "platforms;android-35" "build-tools;35.0.0"`, `printf 'sdk.dir=/root/android-sdk\n' > local.properties`, `./scripts/android-sdk-preflight.sh`.
   - Result: Android command-line tools and required SDK package directories were installed under `/root/android-sdk`, and the repo-local untracked `local.properties` points Gradle at that SDK root.
   - Status: Complete — Android SDK preflight now passes in this environment.
+- **Repeat occurrence 2026-05-18T09:48:44Z:** Pre-session unresolved issue review repeated the Android SDK preflight before backend URL configuration work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
+- **Repeat occurrence 2026-05-18T09:51:47Z:** Android compilation verification for backend URL configuration changes hit the same missing SDK limitation.
+  - Command: `gradle :app:compileDebugKotlin`
+  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
+  - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T10:00:14Z:** Pre-session unresolved issue review and Android unit-test verification for URL path encoding changes hit the same missing SDK limitation.
+  - Commands: `./scripts/android-sdk-preflight.sh`, `gradle :app:testDebugUnitTest`.
+  - Results: preflight reported `ANDROID_HOME is not set and no sdk.dir was found in local.properties`; Gradle reported `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
+  - Solution attempt: Re-ran the repository preflight as directed and attempted the Android unit-test task after code changes; no SDK root or approved Android SDK artifact mirror is available in this shell.
+  - Status: Incomplete — environment limitation remains; Android Gradle checks must be rerun in an SDK-enabled environment.
+
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 

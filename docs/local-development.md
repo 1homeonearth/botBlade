@@ -17,25 +17,31 @@ Health check:
 curl http://localhost:8000/api/health
 ```
 
+## Android backend URL configuration
+
+The Android client reads its backend URL from `BuildConfig.API_BASE_URL` unless the Settings screen has saved a user override. The Settings value is stored in app `SharedPreferences` as a URL only; credentials, bearer tokens, session tokens, query parameters, and URL fragments are not saved there.
+
+Use the Settings tab to edit the Backend API URL, save it, and tap **Test Connection**. The test calls `/api/health` and reports the health status or connection error.
+
 ## Android emulator host note
 
-Android emulators cannot use `127.0.0.1` to reach your host computer. Use:
+Android emulators cannot use `127.0.0.1` to reach your host computer. Debug emulator builds default to:
 
 ```text
 http://10.0.2.2:8000
 ```
 
-Debug builds allow cleartext HTTP for `10.0.2.2`, `127.0.0.1`, and `localhost`.
+If you need to re-enter it in Settings, use exactly that URL while the backend is running on your host at port `8000`. Debug builds allow cleartext HTTP for local development.
 
 ## Real-device LAN backend note
 
-For a physical Android device, run the backend on a host reachable from the same network and configure the app API base URL to:
+For a physical Android device, bind the backend to a host/interface reachable from the same network, then configure the app Backend API URL in Settings. Example:
 
 ```text
-http://<host-lan-ip>:8000
+http://192.168.1.25:8000
 ```
 
-Keep this on a trusted development network. The current backend has no production authentication.
+Replace `192.168.1.25` with your development machine's LAN IP address. Keep this on a trusted development network. The current backend has no production authentication.
 
 ## Local compatibility endpoints
 
