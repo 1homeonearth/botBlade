@@ -61,6 +61,7 @@ data class BotProject(
     val runtime: String,
     val discord: DiscordProjectConfig,
     val permissions: ProjectPermissions,
+    val deployment: ProjectDeployment = ProjectDeployment(),
     val archivedAt: String? = null,
     val createdAt: String,
     val updatedAt: String,
@@ -77,4 +78,58 @@ data class ProjectUpdateRequest(
     val name: String? = null,
     val description: String? = null,
     val templateId: String? = null,
+)
+
+data class ProjectFileSummary(
+    val path: String,
+    val size: Long,
+    val updatedAt: String,
+    val generated: Boolean,
+    val editable: Boolean,
+)
+
+data class ProjectFileContent(
+    val path: String,
+    val size: Long,
+    val updatedAt: String,
+    val generated: Boolean,
+    val editable: Boolean,
+    val content: String,
+)
+
+data class SecretSummary(
+    val id: String,
+    val projectId: String?,
+    val name: String,
+    val type: String,
+    val storageMode: String,
+    val fingerprint: String,
+    val createdAt: String,
+    val updatedAt: String,
+    val rotatedAt: String?,
+)
+
+data class SecretCreateRequest(
+    val projectId: String? = null,
+    val name: String,
+    val type: String,
+    val value: String,
+)
+
+data class BuildRequest(
+    val source: String = "current_project",
+    val clean: Boolean = true,
+    val runTests: Boolean = true,
+    val createDockerImage: Boolean = false,
+)
+
+data class BuildSummary(
+    val buildId: String,
+    val projectId: String,
+    val status: String,
+    val logUrl: String?,
+    val auditEventId: String?,
+    val startedAt: String?,
+    val finishedAt: String?,
+    val errorMessage: String?,
 )

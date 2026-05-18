@@ -39,7 +39,7 @@ export const supportedBotPermissions = new Set([
   "Administrator",
 ]);
 
-export function validateProject(project: BotProject): ProjectValidationResult {
+export function validateProject(project: BotProject, secretExists: (secretId: string) => boolean = () => true): ProjectValidationResult {
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
 
@@ -59,6 +59,12 @@ export function validateProject(project: BotProject): ProjectValidationResult {
     warnings.push({
       code: "MISSING_DISCORD_TOKEN",
       message: "Discord token secret reference is required before deployment.",
+      field: "discord.tokenSecretRef",
+    });
+  } else if (!secretExists(project.discord.tokenSecretRef)) {
+    errors.push({
+      code: "INVALID_TOKEN_SECRET_REF",
+      message: "Discord token secret reference does not match an existing secret.",
       field: "discord.tokenSecretRef",
     });
   }

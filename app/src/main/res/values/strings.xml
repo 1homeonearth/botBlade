@@ -45,4 +45,30 @@
     <string name="create_deployment">Create Deployment</string>
     <string name="settings_empty_message">Local API settings and secret references will be added in a later phase.</string>
     <string name="unknown">Unknown</string>
+
+    <string name="select_project_first">Select or create a bot project first.</string>
+    <string name="generate_project">Generate Project</string>
+    <string name="project_files">Project files</string>
+    <string name="no_file_selected">No file selected.</string>
+    <string name="file_content_hint">Select a file to edit its contents.</string>
+    <string name="save_file">Save</string>
+    <string name="revert_file">Revert</string>
+    <string name="start_build">Start Build</string>
+    <string name="build_started">Build started: %1$s (%2$s)</string>
+    <string name="file_saved">Saved %1$s.</string>
+    <string name="file_loaded">Loaded %1$s.</string>
+    <string name="generated_status">generated=%1$s editable=%2$s updated=%3$s</string>
+    <string name="secrets_title">Secrets</string>
+    <string name="secrets_loading">Loading secrets…</string>
+    <string name="create_secret">Create Secret</string>
+    <string name="secret_name_hint">Name (for example DISCORD_TOKEN)</string>
+    <string name="secret_type_hint">Type (discord_bot_token, github_token, custom…)</string>
+    <string name="secret_project_hint">Optional project ID</string>
+    <string name="secret_value_hint">Secret value</string>
+    <string name="save_secret">Save Secret Reference</string>
+    <string name="secret_saved_hidden">Saved as encrypted secret reference. The full value stays hidden.</string>
+    <string name="rotate_secret">Rotate</string>
+    <string name="delete_secret">Delete</string>
+    <string name="build_logs">Build logs</string>
+    <string name="build_logs_empty">Select a build to view logs.</string>
 </resources>

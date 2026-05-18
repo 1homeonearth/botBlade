@@ -24,9 +24,6 @@ declare class Buffer extends Uint8Array {
   toString(encoding?: string): string;
 }
 
-declare const process: {
-  env: Record<string, string | undefined>;
-};
 
 declare const console: {
   info(message?: unknown, ...optionalParams: unknown[]): void;
@@ -50,3 +47,58 @@ declare module "node:assert/strict" {
   };
   export default assert;
 }
+
+declare module "node:fs/promises" {
+  export function mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
+  export function writeFile(path: string, data: string, encoding?: string): Promise<void>;
+  export function readFile(path: string, encoding?: string): Promise<string>;
+  export function readdir(path: string, options?: { withFileTypes?: boolean }): Promise<Dirent[]>;
+  export function stat(path: string): Promise<{ size: number; mtime: Date; isFile(): boolean; isDirectory(): boolean }>;
+  export function access(path: string): Promise<void>;
+  export function rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
+  export interface Dirent { name: string; isDirectory(): boolean; isFile(): boolean; }
+}
+
+declare module "node:path" {
+  export function join(...paths: string[]): string;
+  export function dirname(path: string): string;
+  export function resolve(...paths: string[]): string;
+  export function relative(from: string, to: string): string;
+  export const sep: string;
+}
+
+declare module "node:crypto" {
+  export default crypto;
+  export function createHash(algorithm: string): { update(data: string): { digest(encoding: "hex"): string } };
+  const crypto: { randomUUID(): string; createHash(algorithm: string): { update(data: string): { digest(encoding: "hex"): string } } };
+}
+
+declare module "node:child_process" {
+  import { EventEmitter } from "node:events";
+  export interface StreamLike { on(event: "data", listener: (chunk: unknown) => void): void; }
+  export interface ChildProcessWithoutNullStreams extends EventEmitter {
+    pid?: number;
+    killed: boolean;
+    stdout: StreamLike;
+    stderr: StreamLike;
+    kill(signal?: string): boolean;
+    on(event: "close", listener: (code: number | null) => void): this;
+    on(event: "error", listener: (error: Error) => void): this;
+  }
+  export function spawn(command: string, args?: string[], options?: { cwd?: string; shell?: boolean; env?: Record<string, string | undefined> }): ChildProcessWithoutNullStreams;
+}
+
+declare module "node:events" {
+  export class EventEmitter {
+    on(event: string, listener: (...args: unknown[]) => void): this;
+  }
+}
+
+declare function setTimeout(callback: () => void, ms: number): unknown;
+declare function clearTimeout(timeout: unknown): void;
+
+
+declare const process: {
+  env: Record<string, string | undefined>;
+  cwd(): string;
+};

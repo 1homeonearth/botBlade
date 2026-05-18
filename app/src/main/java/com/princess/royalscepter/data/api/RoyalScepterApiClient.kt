@@ -11,6 +11,12 @@ import com.princess.royalscepter.data.model.ProjectCreateRequest
 import com.princess.royalscepter.data.model.ProjectDeployment
 import com.princess.royalscepter.data.model.ProjectPermissions
 import com.princess.royalscepter.data.model.ProjectUpdateRequest
+import com.princess.royalscepter.data.model.SecretSummary
+import com.princess.royalscepter.data.model.SecretCreateRequest
+import com.princess.royalscepter.data.model.ProjectFileSummary
+import com.princess.royalscepter.data.model.ProjectFileContent
+import com.princess.royalscepter.data.model.BuildSummary
+import com.princess.royalscepter.data.model.BuildRequest
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -98,6 +104,93 @@ class RoyalScepterApiClient(
     fun cloneProject(projectId: String): BotProject =
         request(path = "/api/projects/${projectId.urlPathSegment()}/clone", method = "POST", requestBody = "{}").toProjectResponse()
 
+
+    @Throws(IOException::class)
+    fun generateProject(projectId: String): List<ProjectFileSummary> {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/generate", method = "POST", requestBody = "{}")
+        val json = requireNotNull(body.asJsonOrNull()) { "Invalid generate response." }
+        return json.optJSONArray("files").toFileSummaries()
+    }
+
+    @Throws(IOException::class)
+    fun listProjectFiles(projectId: String): List<ProjectFileSummary> {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/files", method = "GET")
+        val json = requireNotNull(body.asJsonOrNull()) { "Invalid files response." }
+        return json.optJSONArray("files").toFileSummaries()
+    }
+
+    @Throws(IOException::class)
+    fun getProjectFile(projectId: String, filePath: String): ProjectFileContent {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/files/${filePath.urlFilePath()}", method = "GET")
+        return requireNotNull(body.asJsonOrNull()) { "Invalid file response." }.toProjectFileContent()
+    }
+
+    @Throws(IOException::class)
+    fun saveProjectFile(projectId: String, filePath: String, content: String): ProjectFileContent {
+        val payload = JSONObject().put("content", content).toString()
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/files/${filePath.urlFilePath()}", method = "PUT", requestBody = payload)
+        return requireNotNull(body.asJsonOrNull()) { "Invalid file response." }.toProjectFileContent()
+    }
+
+    @Throws(IOException::class)
+    fun listSecrets(): List<SecretSummary> {
+        val body = request(path = "/api/secrets", method = "GET")
+        val json = requireNotNull(body.asJsonOrNull()) { "Invalid secrets response." }
+        val secrets = json.optJSONArray("secrets") ?: JSONArray()
+        return (0 until secrets.length()).map { index -> secrets.getJSONObject(index).toSecretSummary() }
+    }
+
+    @Throws(IOException::class)
+    fun createSecret(request: SecretCreateRequest): SecretSummary {
+        val payload = JSONObject()
+            .put("name", request.name)
+            .put("type", request.type)
+            .put("value", request.value)
+            .apply { request.projectId?.let { put("projectId", it) } }
+            .toString()
+        return this.request(path = "/api/secrets", method = "POST", requestBody = payload).toSecretResponse()
+    }
+
+    @Throws(IOException::class)
+    fun rotateSecret(secretId: String, value: String): SecretSummary {
+        val payload = JSONObject().put("value", value).toString()
+        return request(path = "/api/secrets/${secretId.urlPathSegment()}/rotate", method = "POST", requestBody = payload).toSecretResponse()
+    }
+
+    @Throws(IOException::class)
+    fun deleteSecret(secretId: String) {
+        request(path = "/api/secrets/${secretId.urlPathSegment()}", method = "DELETE")
+    }
+
+    @Throws(IOException::class)
+    fun createBuild(projectId: String, buildRequest: BuildRequest = BuildRequest()): BuildSummary {
+        val payload = JSONObject()
+            .put("source", buildRequest.source)
+            .put("clean", buildRequest.clean)
+            .put("runTests", buildRequest.runTests)
+            .put("createDockerImage", buildRequest.createDockerImage)
+            .toString()
+        return request(path = "/api/projects/${projectId.urlPathSegment()}/builds", method = "POST", requestBody = payload).toBuildSummary()
+    }
+
+    @Throws(IOException::class)
+    fun listBuilds(projectId: String): List<BuildSummary> {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/builds", method = "GET")
+        val json = requireNotNull(body.asJsonOrNull()) { "Invalid builds response." }
+        val builds = json.optJSONArray("builds") ?: JSONArray()
+        return (0 until builds.length()).map { index -> builds.getJSONObject(index).toBuildSummary() }
+    }
+
+    @Throws(IOException::class)
+    fun getBuild(projectId: String, buildId: String): BuildSummary =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/builds/${buildId.urlPathSegment()}", method = "GET").toBuildSummary()
+
+    @Throws(IOException::class)
+    fun getBuildLogs(projectId: String, buildId: String): String {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/builds/${buildId.urlPathSegment()}/logs", method = "GET")
+        return body.asJsonOrNull()?.optionalString("logs") ?: body
+    }
+
     @Throws(IOException::class)
     private fun request(
         path: String,
@@ -181,6 +274,56 @@ class RoyalScepterApiClient(
         )
     }
 
+
+    private fun JSONArray?.toFileSummaries(): List<ProjectFileSummary> {
+        val array = this ?: JSONArray()
+        return (0 until array.length()).map { index -> array.getJSONObject(index).toProjectFileSummary() }
+    }
+
+    private fun JSONObject.toProjectFileSummary(): ProjectFileSummary = ProjectFileSummary(
+        path = optString("path"),
+        size = optLong("size"),
+        updatedAt = optString("updatedAt"),
+        generated = optBoolean("generated"),
+        editable = optBoolean("editable"),
+    )
+
+    private fun JSONObject.toProjectFileContent(): ProjectFileContent = ProjectFileContent(
+        path = optString("path"),
+        size = optLong("size"),
+        updatedAt = optString("updatedAt"),
+        generated = optBoolean("generated"),
+        editable = optBoolean("editable"),
+        content = optString("content"),
+    )
+
+    private fun String.toSecretResponse(): SecretSummary = requireNotNull(asJsonOrNull()) { "Invalid secret response." }.toSecretSummary()
+
+    private fun JSONObject.toSecretSummary(): SecretSummary = SecretSummary(
+        id = optString("id"),
+        projectId = optionalString("projectId"),
+        name = optString("name"),
+        type = optString("type"),
+        storageMode = optString("storageMode"),
+        fingerprint = optString("fingerprint"),
+        createdAt = optString("createdAt"),
+        updatedAt = optString("updatedAt"),
+        rotatedAt = optionalString("rotatedAt"),
+    )
+
+    private fun String.toBuildSummary(): BuildSummary = requireNotNull(asJsonOrNull()) { "Invalid build response." }.toBuildSummary()
+
+    private fun JSONObject.toBuildSummary(): BuildSummary = BuildSummary(
+        buildId = optString("buildId"),
+        projectId = optString("projectId"),
+        status = optString("status"),
+        logUrl = optionalString("logUrl"),
+        auditEventId = optionalString("auditEventId"),
+        startedAt = optionalString("startedAt"),
+        finishedAt = optionalString("finishedAt"),
+        errorMessage = optionalString("errorMessage"),
+    )
+
     private fun String.asJsonOrNull(): JSONObject? = runCatching { JSONObject(this) }.getOrNull()
 
     private fun JSONObject.optionalString(name: String): String? = if (has(name) && !isNull(name)) {
@@ -195,6 +338,8 @@ class RoyalScepterApiClient(
     }
 
     private fun String.urlPathSegment(): String = replace("/", "")
+
+    private fun String.urlFilePath(): String = split("/").joinToString("/") { it.urlPathSegment() }
 
     private fun String.normalizePlainStatus(): String = replace(Regex("[{}\\\"]"), "")
         .replace(',', ' ')
