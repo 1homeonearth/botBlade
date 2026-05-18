@@ -35,4 +35,4 @@
    - Verify debug vs release backup/cleartext/network security behavior.
 
 ## Environment blockers to revisit first next session
-- None currently blocking: Android SDK preflight passes with `sdk.dir=/root/android-sdk` in `local.properties`.
+- Android SDK validation is blocked in this container: no SDK variables/local.properties are present, and `./scripts/android-sdk-bootstrap.sh` cannot download command-line tools because `dl.google.com` returns HTTP 403. Retry with network access to Google downloads or set `ANDROID_CMDLINE_TOOLS_URL` to an approved mirror, then run `./scripts/android-sdk-preflight.sh` and `gradle :app:assembleDebug :app:assembleRelease --stacktrace`.

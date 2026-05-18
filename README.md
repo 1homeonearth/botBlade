@@ -1,5 +1,16 @@
 # botBlade
 
+[![Android APK workflow](../../actions/workflows/android.yml/badge.svg)](../../actions/workflows/android.yml)
+
+## Download latest release files
+
+The latest GitHub Release publishes stable Android artifact links from the automated APK workflow:
+
+- [Download debug APK](../../releases/latest/download/botBlade-debug.apk) for emulator, device, and local backend testing.
+- [Download unsigned release APK](../../releases/latest/download/botBlade-release-unsigned.apk) for release-candidate validation before signing.
+- [Download SHA256 checksums](../../releases/latest/download/SHA256SUMS.txt) to verify APK integrity.
+- [View the latest release](../../releases/latest) for release notes and all attached files.
+
 botBlade is an Android-based Discord bot builder and deployment console. The repository contains:
 
 - A native Android client for managing bot projects from a phone, tablet, emulator, or local debug device.
@@ -70,7 +81,13 @@ For a real device, start the backend on an address reachable from your LAN and e
 
 The repository includes `.github/workflows/android.yml`, which automatically prepares Java, Gradle, and the Android SDK on GitHub-hosted Ubuntu runners. On pushes to `main` and on pull requests, the workflow compiles Kotlin, assembles both debug and unsigned release APKs, stages them under `dist/apk/`, writes `SHA256SUMS.txt`, and uploads the APK set as a workflow artifact named `botBlade-apks-<commit-sha>`.
 
-Pushing a tag that starts with `v` (for example `v0.1.0`) also creates a GitHub Release for that tag and attaches the debug APK, unsigned release APK, and checksum file. The generated release APK is unsigned until a release-signing step and signing secrets are added.
+Pushing a tag that starts with `v` (for example `v0.1.0`) also publishes or updates a GitHub Release for that tag, marks it as the latest release, and attaches stable asset names so the front-page links keep working:
+
+- [`botBlade-debug.apk`](../../releases/latest/download/botBlade-debug.apk)
+- [`botBlade-release-unsigned.apk`](../../releases/latest/download/botBlade-release-unsigned.apk)
+- [`SHA256SUMS.txt`](../../releases/latest/download/SHA256SUMS.txt)
+
+The generated release APK is unsigned until a release-signing step and signing secrets are added.
 
 ## Backend setup
 
