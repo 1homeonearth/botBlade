@@ -23,6 +23,23 @@
     <string name="toggle_bot">Start / Stop</string>
     <string name="code_editor_empty_message">Project-aware bot editing will be added in a later phase.</string>
     <string name="projects_empty_message">No bot projects yet.</string>
+
+    <string name="projects_loading_message">Loading projects from the local backend…</string>
+    <string name="projects_loaded_message">Loaded %1$d project(s). Tap a card to set it active.</string>
+    <string name="projects_error_message">%1$s</string>
+    <string name="reload_projects">Reload</string>
+    <string name="project_name_hint">Name</string>
+    <string name="project_description_hint">Description</string>
+    <string name="project_template_hint">Template</string>
+    <string name="project_runtime_hint">Runtime</string>
+    <string name="project_name_required">Project name is required.</string>
+    <string name="project_created_message">Created %1$s.</string>
+    <string name="active_project_selected">Selected %1$s as the active project.</string>
+    <string name="project_no_description">No description provided.</string>
+    <string name="project_runtime_value">Runtime: %1$s</string>
+    <string name="project_command_registration_value">Command registration: %1$s</string>
+    <string name="project_archived_value">Archived: %1$s</string>
+    <string name="project_updated_value">Last updated: %1$s</string>
     <string name="create_bot_project">Create Bot Project</string>
     <string name="deployments_empty_message">No deployments yet.</string>
     <string name="create_deployment">Create Deployment</string>

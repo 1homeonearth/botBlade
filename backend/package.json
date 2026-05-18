@@ -1,0 +1,15 @@
+{
+  "name": "royalscepter-backend",
+  "version": "0.1.0",
+  "description": "Local builder service skeleton for royalScepter Discord bot projects.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run build && node dist/server.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "npm run build && node --test dist/__tests__/*.test.js"
+  }
+}
