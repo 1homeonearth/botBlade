@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { RequestValidationError } from "./projectStore.js";
+import type { DeploymentTargetStorePersistence } from "./persistence.js";
 
 export type DeploymentTargetType = "local_process" | "local_docker";
 export const supportedDeploymentTargetTypes = ["local_process", "local_docker"] as const;
@@ -38,6 +39,10 @@ export interface UpdateDeploymentTargetInput {
 export class DeploymentTargetStore {
   private readonly targets = new Map<string, DeploymentTarget>();
 
+  constructor(private readonly persistence?: DeploymentTargetStorePersistence) {
+    for (const target of persistence?.loadDeploymentTargets() ?? []) this.targets.set(target.id, target);
+  }
+
   list(): DeploymentTarget[] { return [...this.targets.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
   get(id: string): DeploymentTarget | undefined { return this.targets.get(id); }
 
@@ -46,6 +51,7 @@ export class DeploymentTargetStore {
     const now = new Date().toISOString();
     const target: DeploymentTarget = { id: `target_${randomUUID()}`, ...parsed, createdAt: now, updatedAt: now };
     this.targets.set(target.id, target);
+    this.persistence?.saveDeploymentTarget(target);
     return target;
   }
 
@@ -56,10 +62,15 @@ export class DeploymentTargetStore {
     const updated: DeploymentTarget = { ...existing, ...parsed, updatedAt: new Date().toISOString() };
     validateTargetConfig(updated.type, updated.config);
     this.targets.set(id, updated);
+    this.persistence?.saveDeploymentTarget(updated);
     return updated;
   }
 
-  delete(id: string): boolean { return this.targets.delete(id); }
+  delete(id: string): boolean {
+    const deleted = this.targets.delete(id);
+    if (deleted) this.persistence?.deleteDeploymentTarget(id);
+    return deleted;
+  }
 }
 
 export async function testDeploymentTarget(target: DeploymentTarget): Promise<DeploymentTargetTestResult> {

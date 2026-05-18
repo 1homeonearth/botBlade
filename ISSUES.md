@@ -19,6 +19,14 @@
   - Command: `./scripts/android-sdk-preflight.sh`
   - Result: `Android SDK preflight failed: ANDROID_HOME is not set.`
   - Status: Incomplete — environment limitation remains; run Android Gradle checks in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T08:25:39Z:** Pre-session unresolved issue review repeated the Android SDK preflight before durable persistence work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set.`
+  - Status: Incomplete — environment limitation remains; no Android SDK is exposed in this shell.
+- **Repeat occurrence 2026-05-18T08:33:15Z:** Attempted to resolve the shell `ANDROID_HOME` issue by installing Android command-line tools and writing shell exports.
+  - Commands: `./scripts/android-sdk-bootstrap.sh`, `curl -fL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip`, `apt-get update`, `./scripts/android-sdk-preflight.sh`.
+  - Result: `ANDROID_HOME` and `ANDROID_SDK_ROOT` are now exported for new login shells via `/root/.bash_profile`, and untracked `local.properties` points Gradle at `/root/android-sdk`. Direct downloads for command-line tools and apt repositories still return `403 Forbidden` through the configured proxy, so required SDK package directories are still unavailable.
+  - Status: Incomplete — the unset environment variable is fixed for new shells, but the actual Android SDK packages cannot be installed until this environment has an approved mirror or proxy access for Android SDK artifacts. Added `scripts/android-sdk-bootstrap.sh` and documented `ANDROID_CMDLINE_TOOLS_URL` mirror override to complete the install once a reachable mirror is available.
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 
@@ -39,3 +47,18 @@
   - Added build-service install diagnostics that log the configured registry, HTTP status/code, and failing URL with credentials/query values redacted.
   - Added backend tests for generated `package.json`/lockfile contents, `npm ci` install-command selection, and redacted registry diagnostics.
 - **Resolution notes:** Use `NPM_CONFIG_REGISTRY=<approved mirror> npm ci` or an uncommitted `.npmrc` registry line in networks where the public registry returns 403.
+
+## 2026-05-18T08:18:00Z — TypeScript Node shim coverage incomplete for SQLite persistence
+
+- **Status:** Complete — added the missing dependency-free Node declarations and adjusted migration path resolution.
+- **Context:** Durable SQLite persistence introduced synchronous filesystem, OS temp-directory, child-process, and AES-GCM crypto usage in a repository that intentionally uses local `node-shims.d.ts` instead of `@types/node`.
+- **Observed details:** `npm --prefix backend run build` failed after adding persistence code.
+- **Relevant logs:**
+  - `src/persistence/sqlitePersistence.ts(4,10): error TS2305: Module '"node:child_process"' has no exported member 'execFileSync'.`
+  - `src/persistence/sqlitePersistence.ts(12,64): error TS2339: Property 'url' does not exist on type 'ImportMeta'.`
+  - `src/persistence/sqlitePersistence.ts(105,21): error TS2339: Property 'randomBytes' does not exist...`
+- **Troubleshooting steps taken:**
+  - Added local declarations for `node:fs`, `node:os`, `execFileSync`, `console.warn`, `Buffer.from(..., encoding)`, and AES-GCM crypto helpers.
+  - Replaced `import.meta.url` migration resolution with a `process.cwd()`-based lookup that works from repo root and `backend/` cwd.
+  - Reran `npm --prefix backend run build` and `npm --prefix backend test` successfully.
+- **Resolution notes:** Complete; no dependency installation was needed.

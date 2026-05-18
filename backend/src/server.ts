@@ -14,16 +14,18 @@ import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUp
 import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
+import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
-const projectStore = new ProjectStore();
-const secretStore = new SecretStore();
+const persistence = process.env.NODE_ENV === "test" && !process.env.ROYALSCEPTER_DATABASE_URL && !process.env.DATABASE_URL ? undefined : SqlitePersistence.fromUrl();
+const projectStore = new ProjectStore(persistence);
+const secretStore = new SecretStore(persistence);
 const fileService = new ProjectFileService();
-const auditService = new AuditService();
+const auditService = new AuditService(persistence);
 const auditFromService = (event: { action: Parameters<AuditService["record"]>[0]["action"]; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => auditService.record(event);
-const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId), auditFromService);
+const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId), auditFromService, undefined, persistence);
 const runtimeService = new LocalProcessRuntimeService(fileService, (secretId) => secretStore.getValue(secretId));
-const targetStore = new DeploymentTargetStore();
-const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService);
+const targetStore = new DeploymentTargetStore(persistence);
+const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService, persistence);
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
 const port = Number(process.env.PORT ?? 8000);
 

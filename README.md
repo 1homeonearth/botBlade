@@ -137,3 +137,7 @@ Stop or restart with `/runtime/stop` and `/runtime/restart`.
 - File routes normalize paths and block traversal outside the generated project workspace.
 - Build commands run only inside the controlled `generated-projects` workspace.
 - Production use requires real authentication, persistent storage, encrypted secret storage, and hardened build isolation.
+
+## Durable persistence
+
+Project metadata, secret summaries, audit events, build/deployment jobs, and runtime metadata can be persisted with the SQLite adapter. See [docs/persistence.md](docs/persistence.md) for configuration, migrations, and backup/restore procedures.

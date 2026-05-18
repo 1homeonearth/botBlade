@@ -7,6 +7,7 @@ import type { DeploymentTargetStore } from "./deploymentTargets.js";
 import type { LocalProcessRuntimeService } from "./localProcessRuntimeService.js";
 import { adapterFor } from "./deploymentAdapters.js";
 import type { AuditAction } from "./auditService.js";
+import type { DeploymentJobStorePersistence } from "./persistence.js";
 
 export type DeploymentStatus = "queued" | "preparing" | "deploying" | "deployed" | "running" | "failed" | "rolled_back" | "canceled";
 
@@ -28,7 +29,12 @@ export class DeploymentJobStore {
   private readonly jobs = new Map<string, DeploymentJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void) {}
+  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void, private readonly persistence?: DeploymentJobStorePersistence) {
+    for (const { job, logs } of persistence?.loadDeploymentJobs() ?? []) {
+      this.jobs.set(job.projectId, [job, ...(this.jobs.get(job.projectId) ?? [])]);
+      this.logs.set(job.deploymentId, logs);
+    }
+  }
 
   list(projectId: string): DeploymentJob[] { return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   get(projectId: string, deploymentId: string): DeploymentJob | undefined { return this.jobs.get(projectId)?.find((job) => job.deploymentId === deploymentId); }
@@ -48,6 +54,7 @@ export class DeploymentJobStore {
     const job: DeploymentJob = { deploymentId: `deployment_${randomUUID()}`, projectId: project.id, targetId, buildId, status: "queued", createdAt: now, updatedAt: now, finishedAt: null, errorMessage: null, logUrl: `/api/projects/${project.id}/deployments/deployment_${randomUUID()}/logs`, auditEventId };
     job.logUrl = `/api/projects/${project.id}/deployments/${job.deploymentId}/logs`;
     this.jobs.set(project.id, [job, ...(this.jobs.get(project.id) ?? [])]);
+    this.persist(job);
     await this.run(project, job, requestId, actorId);
     return job;
   }
@@ -59,7 +66,10 @@ export class DeploymentJobStore {
   }
 
   private async run(project: BotProject, job: DeploymentJob, requestId: string, actorId?: string): Promise<void> {
-    const append = (line: string) => this.logs.set(job.deploymentId, `${this.logs.get(job.deploymentId) ?? ""}${redactSecrets(line)}\n`);
+    const append = (line: string) => {
+      this.logs.set(job.deploymentId, `${this.logs.get(job.deploymentId) ?? ""}${redactSecrets(line)}\n`);
+      this.persist(job);
+    };
     try {
       const target = this.targetStore.get(job.targetId);
       const build = this.buildService.get(project.id, job.buildId);
@@ -81,6 +91,7 @@ export class DeploymentJobStore {
     } finally {
       job.updatedAt = new Date().toISOString();
       job.finishedAt = new Date().toISOString();
+      this.persist(job);
       this.audit?.({
         action: job.status === "failed" ? "deployment.failed" : "deployment.succeeded",
         projectId: project.id,
@@ -91,6 +102,10 @@ export class DeploymentJobStore {
         actorId,
       });
     }
+  }
+
+  private persist(job: DeploymentJob): void {
+    this.persistence?.saveDeploymentJob(job, this.logs.get(job.deploymentId) ?? "");
   }
 }
 

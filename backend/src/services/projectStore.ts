@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BotCommand, BotEvent, BotProject, CommandRegistration } from "../models/project.js";
 import { parseCommandDefinition, validateCommands } from "./commandDefinitions.js";
+import type { ProjectStorePersistence, ProjectStorePort } from "./persistence.js";
 
 export const DEFAULT_TEMPLATE_ID = "template_blank_discord_ts";
 
@@ -114,8 +115,12 @@ export class DuplicateSlugError extends Error {
   }
 }
 
-export class ProjectStore {
+export class ProjectStore implements ProjectStorePort {
   private readonly projects = new Map<string, BotProject>();
+
+  constructor(private readonly persistence?: ProjectStorePersistence) {
+    for (const project of persistence?.loadProjects() ?? []) this.projects.set(project.id, project);
+  }
 
   list(): BotProject[] {
     return [...this.projects.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -154,6 +159,7 @@ export class ProjectStore {
       updatedAt: now,
     };
     this.projects.set(project.id, project);
+    this.persistence?.saveProject(project);
     return project;
   }
 
@@ -175,10 +181,15 @@ export class ProjectStore {
       updatedAt: new Date().toISOString(),
     };
     this.projects.set(projectId, updated);
+    this.persistence?.saveProject(updated);
     return updated;
   }
 
-  delete(projectId: string): boolean { return this.projects.delete(projectId); }
+  delete(projectId: string): boolean {
+    const deleted = this.projects.delete(projectId);
+    if (deleted) this.persistence?.deleteProject(projectId);
+    return deleted;
+  }
 
   archive(projectId: string): BotProject | undefined {
     const existing = this.projects.get(projectId);
@@ -186,6 +197,7 @@ export class ProjectStore {
     const now = new Date().toISOString();
     const archived = { ...existing, archivedAt: existing.archivedAt ?? now, updatedAt: now };
     this.projects.set(projectId, archived);
+    this.persistence?.saveProject(archived);
     return archived;
   }
 
@@ -195,6 +207,7 @@ export class ProjectStore {
     const now = new Date().toISOString();
     const clone = { ...existing, id: `project_${randomUUID()}`, name: `${existing.name} Copy`, slug: this.disambiguateSlug(`${existing.slug}-copy`), archivedAt: null, createdAt: now, updatedAt: now };
     this.projects.set(clone.id, clone);
+    this.persistence?.saveProject(clone);
     return clone;
   }
 
