@@ -22,6 +22,73 @@
             android:layout_marginTop="12dp"
             android:text="@string/secrets_loading" />
 
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/github_settings_title"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:id="@+id/github_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/github_loading" />
+
+        <EditText
+            android:id="@+id/github_token_ref_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/github_token_ref_hint"
+            android:inputType="textNoSuggestions" />
+
+        <Button
+            android:id="@+id/connect_github_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/connect_github" />
+
+        <EditText
+            android:id="@+id/github_owner_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/github_owner_hint"
+            android:inputType="textNoSuggestions" />
+
+        <EditText
+            android:id="@+id/github_repo_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/github_repo_hint"
+            android:inputType="textNoSuggestions" />
+
+        <EditText
+            android:id="@+id/github_branch_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/github_branch_hint"
+            android:inputType="textNoSuggestions" />
+
+        <Button
+            android:id="@+id/link_github_repo_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/link_github_repo" />
+
+        <Button
+            android:id="@+id/create_github_workflow_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/create_github_workflow" />
+
+        <Button
+            android:id="@+id/push_github_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/push_github_disabled" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

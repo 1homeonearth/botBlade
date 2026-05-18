@@ -51,6 +51,33 @@ data class ProjectDeployment(
     val lastDeploymentId: String? = null,
 )
 
+data class BotCommandPermissions(
+    val defaultMemberPermissions: String? = null,
+    val dmPermission: Boolean = false,
+)
+
+data class BotCommandHandler(
+    val kind: String = "static_response",
+    val ephemeral: Boolean = true,
+    val content: String? = null,
+)
+
+data class BotCommand(
+    val id: String? = null,
+    val name: String,
+    val description: String,
+    val type: String = "chat_input",
+    val permissions: BotCommandPermissions = BotCommandPermissions(),
+    val handler: BotCommandHandler = BotCommandHandler(),
+)
+
+data class GitHubProjectConfig(
+    val owner: String? = null,
+    val repo: String? = null,
+    val defaultBranch: String = "main",
+    val lastPushedAt: String? = null,
+)
+
 data class BotProject(
     val id: String,
     val name: String,
@@ -61,7 +88,9 @@ data class BotProject(
     val runtime: String,
     val discord: DiscordProjectConfig,
     val permissions: ProjectPermissions,
+    val commands: List<BotCommand> = emptyList(),
     val deployment: ProjectDeployment = ProjectDeployment(),
+    val github: GitHubProjectConfig? = null,
     val archivedAt: String? = null,
     val createdAt: String,
     val updatedAt: String,
@@ -180,4 +209,28 @@ data class GitHubStatusResponse(
     val connected: Boolean,
     val tokenSecretRef: String? = null,
     val message: String? = null,
+)
+
+
+data class CommandCreateRequest(
+    val name: String,
+    val description: String,
+    val handlerKind: String = "static_response",
+    val handlerContent: String = "",
+    val ephemeral: Boolean = true,
+)
+
+data class GitHubConnectRequest(
+    val tokenSecretRef: String,
+)
+
+data class GitHubLinkRepoRequest(
+    val owner: String,
+    val repo: String,
+    val defaultBranch: String = "main",
+)
+
+data class GitHubWorkflowResponse(
+    val path: String,
+    val content: String,
 )
