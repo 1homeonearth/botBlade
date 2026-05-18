@@ -33,30 +33,48 @@ data class ProjectSummary(
     val runtimeStatus: String? = null,
 )
 
-data class ProjectDetail(
+data class DiscordProjectConfig(
+    val applicationId: String? = null,
+    val clientId: String? = null,
+    val defaultGuildId: String? = null,
+    val tokenSecretRef: String? = null,
+    val commandRegistration: String = "guild",
+)
+
+data class ProjectPermissions(
+    val intents: List<String> = emptyList(),
+    val botPermissions: List<String> = emptyList(),
+)
+
+data class ProjectDeployment(
+    val targetId: String? = null,
+    val lastDeploymentId: String? = null,
+)
+
+data class BotProject(
     val id: String,
     val name: String,
+    val slug: String,
+    val description: String,
+    val templateId: String,
+    val language: String,
+    val runtime: String,
+    val discord: DiscordProjectConfig,
+    val permissions: ProjectPermissions,
+    val archivedAt: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+data class ProjectCreateRequest(
+    val name: String,
+    val description: String = "",
+    val templateId: String = "template_blank_discord_ts",
+    val runtime: String = "node22",
+)
+
+data class ProjectUpdateRequest(
+    val name: String? = null,
     val description: String? = null,
-    val runtimeStatus: String? = null,
-    val build: BuildSummary? = null,
-    val deployment: DeploymentSummary? = null,
-    val secrets: List<SecretSummary> = emptyList(),
-)
-
-data class BuildSummary(
-    val id: String,
-    val status: String,
-    val createdAt: String? = null,
-)
-
-data class DeploymentSummary(
-    val id: String,
-    val status: String,
-    val environment: String? = null,
-    val createdAt: String? = null,
-)
-
-data class SecretSummary(
-    val key: String,
-    val isConfigured: Boolean,
+    val templateId: String? = null,
 )

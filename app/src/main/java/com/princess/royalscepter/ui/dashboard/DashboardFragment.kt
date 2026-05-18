@@ -65,10 +65,11 @@ class DashboardFragment : Fragment() {
 
     private fun updateActiveProject() {
         val activeProjectId = activeProjectStore.getActiveProjectId()
+        val activeProjectName = activeProjectStore.getActiveProjectName()
         activeProjectText.text = if (activeProjectId == null) {
             getString(R.string.active_project_none)
         } else {
-            getString(R.string.active_project_value, activeProjectId)
+            getString(R.string.active_project_value, activeProjectName ?: activeProjectId)
         }
     }
 
