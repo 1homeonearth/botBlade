@@ -86,9 +86,9 @@ export class BuildService {
       const validation = validateProject(project, this.secretExists);
       if (!validation.valid) throw new Error(validation.errors.map((issue) => `${issue.field ?? "project"}: ${issue.message}`).join("; "));
       await this.files.ensureGenerated(project);
-      const cwd = this.files.workspace(project.id);
-      const cwdResolved = path.resolve(cwd);
-      if (!cwdResolved.includes(`${path.sep}generated-projects${path.sep}`)) throw new Error("Refusing to build outside generated-projects workspace.");
+      const { root, workspace: cwd } = this.files.resolveWorkspace(project.id);
+      const relativeWorkspace = path.relative(root, cwd);
+      if (relativeWorkspace.startsWith("..") || path.isAbsolute(relativeWorkspace)) throw new Error("Refusing to build outside generated-projects workspace.");
       if (job.clean) await fs.rm(path.join(cwd, "dist"), { recursive: true, force: true });
       job.status = "installing";
       const installArgs = [await fileExists(path.join(cwd, "package-lock.json")) ? "ci" : "install"];

@@ -109,3 +109,51 @@ test("build install failures include redacted registry diagnostics", async () =>
     await fs.rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("generated workspace helper resolves normal roots and project workspaces", () => {
+  const files = new ProjectFileService(path.join(process.cwd(), "generated-projects", "workspace-validation-normal-test"));
+  const project = projectFixture("project_workspace_validation_normal_test");
+  const resolved = files.resolveWorkspace(project.id);
+  const relativeWorkspace = path.relative(resolved.root, resolved.workspace);
+
+  assert.equal(resolved.root, files.generatedRoot());
+  assert.equal(path.isAbsolute(resolved.root), true);
+  assert.equal(path.isAbsolute(resolved.workspace), true);
+  assert.equal(relativeWorkspace, project.id);
+});
+
+test("build rejects crafted workspaces that only contain generated-projects elsewhere in the path", async () => {
+  const project = projectFixture("project_workspace_validation_crafted_test");
+  const root = path.join(process.cwd(), "generated-projects", "workspace-validation-root");
+  const outside = path.join(process.cwd(), "generated-projects-craft", "generated-projects", "outside-root");
+
+  class CraftedProjectFileService extends ProjectFileService {
+    constructor() {
+      super(root);
+    }
+
+    override workspace(projectId: string): string {
+      return path.join(outside, projectId);
+    }
+  }
+
+  const files = new CraftedProjectFileService();
+  const commands: string[] = [];
+  const runner: CommandRunner = async (command, args) => {
+    commands.push([command, ...args].join(" "));
+  };
+  const service = new BuildService(files, (secretId) => secretId === "secret_discord_token", undefined, runner);
+
+  try {
+    const job = await service.create(project, { clean: false, runTests: true }, "audit_test", "req_test");
+    const logs = service.getLogs(project.id, job.buildId) ?? "";
+
+    assert.equal(job.status, "failed");
+    assert.equal(job.errorMessage, "Refusing to build outside generated-projects workspace.");
+    assert.equal(logs.includes("Refusing to build outside generated-projects workspace."), true);
+    assert.equal(commands.length, 0);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(path.join(process.cwd(), "generated-projects-craft"), { recursive: true, force: true });
+  }
+});

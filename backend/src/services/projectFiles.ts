@@ -16,6 +16,11 @@ export interface ProjectFileContent extends ProjectFileSummary {
   content: string;
 }
 
+export interface GeneratedWorkspacePaths {
+  root: string;
+  workspace: string;
+}
+
 export class ProjectFileService {
   constructor(private readonly rootDir = path.join(process.cwd(), "generated-projects")) {}
 
@@ -65,8 +70,16 @@ export class ProjectFileService {
     return this.read(projectId, relativePath);
   }
 
+  generatedRoot(): string {
+    return path.resolve(this.rootDir);
+  }
+
   workspace(projectId: string): string {
     return path.join(this.rootDir, sanitizeId(projectId));
+  }
+
+  resolveWorkspace(projectId: string): GeneratedWorkspacePaths {
+    return { root: this.generatedRoot(), workspace: path.resolve(this.workspace(projectId)) };
   }
 
   safePath(projectId: string, relativePath: string): string {
