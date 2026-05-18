@@ -83,4 +83,54 @@
     <string name="deployment_target_type_hint">Target type: local_process or local_docker</string>
     <string name="create_deployment_target">Create Deployment Target</string>
     <string name="deploy_latest_build">Deploy Latest Successful Build</string>
+
+    <string name="manage_commands">Manage Slash Commands</string>
+    <string name="project_commands_title">Slash commands for %1$s</string>
+    <string name="commands_loading">Loading slash commands…</string>
+    <string name="commands_loaded">Loaded %1$d slash command(s).</string>
+    <string name="commands_saving">Saving slash command…</string>
+    <string name="commands_deleting">Deleting slash command…</string>
+    <string name="create_command">Create Command</string>
+    <string name="edit_command">Edit</string>
+    <string name="save_command">Save Command</string>
+    <string name="delete_command">Delete</string>
+    <string name="delete_command_confirm">Delete /%1$s?</string>
+    <string name="command_name_hint">Command name (lowercase, 1-32 chars)</string>
+    <string name="command_description_hint">Description (1-100 chars)</string>
+    <string name="command_response_hint">Static response content</string>
+    <string name="command_custom_handler">Use custom TypeScript handler placeholder</string>
+    <string name="command_ephemeral">Reply ephemerally</string>
+    <string name="command_name_error">Use 1-32 lowercase letters, numbers, underscores, or hyphens.</string>
+    <string name="command_description_error">Description must be 1-100 characters.</string>
+    <string name="command_content_error">Static response content is required.</string>
+    <string name="command_saved">Saved /%1$s.</string>
+    <string name="command_deleted">Deleted /%1$s.</string>
+    <string name="project_command_count_value">Slash commands: %1$d</string>
+    <string name="project_github_value">GitHub: %1$s</string>
+    <string name="github_settings_title">GitHub Settings</string>
+    <string name="github_loading">Loading GitHub settings…</string>
+    <string name="github_token_ref_hint">GitHub token secret ref (secret ID, value stays hidden)</string>
+    <string name="connect_github">Connect GitHub Token Reference</string>
+    <string name="github_owner_hint">Repository owner</string>
+    <string name="github_repo_hint">Repository name</string>
+    <string name="github_branch_hint">Default branch (main)</string>
+    <string name="link_github_repo">Link Project Repository</string>
+    <string name="create_github_workflow">Preview Workflow Skeleton</string>
+    <string name="push_github">Push to GitHub</string>
+    <string name="push_github_disabled">Push disabled until GitHub is configured</string>
+    <string name="github_connected">connected</string>
+    <string name="github_not_connected">not connected</string>
+    <string name="github_not_linked">not linked</string>
+    <string name="github_status_value">GitHub token: %1$s
+Active project: %2$s
+Repository: %3$s</string>
+    <string name="github_token_ref_required">Enter a saved GitHub token secret ID.</string>
+    <string name="github_owner_required">Owner is required.</string>
+    <string name="github_repo_required">Repository is required.</string>
+    <string name="github_connecting">Connecting GitHub token secret reference…</string>
+    <string name="github_linking">Linking project repository…</string>
+    <string name="github_workflow_creating">Creating workflow preview…</string>
+    <string name="github_workflow_created">Workflow preview available at %1$s. Push remains disabled unless the backend implements real GitHub push.</string>
+    <string name="github_push_starting">Starting GitHub push…</string>
+    <string name="github_error">GitHub: %1$s</string>
 </resources>

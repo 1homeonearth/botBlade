@@ -3,6 +3,12 @@ package com.princess.royalscepter.data.repository
 import com.princess.royalscepter.data.api.ApiResult
 import com.princess.royalscepter.data.api.RoyalScepterApiClient
 import com.princess.royalscepter.data.model.BotProject
+import com.princess.royalscepter.data.model.BotCommand
+import com.princess.royalscepter.data.model.CommandCreateRequest
+import com.princess.royalscepter.data.model.GitHubConnectRequest
+import com.princess.royalscepter.data.model.GitHubLinkRepoRequest
+import com.princess.royalscepter.data.model.GitHubStatusResponse
+import com.princess.royalscepter.data.model.GitHubWorkflowResponse
 import com.princess.royalscepter.data.model.ProjectCreateRequest
 import com.princess.royalscepter.data.model.ProjectUpdateRequest
 import java.io.IOException
@@ -32,6 +38,42 @@ class ProjectRepository(
 
     suspend fun cloneProject(projectId: String): ApiResult<BotProject> = apiCall {
         apiClient.cloneProject(projectId)
+    }
+
+    suspend fun listCommands(projectId: String): ApiResult<List<BotCommand>> = apiCall {
+        apiClient.listCommands(projectId)
+    }
+
+    suspend fun createCommand(projectId: String, request: CommandCreateRequest): ApiResult<BotCommand> = apiCall {
+        apiClient.createCommand(projectId, request)
+    }
+
+    suspend fun updateCommand(projectId: String, commandId: String, request: CommandCreateRequest): ApiResult<BotCommand> = apiCall {
+        apiClient.updateCommand(projectId, commandId, request)
+    }
+
+    suspend fun deleteCommand(projectId: String, commandId: String): ApiResult<Unit> = apiCall {
+        apiClient.deleteCommand(projectId, commandId)
+    }
+
+    suspend fun getGitHubStatus(): ApiResult<GitHubStatusResponse> = apiCall {
+        apiClient.getGitHubStatus()
+    }
+
+    suspend fun connectGitHub(request: GitHubConnectRequest): ApiResult<GitHubStatusResponse> = apiCall {
+        apiClient.connectGitHub(request)
+    }
+
+    suspend fun linkGitHubRepo(projectId: String, request: GitHubLinkRepoRequest): ApiResult<BotProject> = apiCall {
+        apiClient.linkGitHubRepo(projectId, request)
+    }
+
+    suspend fun pushGitHub(projectId: String): ApiResult<String> = apiCall {
+        apiClient.pushGitHub(projectId)
+    }
+
+    suspend fun createGitHubWorkflow(projectId: String): ApiResult<GitHubWorkflowResponse> = apiCall {
+        apiClient.createGitHubWorkflow(projectId)
     }
 
     private suspend fun <T> apiCall(block: () -> T): ApiResult<T> = withContext(Dispatchers.IO) {

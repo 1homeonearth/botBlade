@@ -24,6 +24,14 @@ import com.princess.royalscepter.data.model.DeploymentTargetTestResponse
 import com.princess.royalscepter.data.model.DeploymentJobSummary
 import com.princess.royalscepter.data.model.DeploymentCreateRequest
 import com.princess.royalscepter.data.model.GitHubStatusResponse
+import com.princess.royalscepter.data.model.BotCommand
+import com.princess.royalscepter.data.model.BotCommandHandler
+import com.princess.royalscepter.data.model.BotCommandPermissions
+import com.princess.royalscepter.data.model.CommandCreateRequest
+import com.princess.royalscepter.data.model.GitHubConnectRequest
+import com.princess.royalscepter.data.model.GitHubLinkRepoRequest
+import com.princess.royalscepter.data.model.GitHubProjectConfig
+import com.princess.royalscepter.data.model.GitHubWorkflowResponse
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -110,6 +118,52 @@ class RoyalScepterApiClient(
     @Throws(IOException::class)
     fun cloneProject(projectId: String): BotProject =
         request(path = "/api/projects/${projectId.urlPathSegment()}/clone", method = "POST", requestBody = "{}").toProjectResponse()
+
+    @Throws(IOException::class)
+    fun listCommands(projectId: String): List<BotCommand> {
+        val body = request(path = "/api/projects/${projectId.urlPathSegment()}/commands", method = "GET")
+        val commands = requireNotNull(body.asJsonOrNull()) { "Invalid commands response." }.optJSONArray("commands") ?: JSONArray()
+        return (0 until commands.length()).map { index -> commands.getJSONObject(index).toBotCommand() }
+    }
+
+    @Throws(IOException::class)
+    fun createCommand(projectId: String, command: CommandCreateRequest): BotCommand =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/commands", method = "POST", requestBody = command.toCommandPayload()).toCommandResponse()
+
+    @Throws(IOException::class)
+    fun updateCommand(projectId: String, commandId: String, command: CommandCreateRequest): BotCommand =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/commands/${commandId.urlPathSegment()}", method = "PATCH", requestBody = command.toCommandPayload()).toCommandResponse()
+
+    @Throws(IOException::class)
+    fun deleteCommand(projectId: String, commandId: String) {
+        request(path = "/api/projects/${projectId.urlPathSegment()}/commands/${commandId.urlPathSegment()}", method = "DELETE")
+    }
+
+    @Throws(IOException::class)
+    fun connectGitHub(request: GitHubConnectRequest): GitHubStatusResponse {
+        val payload = JSONObject().put("tokenSecretRef", request.tokenSecretRef).toString()
+        return request(path = "/api/github/connect", method = "POST", requestBody = payload).toGitHubStatusResponse()
+    }
+
+    @Throws(IOException::class)
+    fun linkGitHubRepo(projectId: String, request: GitHubLinkRepoRequest): BotProject {
+        val payload = JSONObject()
+            .put("owner", request.owner)
+            .put("repo", request.repo)
+            .put("defaultBranch", request.defaultBranch)
+            .toString()
+        return request(path = "/api/projects/${projectId.urlPathSegment()}/github/create-repo", method = "POST", requestBody = payload).toProjectResponse()
+    }
+
+    @Throws(IOException::class)
+    fun pushGitHub(projectId: String): String =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/github/push", method = "POST", requestBody = "{}")
+
+    @Throws(IOException::class)
+    fun createGitHubWorkflow(projectId: String): GitHubWorkflowResponse {
+        val json = requireNotNull(request(path = "/api/projects/${projectId.urlPathSegment()}/github/create-workflow", method = "POST", requestBody = "{}").asJsonOrNull()) { "Invalid workflow response." }
+        return GitHubWorkflowResponse(path = json.optString("path"), content = json.optString("content"))
+    }
 
 
     @Throws(IOException::class)
@@ -250,10 +304,8 @@ class RoyalScepterApiClient(
     }
 
     @Throws(IOException::class)
-    fun getGitHubStatus(): GitHubStatusResponse {
-        val json = requireNotNull(request(path = "/api/github/status", method = "GET").asJsonOrNull()) { "Invalid GitHub status response." }
-        return GitHubStatusResponse(json.optBoolean("connected"), json.optionalString("tokenSecretRef"), json.optionalString("message"))
-    }
+    fun getGitHubStatus(): GitHubStatusResponse =
+        request(path = "/api/github/status", method = "GET").toGitHubStatusResponse()
 
     @Throws(IOException::class)
     private fun request(
@@ -328,10 +380,21 @@ class RoyalScepterApiClient(
                 intents = permissionsJson.optStringArray("intents"),
                 botPermissions = permissionsJson.optStringArray("botPermissions"),
             ),
+            commands = (optJSONArray("commands") ?: JSONArray()).let { commands ->
+                (0 until commands.length()).map { index -> commands.getJSONObject(index).toBotCommand() }
+            },
             deployment = ProjectDeployment(
                 targetId = deploymentJson.optionalString("targetId"),
                 lastDeploymentId = deploymentJson.optionalString("lastDeploymentId"),
             ),
+            github = optJSONObject("github")?.let { githubJson ->
+                GitHubProjectConfig(
+                    owner = githubJson.optionalString("owner"),
+                    repo = githubJson.optionalString("repo"),
+                    defaultBranch = githubJson.optionalString("defaultBranch") ?: "main",
+                    lastPushedAt = githubJson.optionalString("lastPushedAt"),
+                )
+            },
             archivedAt = optionalString("archivedAt"),
             createdAt = optString("createdAt"),
             updatedAt = optString("updatedAt"),
@@ -426,6 +489,42 @@ class RoyalScepterApiClient(
         finishedAt = optionalString("finishedAt"),
         errorMessage = optionalString("errorMessage"),
     )
+
+
+    private fun CommandCreateRequest.toCommandPayload(): String = JSONObject()
+        .put("name", name)
+        .put("description", description)
+        .put("type", "chat_input")
+        .put("handler", JSONObject().put("kind", handlerKind).put("content", handlerContent).put("ephemeral", ephemeral))
+        .toString()
+
+    private fun String.toCommandResponse(): BotCommand = requireNotNull(asJsonOrNull()) { "Invalid command response." }.toBotCommand()
+
+    private fun JSONObject.toBotCommand(): BotCommand {
+        val permissionsJson = optJSONObject("permissions") ?: JSONObject()
+        val handlerValue = opt("handler")
+        val handlerJson = if (handlerValue is JSONObject) handlerValue else JSONObject().put("kind", "custom_typescript_placeholder")
+        return BotCommand(
+            id = optionalString("id"),
+            name = optString("name"),
+            description = optString("description"),
+            type = optionalString("type") ?: "chat_input",
+            permissions = BotCommandPermissions(
+                defaultMemberPermissions = permissionsJson.optionalString("defaultMemberPermissions"),
+                dmPermission = permissionsJson.optBoolean("dmPermission"),
+            ),
+            handler = BotCommandHandler(
+                kind = handlerJson.optionalString("kind") ?: "static_response",
+                ephemeral = handlerJson.optBoolean("ephemeral", true),
+                content = handlerJson.optionalString("content"),
+            ),
+        )
+    }
+
+    private fun String.toGitHubStatusResponse(): GitHubStatusResponse {
+        val json = requireNotNull(asJsonOrNull()) { "Invalid GitHub status response." }
+        return GitHubStatusResponse(json.optBoolean("connected"), json.optionalString("tokenSecretRef"), json.optionalString("message"))
+    }
 
     private fun String.asJsonOrNull(): JSONObject? = runCatching { JSONObject(this) }.getOrNull()
 
