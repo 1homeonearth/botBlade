@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "royalScepter"
+rootProject.name = "botBlade"
 include(":app")

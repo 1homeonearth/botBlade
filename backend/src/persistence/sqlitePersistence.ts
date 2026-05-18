@@ -15,14 +15,14 @@ const DEFAULT_KEY_ID = "local-env";
 export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence {
   private readonly key: Buffer;
 
-  constructor(private readonly databasePath: string, secretKey = process.env.ROYALSCEPTER_SECRET_KEY) {
+  constructor(private readonly databasePath: string, secretKey = process.env.BOTBLADE_SECRET_KEY) {
     ensureSqliteAvailable();
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     this.key = deriveKey(secretKey);
     this.migrate();
   }
 
-  static fromUrl(url = process.env.ROYALSCEPTER_DATABASE_URL ?? process.env.DATABASE_URL ?? defaultSqliteUrl()): SqlitePersistence | undefined {
+  static fromUrl(url = process.env.BOTBLADE_DATABASE_URL ?? process.env.DATABASE_URL ?? defaultSqliteUrl()): SqlitePersistence | undefined {
     if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
       console.warn("Postgres persistence is configured but this dependency-free build only ships the SQLite adapter; use the documented DATABASE_URL for production Postgres deployments.");
       return undefined;
@@ -88,7 +88,7 @@ COMMIT;`);
 
 function defaultSqliteUrl(): string {
   const backendCwd = fs.existsSync(path.resolve(process.cwd(), "src/server.ts"));
-  return backendCwd ? "sqlite://./data/royalscepter.sqlite" : "sqlite://./backend/data/royalscepter.sqlite";
+  return backendCwd ? "sqlite://./data/botblade.sqlite" : "sqlite://./backend/data/botblade.sqlite";
 }
 
 function q(value: string | null): string {
@@ -99,7 +99,7 @@ function q(value: string | null): string {
 function ensureSqliteAvailable(): void { execFileSync("sqlite3", ["--version"], { encoding: "utf8" }); }
 
 function deriveKey(secretKey?: string): Buffer {
-  if (!secretKey) return crypto.createHash("sha256").update("royalScepter-local-dev-secret-key").digest();
+  if (!secretKey) return crypto.createHash("sha256").update("botBlade-local-dev-secret-key").digest();
   if (/^[a-f0-9]{64}$/i.test(secretKey)) return Buffer.from(secretKey, "hex");
   const base64 = Buffer.from(secretKey, "base64");
   if (base64.length === 32) return base64;

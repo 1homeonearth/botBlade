@@ -1,6 +1,6 @@
 # Durable persistence, secrets, backup, and restore
 
-royalScepter supports durable service metadata through persistence interfaces and a checked-in SQLite adapter for local and development use. The same interfaces are intended to be implemented by a Postgres adapter for production deployments that provide `DATABASE_URL` / `ROYALSCEPTER_DATABASE_URL` with a `postgres://` or `postgresql://` URL.
+botBlade supports durable service metadata through persistence interfaces and a checked-in SQLite adapter for local and development use. The same interfaces are intended to be implemented by a Postgres adapter for production deployments that provide `DATABASE_URL` / `BOTBLADE_DATABASE_URL` with a `postgres://` or `postgresql://` URL.
 
 ## What is persisted
 
@@ -21,14 +21,14 @@ Migrations live in `backend/migrations/` and are applied automatically by the SQ
 For local/dev SQLite persistence, set:
 
 ```bash
-export ROYALSCEPTER_DATABASE_URL=sqlite://./backend/data/royalscepter.sqlite
-export ROYALSCEPTER_SECRET_KEY=$(openssl rand -hex 32)
+export BOTBLADE_DATABASE_URL=sqlite://./backend/data/botblade.sqlite
+export BOTBLADE_SECRET_KEY=$(openssl rand -hex 32)
 npm --prefix backend run start
 ```
 
-If no database URL is set, non-test server runs use `sqlite://./backend/data/royalscepter.sqlite`. Tests stay in memory unless a database URL is explicitly set.
+If no database URL is set, non-test server runs use `sqlite://./backend/data/botblade.sqlite`. Tests stay in memory unless a database URL is explicitly set.
 
-`ROYALSCEPTER_SECRET_KEY` accepts a 64-character hex key, a 32-byte base64 key, or any passphrase. Passphrases are hashed with SHA-256 before use. Local development falls back to a deterministic development key, but production deployments must provide a managed secret key.
+`BOTBLADE_SECRET_KEY` accepts a 64-character hex key, a 32-byte base64 key, or any passphrase. Passphrases are hashed with SHA-256 before use. Local development falls back to a deterministic development key, but production deployments must provide a managed secret key.
 
 ## Secret storage model
 
@@ -39,22 +39,22 @@ Normal tables store only secret summaries and fingerprints. Plaintext values are
 SQLite backup should run while the service is stopped or through SQLite's online `VACUUM INTO` flow:
 
 ```bash
-sqlite3 backend/data/royalscepter.sqlite "VACUUM INTO 'backups/royalscepter-$(date -u +%Y%m%dT%H%M%SZ).sqlite';"
+sqlite3 backend/data/botblade.sqlite "VACUUM INTO 'backups/botblade-$(date -u +%Y%m%dT%H%M%SZ).sqlite';"
 ```
 
-Also back up the current `ROYALSCEPTER_SECRET_KEY`; encrypted secret values cannot be decrypted without it.
+Also back up the current `BOTBLADE_SECRET_KEY`; encrypted secret values cannot be decrypted without it.
 
 ## Restore
 
 1. Stop the backend service.
-2. Restore the secret key used for the backup: `export ROYALSCEPTER_SECRET_KEY=...`.
+2. Restore the secret key used for the backup: `export BOTBLADE_SECRET_KEY=...`.
 3. Replace the database file with the backup copy:
 
    ```bash
-   cp backups/royalscepter-YYYYMMDDTHHMMSSZ.sqlite backend/data/royalscepter.sqlite
+   cp backups/botblade-YYYYMMDDTHHMMSSZ.sqlite backend/data/botblade.sqlite
    ```
 
 4. Start the backend. Migrations run automatically and bring older backups forward.
 5. Verify with `GET /api/health`, `GET /api/projects`, and `GET /api/audit-events`.
 
-For Postgres production deployments, use managed snapshots or `pg_dump`/`pg_restore`, and store `ROYALSCEPTER_SECRET_KEY` in the same disaster recovery system as the database credentials.
+For Postgres production deployments, use managed snapshots or `pg_dump`/`pg_restore`, and store `BOTBLADE_SECRET_KEY` in the same disaster recovery system as the database credentials.

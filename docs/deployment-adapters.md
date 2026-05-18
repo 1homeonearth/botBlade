@@ -43,7 +43,7 @@ Implemented as the first production deployment path. It validates `target.type =
 
 ```json
 {
-  "image": "royalscepter/my-bot",
+  "image": "botblade/my-bot",
   "dockerfile": "Dockerfile"
 }
 ```
@@ -53,8 +53,8 @@ Secret values must not be placed in `config`; secret-like config keys are reject
 Deploy semantics:
 
 1. Build image: `docker build -t <image>:<buildId> -f <dockerfile> .`
-2. Replace current container: `docker rm -f royalscepter-<project-slug>` (ignored if missing).
-3. Start container: `docker run -d --name royalscepter-<project-slug> --restart unless-stopped --env-file <tempfile> <image>:<buildId>`.
+2. Replace current container: `docker rm -f botblade-<project-slug>` (ignored if missing).
+3. Start container: `docker run -d --name botblade-<project-slug> --restart unless-stopped --env-file <tempfile> <image>:<buildId>`.
 
 Runtime semantics:
 

@@ -53,7 +53,7 @@ function targetFixture(): DeploymentTarget {
     id: "target_docker",
     name: "Docker Local",
     type: "local_docker",
-    config: { image: "royalscepter/test-bot" },
+    config: { image: "botblade/test-bot" },
     secretRefs: ["secret_extra"],
     createdAt: now,
     updatedAt: now,
@@ -89,9 +89,9 @@ test("local_docker deploy builds image, injects secretRefs through env-file, and
     resolveSecretRef: (id) => id === "secret_discord" ? { id, name: "DISCORD_TOKEN", value: "discord-secret-value" } : { id, name: "EXTRA_TOKEN", value: "extra-secret-value" },
   });
 
-  assert.ok(commands.some((command) => command === "docker build -t royalscepter/test-bot:build_current -f Dockerfile ."));
-  assert.ok(commands.some((command) => command.startsWith("docker run -d --name royalscepter-deploy-adapter-test --restart unless-stopped --env-file ")));
-  assert.equal(lines.some((line) => line.includes("Started container royalscepter-deploy-adapter-test")), true);
+  assert.ok(commands.some((command) => command === "docker build -t botblade/test-bot:build_current -f Dockerfile ."));
+  assert.ok(commands.some((command) => command.startsWith("docker run -d --name botblade-deploy-adapter-test --restart unless-stopped --env-file ")));
+  assert.equal(lines.some((line) => line.includes("Started container botblade-deploy-adapter-test")), true);
   assert.equal(commands.join("\n").includes("discord-secret-value"), false);
   await fs.rm(workspace, { recursive: true, force: true });
 });
@@ -124,7 +124,7 @@ test("local_docker status, logs, restart, and rollback call Docker with determin
 
   assert.equal(status.status, "running");
   assert.equal(logs, "bot ready");
-  assert.ok(commands.includes("docker restart royalscepter-deploy-adapter-test"));
-  assert.ok(commands.some((command) => command.endsWith("royalscepter/test-bot:build_previous")));
+  assert.ok(commands.includes("docker restart botblade-deploy-adapter-test"));
+  assert.ok(commands.some((command) => command.endsWith("botblade/test-bot:build_previous")));
   await fs.rm(workspace, { recursive: true, force: true });
 });

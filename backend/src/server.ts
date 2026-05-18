@@ -16,7 +16,7 @@ import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput,
 import { validateProject } from "./services/projectValidation.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
-const persistence = process.env.NODE_ENV === "test" && !process.env.ROYALSCEPTER_DATABASE_URL && !process.env.DATABASE_URL ? undefined : SqlitePersistence.fromUrl();
+const persistence = process.env.NODE_ENV === "test" && !process.env.BOTBLADE_DATABASE_URL && !process.env.DATABASE_URL ? undefined : SqlitePersistence.fromUrl();
 const projectStore = new ProjectStore(persistence);
 const secretStore = new SecretStore(persistence);
 const fileService = new ProjectFileService();
@@ -49,7 +49,7 @@ export function createRequestListener() {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  createServer(createRequestListener()).listen(port, () => console.info(JSON.stringify({ level: "info", message: "royalScepter backend listening", port })));
+  createServer(createRequestListener()).listen(port, () => console.info(JSON.stringify({ level: "info", message: "botBlade backend listening", port })));
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, requestId: string): Promise<void> {

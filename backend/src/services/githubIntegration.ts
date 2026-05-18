@@ -22,7 +22,7 @@ class GitCliGitHubClient implements GitHubClient {
     const branch = project.github?.defaultBranch || "main";
     const workspace = path.join(this.workspaceRoot, project.id.replace(/[^A-Za-z0-9_-]/g, "_"));
     await fs.mkdir(workspace, { recursive: true });
-    const files = { ...templateFiles(project), ".github/workflows/royalscepter-build.yml": workflowContent(branch) };
+    const files = { ...templateFiles(project), ".github/workflows/botblade-build.yml": workflowContent(branch) };
     for (const [relativePath, content] of Object.entries(files)) {
       const target = path.join(workspace, relativePath);
       await fs.mkdir(path.dirname(target), { recursive: true });
@@ -32,9 +32,9 @@ class GitCliGitHubClient implements GitHubClient {
     execFileSync("git", ["-C", workspace, "init"]);
     execFileSync("git", ["-C", workspace, "checkout", "-B", branch]);
     execFileSync("git", ["-C", workspace, "add", "."]);
-    execFileSync("git", ["-C", workspace, "config", "user.email", "royalscepter-bot@users.noreply.github.com"]);
-    execFileSync("git", ["-C", workspace, "config", "user.name", "royalScepter Bot"]);
-    execFileSync("git", ["-C", workspace, "commit", "-m", "chore: generate royalScepter project"]);
+    execFileSync("git", ["-C", workspace, "config", "user.email", "botblade-bot@users.noreply.github.com"]);
+    execFileSync("git", ["-C", workspace, "config", "user.name", "botBlade Bot"]);
+    execFileSync("git", ["-C", workspace, "commit", "-m", "chore: generate botBlade project"]);
     try { execFileSync("git", ["-C", workspace, "remote", "remove", "origin"]); } catch {}
     execFileSync("git", ["-C", workspace, "remote", "add", "origin", remoteUrl]);
     execFileSync("git", ["-C", workspace, "push", "--set-upstream", "origin", branch, "--force"]);
@@ -96,10 +96,10 @@ export class GitHubIntegrationService {
 
   workflow(project: BotProject): { path: string; content: string } {
     if (!project.github?.owner || !project.github?.repo) throw { statusCode: 400, code: "GITHUB_REPO_NOT_LINKED", message: "Link owner/repo before creating workflow content.", details: {} };
-    return { path: ".github/workflows/royalscepter-build.yml", content: workflowContent(project.github?.defaultBranch || "main") };
+    return { path: ".github/workflows/botblade-build.yml", content: workflowContent(project.github?.defaultBranch || "main") };
   }
 }
 
-function workflowContent(branch: string): string { return `name: royalScepter Build\n\non:\n  push:\n    branches: [${branch}]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n      - run: npm ci\n      - run: npm run build\n`; }
+function workflowContent(branch: string): string { return `name: botBlade Build\n\non:\n  push:\n    branches: [${branch}]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n      - run: npm ci\n      - run: npm run build\n`; }
 
 function notConfigured(): never { throw { statusCode: 400, code: "NOT_CONFIGURED", message: "Configure a GitHub token secret reference before running this operation.", details: {} }; }

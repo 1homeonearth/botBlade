@@ -1,8 +1,8 @@
-# royalScepter Security
+# botBlade Security
 
 ## API authentication and authorization
 
-All backend API routes except `GET /api/health` and `GET /api/version` require a bearer token or session credential. Configure bearer credentials with `ROYALSCEPTER_AUTH_TOKENS` (preferred JSON format) or the legacy `ROYALSCEPTER_API_TOKEN` / `ROYALSCEPTER_API_TOKENS` variables. Configure session credentials with `ROYALSCEPTER_SESSION_TOKENS`, then send them as `Cookie: royalScepterSession=<session-token>` or `x-session-token: <session-token>`.
+All backend API routes except `GET /api/health` and `GET /api/version` require a bearer token or session credential. Configure bearer credentials with `BOTBLADE_AUTH_TOKENS` (preferred JSON format) or the legacy `BOTBLADE_API_TOKEN` / `BOTBLADE_API_TOKENS` variables. Configure session credentials with `BOTBLADE_SESSION_TOKENS`, then send them as `Cookie: botBladeSession=<session-token>` or `x-session-token: <session-token>`.
 
 Credential objects should include `token`, `actorId` or `userId`, optional `tokenId`, `roles`, and `projectIds`. Use `roles: ["admin"]` or `projectIds: ["*"]` only for trusted local administrators. Project-scoped credentials must list allowed project IDs and are denied before project routes, runtime/deployment/build/GitHub routes, audit records, project secrets, and other protected resources are accessed.
 
@@ -59,4 +59,4 @@ Deployment targets accept `secretRefs` for credentials. Target `config` rejects 
 
 ## Android API client configuration
 
-`RoyalScepterApiClient` accepts a bearer token or a session token in its constructor and applies it to every API call. Leave `ApiConfig.DEFAULT_BEARER_TOKEN` and `ApiConfig.DEFAULT_SESSION_TOKEN` empty in committed source; for local debug builds, inject a short-lived development token through local-only Gradle, IDE, or dependency-injection configuration. Prefer bearer tokens for API tooling and session tokens only when the backend has issued a session credential.
+`BotBladeApiClient` accepts a bearer token or a session token in its constructor and applies it to every API call. Leave `ApiConfig.DEFAULT_BEARER_TOKEN` and `ApiConfig.DEFAULT_SESSION_TOKEN` empty in committed source; for local debug builds, inject a short-lived development token through local-only Gradle, IDE, or dependency-injection configuration. Prefer bearer tokens for API tooling and session tokens only when the backend has issued a session credential.

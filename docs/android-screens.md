@@ -22,7 +22,7 @@ Central place for local backend configuration and future account/environment set
 
 ### GitHub display manual verification
 
-When verifying the Projects and Settings GitHub UI manually, load or stub an active project whose GitHub object has only one repository identifier populated, such as `owner = "princess"` with `repo = ""` or `owner = ""` with `repo = "royal-scepter"`. Both the Projects card GitHub row and the Settings GitHub status line should show the `github_not_linked` text (`not linked`) instead of a partial `owner/repo` value, and the GitHub push/workflow actions should remain disabled until both owner and repo are non-blank.
+When verifying the Projects and Settings GitHub UI manually, load or stub an active project whose GitHub object has only one repository identifier populated, such as `owner = "princess"` with `repo = ""` or `owner = ""` with `repo = "bot-blade"`. Both the Projects card GitHub row and the Settings GitHub status line should show the `github_not_linked` text (`not linked`) instead of a partial `owner/repo` value, and the GitHub push/workflow actions should remain disabled until both owner and repo are non-blank.
 
 ## Secrets UI
 

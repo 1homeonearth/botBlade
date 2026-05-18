@@ -1,4 +1,4 @@
--- Durable metadata tables for royalScepter.
+-- Durable metadata tables for botBlade.
 -- Secrets are split so normal query tables contain summaries/fingerprints only; encrypted_value is stored separately.
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,
