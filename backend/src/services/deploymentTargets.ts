@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { RequestValidationError } from "./projectStore.js";
 import type { DeploymentTargetStorePersistence } from "./persistence.js";
+import { capabilitiesForTargetType, type DeploymentAdapterCapabilities } from "./deploymentAdapters.js";
 
 export type DeploymentTargetType = "local_process" | "local_docker";
 export const supportedDeploymentTargetTypes = ["local_process", "local_docker"] as const;
@@ -14,6 +15,7 @@ export interface DeploymentTarget {
   secretRefs: string[];
   createdAt: string;
   updatedAt: string;
+  capabilities?: DeploymentAdapterCapabilities;
 }
 
 export interface DeploymentTargetTestResult {
@@ -119,3 +121,7 @@ function validateTargetConfig(type: DeploymentTargetType, config: Record<string,
 }
 
 function asRecord(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
+
+export function deploymentTargetWithCapabilities(target: DeploymentTarget): DeploymentTarget {
+  return { ...target, capabilities: capabilitiesForTargetType(target.type) };
+}

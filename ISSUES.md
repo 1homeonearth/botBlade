@@ -96,3 +96,11 @@
   - Replaced `import.meta.url` migration resolution with a `process.cwd()`-based lookup that works from repo root and `backend/` cwd.
   - Reran `npm --prefix backend run build` and `npm --prefix backend test` successfully.
 - **Resolution notes:** Complete; no dependency installation was needed.
+- **Repeat occurrence 2026-05-18T10:02:18Z:** Pre-session unresolved issue review repeated the Android SDK preflight before deployment adapter work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
+- **Repeat occurrence 2026-05-18T10:18:47Z:** Android verification for deployment UI changes hit the same missing SDK limitation.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.

@@ -20,6 +20,9 @@ class DeploymentRepository(
     suspend fun createDeployment(projectId: String, targetId: String, buildId: String): ApiResult<DeploymentJobSummary> = apiCall { apiClient.createDeployment(projectId, DeploymentCreateRequest(targetId, buildId)) }
     suspend fun listDeployments(projectId: String): ApiResult<List<DeploymentJobSummary>> = apiCall { apiClient.listDeployments(projectId) }
     suspend fun getDeploymentLogs(projectId: String, deploymentId: String): ApiResult<String> = apiCall { apiClient.getDeploymentLogs(projectId, deploymentId) }
+    suspend fun getDeploymentStatus(projectId: String, deploymentId: String) = apiCall { apiClient.getDeploymentStatus(projectId, deploymentId) }
+    suspend fun restartDeployment(projectId: String, deploymentId: String) = apiCall { apiClient.deploymentAction(projectId, deploymentId, "restart") }
+    suspend fun rollbackDeployment(projectId: String, deploymentId: String) = apiCall { apiClient.deploymentAction(projectId, deploymentId, "rollback") }
     suspend fun getGitHubStatus() = apiCall { apiClient.getGitHubStatus() }
 
     private suspend fun <T> apiCall(block: () -> T): ApiResult<T> = withContext(Dispatchers.IO) {

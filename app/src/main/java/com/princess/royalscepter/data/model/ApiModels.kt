@@ -176,10 +176,17 @@ data class RuntimeStatusResponse(
     val message: String? = null,
 )
 
+data class DeploymentAdapterCapabilities(
+    val supported: Boolean = false,
+    val actions: Map<String, Boolean> = emptyMap(),
+    val notes: List<String> = emptyList(),
+)
+
 data class DeploymentTargetSummary(
     val id: String,
     val name: String,
     val type: String,
+    val capabilities: DeploymentAdapterCapabilities = DeploymentAdapterCapabilities(),
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )
@@ -204,6 +211,12 @@ data class DeploymentJobSummary(
     val createdAt: String? = null,
     val finishedAt: String? = null,
     val errorMessage: String? = null,
+)
+
+data class DeploymentActionResponse(
+    val status: String? = null,
+    val running: Boolean = false,
+    val message: String? = null,
 )
 
 data class DeploymentCreateRequest(
