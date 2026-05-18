@@ -99,3 +99,8 @@
   - Command: `./scripts/android-sdk-preflight.sh`
   - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
   - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T11:05:00Z:** Pre-session unresolved issue review for this task retried the SDK preflight before implementation.
+  - Commands: `./scripts/android-sdk-preflight.sh`, `printf 'sdk.dir=/root/android-sdk\n' > local.properties`, `./scripts/android-sdk-preflight.sh`
+  - Result: first run reported `ANDROID_HOME is not set and no sdk.dir was found`; second run reported `ANDROID_HOME does not point to an existing directory: /root/android-sdk`.
+  - Solution attempt: added repo-local `local.properties` pointing to `/root/android-sdk` and reran preflight.
+  - Status: Incomplete — Android SDK path is still unavailable in this shell, so Android Gradle checks remain blocked.

@@ -30,7 +30,7 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
   const value = secretStore.getValue(secretId);
   return summary && value !== undefined ? { id: summary.id, name: summary.name, value } : undefined;
 });
-const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
+const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
 const port = Number(process.env.PORT ?? 8000);
 
 export function createRequestListener() {
@@ -272,8 +272,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
     if (method === "POST" && action === "push") {
-      const result = githubService.push(project);
-      auditService.record({ action: "github.push", actorId: actor.id, projectId, resourceType: "github_repository", resourceId: `${project.github?.owner}/${project.github?.repo}`, metadata: { owner: project.github?.owner, repo: project.github?.repo }, requestId });
+      const result = await githubService.push(project, requestId);
       return writeJson(res, 200, result);
     }
     if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
