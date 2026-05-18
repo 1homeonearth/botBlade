@@ -6,6 +6,7 @@ import type { BotProject } from "../models/project.js";
 import { redactSecrets } from "./redaction.js";
 import { ProjectFileService } from "./projectFiles.js";
 import { validateProject } from "./projectValidation.js";
+import type { AuditAction } from "./auditService.js";
 
 export type BuildStatus = "queued" | "validating" | "installing" | "building" | "testing" | "packaging" | "succeeded" | "failed" | "canceled";
 
@@ -28,7 +29,7 @@ export class BuildService {
   private readonly jobs = new Map<string, BuildJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean) {}
+  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => void) {}
 
   list(projectId: string): BuildJob[] {
     return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
@@ -43,7 +44,7 @@ export class BuildService {
     return this.logs.get(buildId) ?? "";
   }
 
-  async create(project: BotProject, request: unknown): Promise<BuildJob> {
+  async create(project: BotProject, request: unknown, auditEventId = `audit_${randomUUID()}`, requestId = "system"): Promise<BuildJob> {
     const body = request && typeof request === "object" && !Array.isArray(request) ? request as Record<string, unknown> : {};
     const buildId = `build_${randomUUID()}`;
     const job: BuildJob = {
@@ -51,7 +52,7 @@ export class BuildService {
       projectId: project.id,
       status: "queued",
       logUrl: `/api/projects/${project.id}/builds/${buildId}/logs`,
-      auditEventId: `audit_${randomUUID()}`,
+      auditEventId,
       source: typeof body.source === "string" ? body.source : "current_project",
       clean: typeof body.clean === "boolean" ? body.clean : true,
       runTests: typeof body.runTests === "boolean" ? body.runTests : true,
@@ -61,11 +62,11 @@ export class BuildService {
       errorMessage: null,
     };
     this.jobs.set(project.id, [job, ...(this.jobs.get(project.id) ?? [])]);
-    await this.run(project, job);
+    await this.run(project, job, requestId);
     return job;
   }
 
-  private async run(project: BotProject, job: BuildJob): Promise<void> {
+  private async run(project: BotProject, job: BuildJob, requestId: string): Promise<void> {
     const append = (line: string) => this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(line)}\n`);
     try {
       job.status = "validating";
@@ -93,6 +94,14 @@ export class BuildService {
       append(`Build failed: ${job.errorMessage}`);
     } finally {
       job.finishedAt = new Date().toISOString();
+      this.audit?.({
+        action: job.status === "succeeded" ? "build.succeeded" : "build.failed",
+        projectId: project.id,
+        resourceType: "build",
+        resourceId: job.buildId,
+        metadata: { status: job.status, source: job.source, runTests: job.runTests, createDockerImage: job.createDockerImage, errorMessage: job.errorMessage },
+        requestId,
+      });
     }
   }
 }

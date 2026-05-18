@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import crypto from "node:crypto";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
+import { AuditService } from "./services/auditService.js";
 import { BuildService } from "./services/buildService.js";
 import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./services/commandDefinitions.js";
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
@@ -16,32 +17,42 @@ import { validateProject } from "./services/projectValidation.js";
 const projectStore = new ProjectStore();
 const secretStore = new SecretStore();
 const fileService = new ProjectFileService();
-const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId));
+const auditService = new AuditService();
+const auditFromService = (event: { action: Parameters<AuditService["record"]>[0]["action"]; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => auditService.record(event);
+const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId), auditFromService);
 const runtimeService = new LocalProcessRuntimeService(fileService, (secretId) => secretStore.getValue(secretId));
 const targetStore = new DeploymentTargetStore();
-const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService);
+const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService);
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
 const port = Number(process.env.PORT ?? 8000);
 
-createServer(async (req, res) => {
-  const requestId = typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"] : crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  res.setHeader("content-type", "application/json");
-  try {
-    await handleRequest(req, res);
-    console.info(redactSecrets(JSON.stringify({ level: "info", requestId, method: req.method, url: req.url })));
-  } catch (error) {
-    writeError(res, error, requestId);
-  }
-}).listen(port, () => console.info(JSON.stringify({ level: "info", message: "royalScepter backend listening", port })));
+export function createRequestListener() {
+  return async (req: IncomingMessage, res: ServerResponse) => {
+    const requestId = typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"] : crypto.randomUUID();
+    res.setHeader("x-request-id", requestId);
+    res.setHeader("content-type", "application/json");
+    try {
+      await handleRequest(req, res, requestId);
+      console.info(redactSecrets(JSON.stringify({ level: "info", requestId, method: req.method, url: req.url })));
+    } catch (error) {
+      console.error(redactSecrets(JSON.stringify({ level: "error", requestId, method: req.method, url: req.url, message: error instanceof Error ? error.message : "Request failed" })));
+      writeError(res, error, requestId);
+    }
+  };
+}
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+if (process.env.NODE_ENV !== "test") {
+  createServer(createRequestListener()).listen(port, () => console.info(JSON.stringify({ level: "info", message: "royalScepter backend listening", port })));
+}
+
+async function handleRequest(req: IncomingMessage, res: ServerResponse, requestId: string): Promise<void> {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
 
   if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
+  if (method === "GET" && path === "/api/audit-events") return writeJson(res, 200, { auditEvents: auditService.list() });
 
   if (method === "GET" && path === "/api/github/status") return writeJson(res, 200, githubService.status());
   if (method === "POST" && path === "/api/github/connect") return writeJson(res, 200, githubService.connect(await readJson(req)));
@@ -76,26 +87,45 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   if (method === "GET" && path === "/api/secrets") return writeJson(res, 200, { secrets: secretStore.list() });
-  if (method === "POST" && path === "/api/secrets") return writeJson(res, 201, secretStore.create(parseCreateSecretInput(await readJson(req))));
+  if (method === "POST" && path === "/api/secrets") {
+    const secret = secretStore.create(parseCreateSecretInput(await readJson(req)));
+    const audit = auditService.record({ action: "secret.create", projectId: secret.projectId, resourceType: "secret", resourceId: secret.id, metadata: { name: secret.name, type: secret.type, storageMode: secret.storageMode, fingerprint: secret.fingerprint }, requestId });
+    return writeJson(res, 201, { ...secret, auditEventId: audit.id });
+  }
   const secretMatch = path.match(/^\/api\/secrets\/([^/]+)(?:\/(rotate))?$/);
   if (secretMatch) {
     const [, secretId, action] = secretMatch;
     if (method === "GET" && !action) return writeJson(res, 200, secretStore.get(secretId) ?? notFoundSecret(secretId));
     if (method === "PATCH" && !action) return writeJson(res, 200, secretStore.update(secretId, parseUpdateSecretInput(await readJson(req))) ?? notFoundSecret(secretId));
     if (method === "DELETE" && !action) {
+      const existing = secretStore.get(secretId);
       if (!secretStore.delete(secretId)) throw notFoundSecret(secretId);
+      auditService.record({ action: "secret.delete", projectId: existing?.projectId ?? null, resourceType: "secret", resourceId: secretId, metadata: { name: existing?.name, type: existing?.type }, requestId });
       res.statusCode = 204;
       res.end();
       return;
     }
-    if (method === "POST" && action === "rotate") return writeJson(res, 200, secretStore.rotate(secretId, parseRotateSecretInput(await readJson(req))) ?? notFoundSecret(secretId));
+    if (method === "POST" && action === "rotate") {
+      const secret = secretStore.rotate(secretId, parseRotateSecretInput(await readJson(req))) ?? notFoundSecret(secretId);
+      const audit = auditService.record({ action: "secret.rotate", projectId: secret.projectId, resourceType: "secret", resourceId: secret.id, metadata: { name: secret.name, type: secret.type, fingerprint: secret.fingerprint }, requestId });
+      return writeJson(res, 200, { ...secret, auditEventId: audit.id });
+    }
   }
 
   if (method === "GET" && path === "/api/projects") return writeJson(res, 200, { projects: projectStore.list() });
   if (method === "POST" && path === "/api/projects") {
     const input = parseCreateProjectInput(await readJson(req));
     if (input.discord?.tokenSecretRef && !secretStore.has(input.discord.tokenSecretRef)) throw new RequestValidationError([{ field: "discord.tokenSecretRef", message: "Secret reference does not exist." }]);
-    return writeJson(res, 201, projectStore.create(input));
+    const project = projectStore.create(input);
+    const audit = auditService.record({ action: "project.create", projectId: project.id, resourceType: "project", resourceId: project.id, metadata: { name: project.name, slug: project.slug, templateId: project.templateId }, requestId });
+    return writeJson(res, 201, { ...project, auditEventId: audit.id });
+  }
+
+  const auditMatch = path.match(/^\/api\/projects\/([^/]+)\/audit-events$/);
+  if (auditMatch) {
+    const [, projectId] = auditMatch;
+    if (!projectStore.get(projectId)) throw notFoundProject(projectId);
+    if (method === "GET") return writeJson(res, 200, { auditEvents: auditService.list(projectId) });
   }
 
   const fileMatch = path.match(/^\/api\/projects\/([^/]+)\/files(?:\/(.*))?$/);
@@ -113,7 +143,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const [, projectId, buildId, logs] = buildMatch;
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
-    if (method === "POST" && !buildId) return writeJson(res, 201, await buildService.create(project, await readJson(req)));
+    if (method === "POST" && !buildId) {
+      const body = await readJson(req);
+      const audit = auditService.record({ action: "build.start", projectId, resourceType: "build", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
+      const job = await buildService.create(project, body, audit.id, requestId);
+      audit.resourceId = job.buildId;
+      return writeJson(res, 201, job);
+    }
     if (method === "GET" && !buildId) return writeJson(res, 200, { builds: buildService.list(projectId) });
     if (method === "GET" && buildId && !logs) return writeJson(res, 200, buildService.get(projectId, buildId) ?? notFoundBuild(buildId));
     if (method === "GET" && buildId && logs) return writeJson(res, 200, { logs: buildService.getLogs(projectId, buildId) ?? notFoundBuild(buildId) });
@@ -125,9 +161,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && action === "status") return writeJson(res, 200, runtimeService.getStatus(projectId));
-    if (method === "POST" && action === "start") return writeJson(res, 200, await runtimeService.start(project));
-    if (method === "POST" && action === "stop") return writeJson(res, 200, await runtimeService.stop(projectId));
-    if (method === "POST" && action === "restart") return writeJson(res, 200, await runtimeService.restart(project));
+    if (method === "POST" && action === "start") { const status = await runtimeService.start(project); const audit = auditService.record({ action: "runtime.start", projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "stop") { const status = await runtimeService.stop(projectId); const audit = auditService.record({ action: "runtime.stop", projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "restart") { const status = await runtimeService.restart(project); const audit = auditService.record({ action: "runtime.restart", projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
     if (method === "GET" && action === "logs") return writeJson(res, 200, { logs: runtimeService.getLogs(projectId) });
   }
 
@@ -136,7 +172,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const [, projectId, deploymentId, action] = deploymentMatch;
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
-    if (method === "POST" && !deploymentId) return writeJson(res, 201, await deploymentStore.create(project, await readJson(req)));
+    if (method === "POST" && !deploymentId) {
+      const body = await readJson(req);
+      const audit = auditService.record({ action: "deployment.start", projectId, resourceType: "deployment", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
+      const job = await deploymentStore.create(project, body, audit.id, requestId);
+      audit.resourceId = job.deploymentId;
+      return writeJson(res, 201, job);
+    }
     if (method === "GET" && !deploymentId) return writeJson(res, 200, { deployments: deploymentStore.list(projectId) });
     if (method === "GET" && deploymentId && !action) return writeJson(res, 200, deploymentStore.get(projectId, deploymentId) ?? notFoundDeployment(deploymentId));
     if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, { logs: deploymentStore.getLogs(projectId, deploymentId) ?? notFoundDeployment(deploymentId) });
@@ -155,7 +197,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       validateCommands(commands);
       project.commands = commands;
       project.updatedAt = new Date().toISOString();
-      return writeJson(res, 201, command);
+      const audit = auditService.record({ action: "discord.commands.register", projectId, resourceType: "command", resourceId: command.id ?? command.name, metadata: { name: command.name, description: command.description }, requestId });
+      return writeJson(res, 201, { ...command, auditEventId: audit.id });
     }
     const index = project.commands.findIndex((command) => command.id === commandId);
     if (index < 0) throw notFoundCommand(commandId ?? "");
@@ -183,7 +226,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
-    if (method === "POST" && action === "push") return writeJson(res, 200, githubService.push(project));
+    if (method === "POST" && action === "push") {
+      const result = githubService.push(project);
+      auditService.record({ action: "github.push", projectId, resourceType: "github_repository", resourceId: `${project.github?.owner}/${project.github?.repo}`, metadata: { owner: project.github?.owner, repo: project.github?.repo }, requestId });
+      return writeJson(res, 200, result);
+    }
     if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
   }
 
@@ -194,7 +241,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (method === "PATCH" && !action) {
       const input = parseUpdateProjectInput(await readJson(req));
       if (input.discord?.tokenSecretRef && !secretStore.has(input.discord.tokenSecretRef)) throw new RequestValidationError([{ field: "discord.tokenSecretRef", message: "Secret reference does not exist." }]);
-      return writeJson(res, 200, projectStore.update(projectId, input) ?? notFoundProject(projectId));
+      const project = projectStore.update(projectId, input) ?? notFoundProject(projectId);
+      const audit = auditService.record({ action: "project.update", projectId, resourceType: "project", resourceId: projectId, metadata: input as Record<string, unknown>, requestId });
+      return writeJson(res, 200, { ...project, auditEventId: audit.id });
     }
     if (method === "DELETE" && !action) {
       if (!projectStore.delete(projectId)) throw notFoundProject(projectId);
@@ -202,8 +251,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       res.end();
       return;
     }
-    if (method === "POST" && action === "archive") return writeJson(res, 200, projectStore.archive(projectId) ?? notFoundProject(projectId));
-    if (method === "POST" && action === "clone") return writeJson(res, 201, projectStore.clone(projectId) ?? notFoundProject(projectId));
+    if (method === "POST" && action === "archive") { const project = projectStore.archive(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.archive", projectId, resourceType: "project", resourceId: projectId, metadata: { archivedAt: project.archivedAt }, requestId }); return writeJson(res, 200, { ...project, auditEventId: audit.id }); }
+    if (method === "POST" && action === "clone") { const clone = projectStore.clone(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.clone", projectId: clone.id, resourceType: "project", resourceId: clone.id, metadata: { sourceProjectId: projectId, name: clone.name, slug: clone.slug }, requestId }); return writeJson(res, 201, { ...clone, auditEventId: audit.id }); }
     if (method === "POST" && action === "validate") {
       const project = projectStore.get(projectId);
       if (!project) throw notFoundProject(projectId);
@@ -212,7 +261,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (method === "POST" && (action === "generate" || action === "regenerate")) {
       const project = projectStore.get(projectId);
       if (!project) throw notFoundProject(projectId);
-      return writeJson(res, 200, await fileService.generate(project, action === "regenerate"));
+      const audit = auditService.record({ action: "generate.start", projectId, resourceType: "project", resourceId: projectId, metadata: { force: action === "regenerate" }, requestId });
+      const result = await fileService.generate(project, action === "regenerate");
+      return writeJson(res, 200, { ...result, auditEventId: audit.id });
     }
   }
   throw { statusCode: 404, code: "NOT_FOUND", message: "Route not found.", details: {} };
