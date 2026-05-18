@@ -28,8 +28,8 @@ require_command() {
 }
 
 write_shell_exports() {
-  local marker_start="# >>> royalScepter Android SDK >>>"
-  local marker_end="# <<< royalScepter Android SDK <<<"
+  local marker_start="# >>> botBlade Android SDK >>>"
+  local marker_end="# <<< botBlade Android SDK <<<"
   local block
   block=$(cat <<EXPORTS
 $marker_start

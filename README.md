@@ -1,6 +1,6 @@
-# royalScepter
+# botBlade
 
-royalScepter is an Android-based Discord bot builder and deployment console. The repository contains:
+botBlade is an Android-based Discord bot builder and deployment console. The repository contains:
 
 - A native Android client for managing bot projects from a phone, tablet, emulator, or local debug device.
 - A local backend builder API that stores project metadata in memory, generates TypeScript Discord bot projects, edits generated files, validates projects, runs builds, manages local runtime controls, stores secret metadata, and records audit events for sensitive actions.
@@ -31,7 +31,7 @@ Future / not complete yet:
 
 ## Android app setup
 
-The Android app is in `app/` and uses Kotlin, AndroidX, AppCompat, Material Components, and native Android views. The package namespace is `com.princess.royalscepter`.
+The Android app is in `app/` and uses Kotlin, AndroidX, AppCompat, Material Components, and native Android views. The package namespace is `com.princess.botblade`.
 
 Build a debug APK from the repository root:
 
@@ -64,6 +64,13 @@ http://192.168.1.25:8000
 ```
 
 For a real device, start the backend on an address reachable from your LAN and enter `http://<host-lan-ip>:8000` in Settings. Keep this on a trusted development network; do not put credentials, tokens, query parameters, or fragments in the backend URL.
+
+
+## GitHub Actions APK builds and releases
+
+The repository includes `.github/workflows/android.yml`, which automatically prepares Java, Gradle, and the Android SDK on GitHub-hosted Ubuntu runners. On pushes to `main` and on pull requests, the workflow compiles Kotlin, assembles both debug and unsigned release APKs, stages them under `dist/apk/`, writes `SHA256SUMS.txt`, and uploads the APK set as a workflow artifact named `botBlade-apks-<commit-sha>`.
+
+Pushing a tag that starts with `v` (for example `v0.1.0`) also creates a GitHub Release for that tag and attaches the debug APK, unsigned release APK, and checksum file. The generated release APK is unsigned until a release-signing step and signing secrets are added.
 
 ## Backend setup
 

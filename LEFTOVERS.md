@@ -18,7 +18,7 @@
 
 4. **Android tests expansion**
    - Add/verify Robolectric/JUnit deps in `app/build.gradle.kts`.
-   - Add tests for `RoyalScepterApiClient` parsing helpers, `ActiveProjectStore` persistence, URL encoding, redaction, GitHub display formatting.
+   - Add tests for `BotBladeApiClient` parsing helpers, `ActiveProjectStore` persistence, URL encoding, redaction, GitHub display formatting.
    - Document Android test command in `README.md`.
 
 5. **Production deployment path completion**

@@ -1,16 +1,21 @@
-name: Android
+name: BotBlade Android APKs
 
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  android-debug-build:
+  android-apk-build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - name: Check out repository
@@ -66,10 +71,36 @@ jobs:
             gradle :app:compileDebugKotlin --stacktrace
           fi
 
-      - name: Assemble debug APK
+      - name: Assemble debug and release APKs
         run: |
           if [ -x ./gradlew ]; then
-            ./gradlew :app:assembleDebug --no-daemon --stacktrace
+            ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
           else
-            gradle :app:assembleDebug --stacktrace
+            gradle :app:assembleDebug :app:assembleRelease --stacktrace
           fi
+
+      - name: Stage APK outputs
+        run: |
+          mkdir -p dist/apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/apk/botBlade-debug-${{ github.sha }}.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/apk/botBlade-release-unsigned-${{ github.sha }}.apk
+          sha256sum dist/apk/*.apk | tee dist/apk/SHA256SUMS.txt
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: botBlade-apks-${{ github.sha }}
+          path: dist/apk/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish tagged GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" dist/apk/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "botBlade $TAG_NAME" \
+            --notes "Automated botBlade APK release for $TAG_NAME. The release APK is unsigned unless a signing step is added."

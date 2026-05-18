@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
-process.env.ROYALSCEPTER_AUTH_TOKENS = JSON.stringify([
+process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
   { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
   { token: "scoped-token", actorId: "scoped_user", roles: ["member"], projectIds: ["project_allowed"] },
 ]);
-process.env.ROYALSCEPTER_SESSION_TOKENS = JSON.stringify([{ token: "session-token", actorId: "session_user", roles: ["admin"], projectIds: ["*"] }]);
+process.env.BOTBLADE_SESSION_TOKENS = JSON.stringify([{ token: "session-token", actorId: "session_user", roles: ["admin"], projectIds: ["*"] }]);
 const { createRequestListener } = await import("../server.js");
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
@@ -15,7 +15,7 @@ async function request(method: Method, url: string, body?: unknown, options: { t
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
   const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${Math.random().toString(16).slice(2)}` };
   if (!options.unauthenticated) {
-    if (options.sessionToken) headers.cookie = `royalScepterSession=${encodeURIComponent(options.sessionToken)}`;
+    if (options.sessionToken) headers.cookie = `botBladeSession=${encodeURIComponent(options.sessionToken)}`;
     else headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
   }
   const req = {
@@ -58,7 +58,7 @@ test("project routes reject actors without project authorization", async () => {
 
 test("project routes allow authorized bearer and session actors", async () => {
   const created = await request("POST", "/api/projects", { name: "Authorization Allowed" });
-  process.env.ROYALSCEPTER_AUTH_TOKENS = JSON.stringify([
+  process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
     { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
     { token: "scoped-token", actorId: "scoped_user", roles: ["member"], projectIds: [created.body.id] },
   ]);
@@ -129,7 +129,7 @@ test("project PATCH preserves omitted nested config fields", async () => {
     },
     permissions: { intents: ["Guilds", "GuildMessages"], botPermissions: ["SendMessages", "ManageGuild"] },
     deployment: { targetId: "target_original", lastDeploymentId: "deployment_original" },
-    github: { owner: "royal", repo: "scepter", defaultBranch: "develop", lastPushedAt: "2026-05-01T00:00:00.000Z" },
+    github: { owner: "bot", repo: "blade", defaultBranch: "develop", lastPushedAt: "2026-05-01T00:00:00.000Z" },
   });
   assert.equal(created.statusCode, 201);
   const projectId = created.body.id;
@@ -155,8 +155,8 @@ test("project PATCH preserves omitted nested config fields", async () => {
   const githubPatched = await request("PATCH", `/api/projects/${projectId}`, { github: { defaultBranch: "main" } });
   assert.equal(githubPatched.statusCode, 200);
   assert.equal(githubPatched.body.github.defaultBranch, "main");
-  assert.equal(githubPatched.body.github.owner, "royal");
-  assert.equal(githubPatched.body.github.repo, "scepter");
+  assert.equal(githubPatched.body.github.owner, "bot");
+  assert.equal(githubPatched.body.github.repo, "blade");
   assert.equal(githubPatched.body.github.lastPushedAt, "2026-05-01T00:00:00.000Z");
 });
 

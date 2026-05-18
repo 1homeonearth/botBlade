@@ -1,8 +1,8 @@
-# royalScepter Design
+# botBlade Design
 
 ## Product vision
 
-royalScepter aims to make Discord bot creation and operation manageable from Android. A user should be able to create a bot project, define commands, store secret references, generate source code, build it, run it locally during development, and eventually deploy it to production adapters.
+botBlade aims to make Discord bot creation and operation manageable from Android. A user should be able to create a bot project, define commands, store secret references, generate source code, build it, run it locally during development, and eventually deploy it to production adapters.
 
 ## Architecture
 

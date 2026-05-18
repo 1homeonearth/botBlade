@@ -12,7 +12,7 @@ import type { BuildJob } from "../services/buildService.js";
 import type { DeploymentJob } from "../services/deploymentJobs.js";
 
 test("SQLite persistence survives store restart and keeps secret values encrypted", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "royalscepter-persistence-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "botblade-persistence-"));
   const dbPath = path.join(dir, "state.sqlite");
   const key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   const secretValue = "super-secret-value-that-must-not-leak";

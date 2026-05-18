@@ -166,7 +166,7 @@ function generatedWorkspace(projectId: string): string {
 
 function dockerImage(context: DeploymentAdapterContext): string {
   const configured = context.target.config.image;
-  return typeof configured === "string" && configured.trim() ? configured.trim() : `royalscepter/${context.project.slug}`;
+  return typeof configured === "string" && configured.trim() ? configured.trim() : `botblade/${context.project.slug}`;
 }
 
 function taggedImage(context: DeploymentAdapterContext): string {
@@ -179,7 +179,7 @@ function dockerfile(context: DeploymentAdapterContext): string {
 }
 
 function containerName(context: DeploymentAdapterContext): string {
-  return `royalscepter-${context.project.slug}`.replace(/[^a-zA-Z0-9_.-]/g, "-").slice(0, 128);
+  return `botblade-${context.project.slug}`.replace(/[^a-zA-Z0-9_.-]/g, "-").slice(0, 128);
 }
 
 async function removeContainer(context: DeploymentAdapterContext): Promise<void> {
@@ -202,7 +202,7 @@ async function writeSecretEnvFile(context: DeploymentAdapterContext): Promise<st
     if (!secret) throw structuredError("SECRET_REF_NOT_FOUND", `Secret reference '${context.project.discord.tokenSecretRef}' was not found.`);
     env.DISCORD_TOKEN = secret.value;
   }
-  const envFile = path.join(generatedWorkspace(context.project.id), `.royalscepter-deploy-${context.build.buildId}.env`);
+  const envFile = path.join(generatedWorkspace(context.project.id), `.botblade-deploy-${context.build.buildId}.env`);
   await fs.writeFile(envFile, Object.entries(env).map(([key, value]) => `${key}=${escapeEnvValue(value)}`).join("\n"), "utf8");
   return envFile;
 }

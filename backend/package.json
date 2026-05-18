@@ -1,7 +1,7 @@
 {
-  "name": "royalscepter-backend",
+  "name": "botblade-backend",
   "version": "0.1.0",
-  "description": "Local builder service skeleton for royalScepter Discord bot projects.",
+  "description": "Local builder service skeleton for botBlade Discord bot projects.",
   "type": "module",
   "engines": {
     "node": ">=22"

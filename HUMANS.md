@@ -1,4 +1,4 @@
-# royalScepter Android compile handoff
+# botBlade Android compile handoff
 
 Current branch includes the Android slash-command and GitHub settings polish from the latest commits. Backend tests pass, and Android resource XML parsing passes locally, but Android compilation is still blocked by this container's network/proxy restrictions around Android SDK downloads.
 
@@ -19,7 +19,7 @@ Current branch includes the Android slash-command and GitHub settings polish fro
 
 Copy/paste this:
 
-> Continue from `/workspace/royalScepter` on the current branch. First inspect `git status` and `HUMANS.md`. The latest work added Android slash-command management and GitHub settings polish. Android compilation is blocked in this container because SDK downloads from `dl.google.com` and apt repositories return HTTP 403 via the proxy, even when `ANDROID_HOME=/workspace/android-sdk` is set. `app/build.gradle.kts` now pins `buildToolsVersion = "35.0.0"`. If you have an environment with Android SDK access, install `platforms;android-35`, `build-tools;35.0.0`, and `platform-tools`, set `ANDROID_HOME` to that SDK, then run `gradle :app:compileDebugKotlin`. If compilation fails with Kotlin/resource errors, fix them, rerun backend tests and Android compile, then commit and open a PR. Preserve no-raw-token/no-secret logging behavior and do not fake GitHub push success.
+> Continue from `/workspace/botBlade` on the current branch. First inspect `git status` and `HUMANS.md`. The latest work added Android slash-command management and GitHub settings polish. Android compilation is blocked in this container because SDK downloads from `dl.google.com` and apt repositories return HTTP 403 via the proxy, even when `ANDROID_HOME=/workspace/android-sdk` is set. `app/build.gradle.kts` now pins `buildToolsVersion = "35.0.0"`. If you have an environment with Android SDK access, install `platforms;android-35`, `build-tools;35.0.0`, and `platform-tools`, set `ANDROID_HOME` to that SDK, then run `gradle :app:compileDebugKotlin`. If compilation fails with Kotlin/resource errors, fix them, rerun backend tests and Android compile, then commit and open a PR. Preserve no-raw-token/no-secret logging behavior and do not fake GitHub push success.
 
 ## Commands worth rerunning in an SDK-enabled environment
 
