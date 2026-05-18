@@ -9,6 +9,9 @@ fail() {
 Android SDK preflight failed: $1
 
 Install the required Android SDK packages, then rerun this check:
+  ./scripts/android-sdk-bootstrap.sh
+
+Or install manually with:
   sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
 Set ANDROID_HOME to your Android SDK root, for example:
@@ -17,13 +20,26 @@ Set ANDROID_HOME to your Android SDK root, for example:
 Optional local setup may use an untracked local.properties file containing:
   sdk.dir=/path/to/android-sdk
 
+If direct Google downloads are blocked, run the bootstrap script with ANDROID_CMDLINE_TOOLS_URL pointing at an approved mirror.
+
 See docs/android-sdk-setup.md for the full bootstrap guide.
 MESSAGE
   exit 1
 }
 
+if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
+  ANDROID_HOME="$ANDROID_SDK_ROOT"
+fi
+
+if [[ -z "${ANDROID_HOME:-}" && -f local.properties ]]; then
+  sdk_dir_line=$(sed -n 's/^sdk\.dir=//p' local.properties | tail -n 1)
+  if [[ -n "$sdk_dir_line" ]]; then
+    ANDROID_HOME="$sdk_dir_line"
+  fi
+fi
+
 if [[ -z "${ANDROID_HOME:-}" ]]; then
-  fail 'ANDROID_HOME is not set.'
+  fail 'ANDROID_HOME is not set and no sdk.dir was found in local.properties.'
 fi
 
 if [[ ! -d "$ANDROID_HOME" ]]; then

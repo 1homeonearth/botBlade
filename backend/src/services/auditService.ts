@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { redactSecrets } from "./redaction.js";
+import type { AuditServicePersistence, AuditServicePort } from "./persistence.js";
 
 export type AuditAction =
   | "project.create"
@@ -44,8 +45,12 @@ export interface AuditInput {
   requestId: string;
 }
 
-export class AuditService {
+export class AuditService implements AuditServicePort {
   private readonly events: AuditEvent[] = [];
+
+  constructor(private readonly persistence?: AuditServicePersistence) {
+    this.events.push(...(persistence?.loadAuditEvents() ?? []));
+  }
 
   record(input: AuditInput): AuditEvent {
     const event: AuditEvent = {
@@ -60,6 +65,7 @@ export class AuditService {
       requestId: input.requestId,
     };
     this.events.unshift(event);
+    this.persistence?.saveAuditEvent(event);
     return event;
   }
 

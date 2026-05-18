@@ -1,6 +1,7 @@
 import crypto, { randomUUID } from "node:crypto";
 import { registerSecretValue, unregisterSecretValue } from "./redaction.js";
 import { RequestValidationError } from "./projectStore.js";
+import type { SecretRecord, SecretStorePersistence, SecretStorePort } from "./persistence.js";
 
 export const supportedSecretTypes = new Set([
   "discord_bot_token",
@@ -24,7 +25,7 @@ export interface SecretSummary {
   rotatedAt: string | null;
 }
 
-interface StoredSecret extends SecretSummary {
+export interface StoredSecret extends SecretSummary {
   value: string;
 }
 
@@ -41,8 +42,15 @@ export interface UpdateSecretInput {
   type?: string;
 }
 
-export class SecretStore {
+export class SecretStore implements SecretStorePort {
   private readonly secrets = new Map<string, StoredSecret>();
+
+  constructor(private readonly persistence?: SecretStorePersistence) {
+    for (const secret of persistence?.loadSecrets() ?? []) {
+      this.secrets.set(secret.id, secret as SecretRecord);
+      registerSecretValue(secret.value);
+    }
+  }
 
   list(): SecretSummary[] {
     return [...this.secrets.values()].map(toSummary).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -78,6 +86,7 @@ export class SecretStore {
     };
     this.secrets.set(secret.id, secret);
     registerSecretValue(input.value);
+    this.persistence?.saveSecret(secret);
     return toSummary(secret);
   }
 
@@ -94,6 +103,7 @@ export class SecretStore {
       updatedAt: new Date().toISOString(),
     };
     this.secrets.set(secretId, updated);
+    this.persistence?.saveSecret(updated);
     return toSummary(updated);
   }
 
@@ -106,13 +116,16 @@ export class SecretStore {
     const now = new Date().toISOString();
     const updated: StoredSecret = { ...existing, value, fingerprint: fingerprint(value), updatedAt: now, rotatedAt: now };
     this.secrets.set(secretId, updated);
+    this.persistence?.saveSecret(updated);
     return toSummary(updated);
   }
 
   delete(secretId: string): boolean {
     const existing = this.secrets.get(secretId);
     if (existing) unregisterSecretValue(existing.value);
-    return this.secrets.delete(secretId);
+    const deleted = this.secrets.delete(secretId);
+    if (deleted) this.persistence?.deleteSecret(secretId);
+    return deleted;
   }
 }
 

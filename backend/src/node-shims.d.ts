@@ -1,7 +1,3 @@
-declare module "node:crypto" {
-  export function randomUUID(): string;
-}
-
 declare module "node:http" {
   export interface IncomingMessage {
     method?: string;
@@ -19,7 +15,7 @@ declare module "node:http" {
 
 declare class Buffer extends Uint8Array {
   static isBuffer(value: unknown): value is Buffer;
-  static from(value: unknown): Buffer;
+  static from(value: unknown, encoding?: string): Buffer;
   static concat(chunks: Buffer[]): Buffer;
   toString(encoding?: string): string;
 }
@@ -28,6 +24,7 @@ declare class Buffer extends Uint8Array {
 declare const console: {
   info(message?: unknown, ...optionalParams: unknown[]): void;
   error(message?: unknown, ...optionalParams: unknown[]): void;
+  warn(message?: unknown, ...optionalParams: unknown[]): void;
 };
 
 declare class URL {
@@ -46,6 +43,19 @@ declare module "node:assert/strict" {
     ok(value: unknown, message?: string): void;
   };
   export default assert;
+}
+
+
+declare module "node:fs" {
+  export function mkdirSync(path: string, options?: { recursive?: boolean }): void;
+  export function readdirSync(path: string | URL): string[];
+  export function readFileSync(path: string | URL, encoding: string): string;
+  export function mkdtempSync(prefix: string): string;
+  export function existsSync(path: string): boolean;
+}
+
+declare module "node:os" {
+  export function tmpdir(): string;
 }
 
 declare module "node:fs/promises" {
@@ -69,8 +79,12 @@ declare module "node:path" {
 
 declare module "node:crypto" {
   export default crypto;
-  export function createHash(algorithm: string): { update(data: string): { digest(encoding: "hex"): string } };
-  const crypto: { randomUUID(): string; createHash(algorithm: string): { update(data: string): { digest(encoding: "hex"): string } } };
+  export function randomUUID(): string;
+  export function randomBytes(size: number): Buffer;
+  export function createHash(algorithm: string): { update(data: string): { digest(): Buffer; digest(encoding: "hex"): string } };
+  export function createCipheriv(algorithm: string, key: Buffer, iv: Buffer): { update(data: string, inputEncoding: string): Buffer; final(): Buffer; getAuthTag(): Buffer };
+  export function createDecipheriv(algorithm: string, key: Buffer, iv: Buffer): { setAuthTag(tag: Buffer): void; update(data: Buffer): Buffer; final(): Buffer };
+  const crypto: { randomUUID(): string; randomBytes(size: number): Buffer; createHash(algorithm: string): { update(data: string): { digest(): Buffer; digest(encoding: "hex"): string } }; createCipheriv: typeof createCipheriv; createDecipheriv: typeof createDecipheriv };
 }
 
 declare module "node:child_process" {
@@ -86,6 +100,7 @@ declare module "node:child_process" {
     on(event: "error", listener: (error: Error) => void): this;
   }
   export function spawn(command: string, args?: string[], options?: { cwd?: string; shell?: boolean; env?: Record<string, string | undefined> }): ChildProcessWithoutNullStreams;
+  export function execFileSync(command: string, args?: string[], options?: { input?: string; encoding?: string }): string;
 }
 
 declare module "node:events" {

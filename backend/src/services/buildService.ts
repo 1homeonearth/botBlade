@@ -7,6 +7,7 @@ import { redactSecrets } from "./redaction.js";
 import { ProjectFileService } from "./projectFiles.js";
 import { validateProject } from "./projectValidation.js";
 import type { AuditAction } from "./auditService.js";
+import type { BuildServicePersistence } from "./persistence.js";
 
 export type BuildStatus = "queued" | "validating" | "installing" | "building" | "testing" | "packaging" | "succeeded" | "failed" | "canceled";
 
@@ -32,7 +33,12 @@ export class BuildService {
   private readonly jobs = new Map<string, BuildJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void, private readonly commandRunner: CommandRunner = runCommand) {}
+  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void, private readonly commandRunner: CommandRunner = runCommand, private readonly persistence?: BuildServicePersistence) {
+    for (const { job, logs } of persistence?.loadBuildJobs() ?? []) {
+      this.jobs.set(job.projectId, [job, ...(this.jobs.get(job.projectId) ?? [])]);
+      this.logs.set(job.buildId, logs);
+    }
+  }
 
   list(projectId: string): BuildJob[] {
     return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
@@ -65,12 +71,16 @@ export class BuildService {
       errorMessage: null,
     };
     this.jobs.set(project.id, [job, ...(this.jobs.get(project.id) ?? [])]);
+    this.persist(job);
     await this.run(project, job, requestId, actorId);
     return job;
   }
 
   private async run(project: BotProject, job: BuildJob, requestId: string, actorId?: string): Promise<void> {
-    const append = (line: string) => this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(sanitizeUrlsInText(line))}\n`);
+    const append = (line: string) => {
+      this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(sanitizeUrlsInText(line))}\n`);
+      this.persist(job);
+    };
     try {
       job.status = "validating";
       const validation = validateProject(project, this.secretExists);
@@ -103,6 +113,7 @@ export class BuildService {
       append(`Build failed: ${job.errorMessage}`);
     } finally {
       job.finishedAt = new Date().toISOString();
+      this.persist(job);
       this.audit?.({
         action: job.status === "succeeded" ? "build.succeeded" : "build.failed",
         projectId: project.id,
@@ -113,6 +124,10 @@ export class BuildService {
         actorId,
       });
     }
+  }
+
+  private persist(job: BuildJob): void {
+    this.persistence?.saveBuildJob(job, this.logs.get(job.buildId) ?? "");
   }
 }
 

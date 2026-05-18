@@ -2,6 +2,22 @@
 
 Use this guide to bootstrap a local Android SDK without checking machine-specific SDK paths into the repository.
 
+## Quick bootstrap
+
+From the repository root, the checked-in bootstrap script can download command-line tools, install this app's required SDK packages, write an untracked `local.properties`, and add `ANDROID_HOME`/`ANDROID_SDK_ROOT` exports to your shell profile:
+
+```bash
+./scripts/android-sdk-bootstrap.sh
+```
+
+If your network blocks direct Google downloads, provide an approved internal mirror of the command-line tools archive:
+
+```bash
+ANDROID_CMDLINE_TOOLS_URL=https://your-mirror/commandlinetools-linux-13114758_latest.zip ./scripts/android-sdk-bootstrap.sh
+```
+
+The rest of this document shows the same setup manually.
+
 ## 1. Install Android command-line tools
 
 1. Download the Android command-line tools for your operating system from the [Android Studio downloads page](https://developer.android.com/studio#command-tools).
@@ -65,10 +81,10 @@ This file is intentionally ignored by `.gitignore`; keep it local and do not com
 
 ## 5. Run the SDK preflight check
 
-Before compiling the app, run the checked-in preflight script:
+Before compiling the app, run the checked-in preflight script. It reads `ANDROID_HOME`, falls back to `ANDROID_SDK_ROOT`, and can also read `sdk.dir` from the untracked `local.properties` file:
 
 ```bash
-ANDROID_HOME=/path/to/android-sdk ./scripts/android-sdk-preflight.sh
+./scripts/android-sdk-preflight.sh
 ```
 
 The script fails early with a clear error if either required directory is missing:
