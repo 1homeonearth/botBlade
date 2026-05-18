@@ -14,7 +14,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.princess.royalscepter.R
+import com.princess.royalscepter.data.api.ApiConfig
 import com.princess.royalscepter.data.api.ApiResult
+import com.princess.royalscepter.data.api.RoyalScepterApiClient
 import com.princess.royalscepter.data.model.BotProject
 import com.princess.royalscepter.data.model.GitHubConnectRequest
 import com.princess.royalscepter.data.model.GitHubLinkRepoRequest
@@ -24,12 +26,17 @@ import com.princess.royalscepter.data.model.SecretSummary
 import com.princess.royalscepter.data.repository.ProjectRepository
 import com.princess.royalscepter.data.repository.SecretRepository
 import com.princess.royalscepter.data.store.ActiveProjectStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsFragment : Fragment() {
     private val secretRepository = SecretRepository()
     private val projectRepository = ProjectRepository()
     private lateinit var status: TextView
+    private lateinit var apiStatus: TextView
+    private lateinit var backendUrlInput: EditText
+    private lateinit var testConnectionButton: Button
     private lateinit var list: LinearLayout
     private lateinit var nameInput: EditText
     private lateinit var typeInput: EditText
@@ -61,6 +68,9 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         status = view.findViewById(R.id.secrets_status)
+        apiStatus = view.findViewById(R.id.api_settings_status)
+        backendUrlInput = view.findViewById(R.id.backend_url_input)
+        testConnectionButton = view.findViewById(R.id.test_backend_connection_button)
         list = view.findViewById(R.id.secrets_list_container)
         nameInput = view.findViewById(R.id.secret_name_input)
         typeInput = view.findViewById(R.id.secret_type_input)
@@ -75,8 +85,12 @@ class SettingsFragment : Fragment() {
         workflowButton = view.findViewById(R.id.create_github_workflow_button)
 
         valueInput.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        backendUrlInput.setText(ApiConfig.baseUrl)
+        apiStatus.text = getString(R.string.backend_url_current, ApiConfig.baseUrl)
         typeInput.setText("discord_bot_token")
         githubBranchInput.setText("main")
+        view.findViewById<Button>(R.id.save_backend_url_button).setOnClickListener { saveBackendUrl() }
+        testConnectionButton.setOnClickListener { testBackendConnection() }
         view.findViewById<Button>(R.id.create_secret_button).setOnClickListener { createSecret() }
         view.findViewById<Button>(R.id.connect_github_button).setOnClickListener { connectGitHub() }
         view.findViewById<Button>(R.id.link_github_repo_button).setOnClickListener { linkGitHubRepo() }
@@ -84,6 +98,37 @@ class SettingsFragment : Fragment() {
         pushGitHubButton.setOnClickListener { pushGitHub() }
         loadSecrets()
         loadGitHubSection()
+    }
+
+    private fun saveBackendUrl(): Boolean {
+        val candidate = backendUrlInput.text.toString()
+        val validationError = ApiConfig.validateBaseUrl(candidate)
+        if (validationError != null) {
+            backendUrlInput.error = validationError
+            apiStatus.text = validationError
+            return false
+        }
+
+        val savedUrl = ApiConfig.saveBaseUrl(candidate)
+        backendUrlInput.setText(savedUrl)
+        backendUrlInput.error = null
+        apiStatus.text = getString(R.string.backend_url_saved, savedUrl)
+        return true
+    }
+
+    private fun testBackendConnection() = lifecycleScope.launch {
+        if (!saveBackendUrl()) return@launch
+        val url = ApiConfig.baseUrl
+        apiStatus.text = getString(R.string.backend_url_testing, url)
+        testConnectionButton.isEnabled = false
+        val result = withContext(Dispatchers.IO) {
+            runCatching { RoyalScepterApiClient(baseUrl = url).getHealth() }
+        }
+        testConnectionButton.isEnabled = true
+        apiStatus.text = result.fold(
+            onSuccess = { health -> getString(R.string.backend_url_test_success, url, health.status) },
+            onFailure = { error -> getString(R.string.backend_url_test_failed, url, error.message ?: getString(R.string.unknown)) },
+        )
     }
 
     private fun loadSecrets() = lifecycleScope.launch {
