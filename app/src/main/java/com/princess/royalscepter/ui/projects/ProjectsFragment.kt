@@ -20,6 +20,7 @@ import com.princess.royalscepter.data.model.BotCommand
 import com.princess.royalscepter.data.model.BotProject
 import com.princess.royalscepter.data.model.CommandCreateRequest
 import com.princess.royalscepter.data.model.ProjectCreateRequest
+import com.princess.royalscepter.data.model.displayNameOrNull
 import com.princess.royalscepter.data.repository.ProjectRepository
 import com.princess.royalscepter.data.store.ActiveProjectStore
 import kotlinx.coroutines.launch
@@ -234,7 +235,7 @@ class ProjectsFragment : Fragment() {
         content.addView(TextView(requireContext()).apply { text = project.description.ifBlank { getString(R.string.project_no_description) } })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_runtime_value, project.runtime) })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_command_count_value, project.commands.size) })
-        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_github_value, project.github?.let { "${it.owner}/${it.repo}" } ?: getString(R.string.github_not_linked)) })
+        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_github_value, project.github?.displayNameOrNull() ?: getString(R.string.github_not_linked)) })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_command_registration_value, project.discord.commandRegistration) })
         if (project.archivedAt != null) content.addView(TextView(requireContext()).apply { text = getString(R.string.project_archived_value, project.archivedAt) })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_updated_value, project.updatedAt) })

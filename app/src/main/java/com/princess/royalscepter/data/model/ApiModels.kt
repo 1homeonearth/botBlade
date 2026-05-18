@@ -78,6 +78,12 @@ data class GitHubProjectConfig(
     val lastPushedAt: String? = null,
 )
 
+fun GitHubProjectConfig.displayNameOrNull(): String? {
+    val displayOwner = owner?.trim()
+    val displayRepo = repo?.trim()
+    return if (!displayOwner.isNullOrBlank() && !displayRepo.isNullOrBlank()) "$displayOwner/$displayRepo" else null
+}
+
 data class BotProject(
     val id: String,
     val name: String,
