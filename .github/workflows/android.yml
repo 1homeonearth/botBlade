@@ -48,7 +48,9 @@ jobs:
           ls -la "${ANDROID_HOME:-/tmp}/build-tools" || true
 
       - name: Install required Android SDK packages
-        run: sdkmanager --sdk_root "${ANDROID_SDK_ROOT:-$ANDROID_HOME}" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Preflight Android SDK packages
         run: ./scripts/android-sdk-preflight.sh
