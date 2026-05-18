@@ -113,6 +113,53 @@ test("project CRUD works and project create records audit event", async () => {
   assert.ok(events.body.auditEvents.some((event: { action: string; actorId: string }) => event.action === "project.create" && event.actorId === "admin_user"));
 });
 
+
+test("project PATCH preserves omitted nested config fields", async () => {
+  const secret = await request("POST", "/api/secrets", { name: "Nested Patch Discord", type: "discord_bot_token", value: "nested-patch-token" });
+  assert.equal(secret.statusCode, 201);
+
+  const created = await request("POST", "/api/projects", {
+    name: "Nested Patch Preserve",
+    discord: {
+      applicationId: "app_original",
+      clientId: "client_original",
+      defaultGuildId: "guild_original",
+      tokenSecretRef: secret.body.id,
+      commandRegistration: "global",
+    },
+    permissions: { intents: ["Guilds", "GuildMessages"], botPermissions: ["SendMessages", "ManageGuild"] },
+    deployment: { targetId: "target_original", lastDeploymentId: "deployment_original" },
+    github: { owner: "royal", repo: "scepter", defaultBranch: "develop", lastPushedAt: "2026-05-01T00:00:00.000Z" },
+  });
+  assert.equal(created.statusCode, 201);
+  const projectId = created.body.id;
+
+  const discordPatched = await request("PATCH", `/api/projects/${projectId}`, { discord: { defaultGuildId: "guild_next" } });
+  assert.equal(discordPatched.statusCode, 200);
+  assert.equal(discordPatched.body.discord.defaultGuildId, "guild_next");
+  assert.equal(discordPatched.body.discord.applicationId, "app_original");
+  assert.equal(discordPatched.body.discord.clientId, "client_original");
+  assert.equal(discordPatched.body.discord.tokenSecretRef, secret.body.id);
+  assert.equal(discordPatched.body.discord.commandRegistration, "global");
+
+  const permissionsPatched = await request("PATCH", `/api/projects/${projectId}`, { permissions: { intents: ["Guilds"] } });
+  assert.equal(permissionsPatched.statusCode, 200);
+  assert.equal(JSON.stringify(permissionsPatched.body.permissions.intents), JSON.stringify(["Guilds"]));
+  assert.equal(JSON.stringify(permissionsPatched.body.permissions.botPermissions), JSON.stringify(["SendMessages", "ManageGuild"]));
+
+  const deploymentPatched = await request("PATCH", `/api/projects/${projectId}`, { deployment: { targetId: "target_next" } });
+  assert.equal(deploymentPatched.statusCode, 200);
+  assert.equal(deploymentPatched.body.deployment.targetId, "target_next");
+  assert.equal(deploymentPatched.body.deployment.lastDeploymentId, "deployment_original");
+
+  const githubPatched = await request("PATCH", `/api/projects/${projectId}`, { github: { defaultBranch: "main" } });
+  assert.equal(githubPatched.statusCode, 200);
+  assert.equal(githubPatched.body.github.defaultBranch, "main");
+  assert.equal(githubPatched.body.github.owner, "royal");
+  assert.equal(githubPatched.body.github.repo, "scepter");
+  assert.equal(githubPatched.body.github.lastPushedAt, "2026-05-01T00:00:00.000Z");
+});
+
 test("secret create/rotate/delete audit and never return secret value", async () => {
   const secretValue = "test-secret-value-route-audit";
   const created = await request("POST", "/api/secrets", { name: "Discord", type: "discord_bot_token", value: secretValue });

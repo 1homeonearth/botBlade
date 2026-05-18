@@ -27,6 +27,10 @@
   - Commands: `./scripts/android-sdk-bootstrap.sh`, `curl -fL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip`, `apt-get update`, `./scripts/android-sdk-preflight.sh`.
   - Result: `ANDROID_HOME` and `ANDROID_SDK_ROOT` are now exported for new login shells via `/root/.bash_profile`, and untracked `local.properties` points Gradle at `/root/android-sdk`. Direct downloads for command-line tools and apt repositories still return `403 Forbidden` through the configured proxy, so required SDK package directories are still unavailable.
   - Status: Incomplete — the unset environment variable is fixed for new shells, but the actual Android SDK packages cannot be installed until this environment has an approved mirror or proxy access for Android SDK artifacts. Added `scripts/android-sdk-bootstrap.sh` and documented `ANDROID_CMDLINE_TOOLS_URL` mirror override to complete the install once a reachable mirror is available.
+- **Repeat occurrence 2026-05-18T09:42:52Z:** Pre-session unresolved issue review repeated the Android SDK preflight before PATCH parsing work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 
