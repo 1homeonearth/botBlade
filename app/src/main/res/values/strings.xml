@@ -1,21 +1,31 @@
 <resources>
     <string name="app_name">royalScepter</string>
     <string name="dashboard_nav_title">Dashboard</string>
-    <string name="code_editor_nav_title">Code Editor</string>
+    <string name="projects_nav_title">Projects</string>
+    <string name="editor_nav_title">Editor</string>
     <string name="settings_nav_title">Settings</string>
+    <string name="deployments_nav_title">Deployments</string>
     <string name="dashboard_title">Bot Dashboard</string>
-    <string name="code_editor_title">Code Editor</string>
+    <string name="projects_title">Projects</string>
+    <string name="code_editor_title">Editor</string>
+    <string name="deployments_title">Deployments</string>
     <string name="settings_title">Settings</string>
     <string name="bot_status_unknown">Bot Status: Unknown</string>
     <string name="bot_status_value">Bot Status: %1$s</string>
+    <string name="active_project_none">Active Project: None</string>
+    <string name="active_project_value">Active Project: %1$s</string>
     <string name="dashboard_empty_message">Connect to the local builder service to view bot runtime status.</string>
     <string name="dashboard_loading_message">Checking local bot service…</string>
     <string name="dashboard_status_loaded">Status loaded from /api/bot-status/.</string>
-    <string name="dashboard_toggle_sent">Toggle request sent to /api/bot-toggle/.</string>
-    <string name="dashboard_error_message">Unable to reach the local service. Showing Bot Status: Unknown.</string>
+    <string name="dashboard_toggle_sent">Toggle request sent to /api/bot-toggle/ with action=%1$s.</string>
+    <string name="dashboard_error_message">%1$s Showing Bot Status: Unknown.</string>
     <string name="refresh_status">Refresh</string>
     <string name="toggle_bot">Start / Stop</string>
     <string name="code_editor_empty_message">Project-aware bot editing will be added in a later phase.</string>
+    <string name="projects_empty_message">No bot projects yet.</string>
+    <string name="create_bot_project">Create Bot Project</string>
+    <string name="deployments_empty_message">No deployments yet.</string>
+    <string name="create_deployment">Create Deployment</string>
     <string name="settings_empty_message">Local API settings and secret references will be added in a later phase.</string>
     <string name="unknown">Unknown</string>
 </resources>

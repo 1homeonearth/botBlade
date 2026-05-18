@@ -5,7 +5,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.royalscepter.ui.dashboard.DashboardFragment
+import com.princess.royalscepter.ui.deployments.DeploymentsFragment
 import com.princess.royalscepter.ui.editor.CodeEditorFragment
+import com.princess.royalscepter.ui.projects.ProjectsFragment
 import com.princess.royalscepter.ui.settings.SettingsFragment
 
 class MainActivity : AppCompatActivity() {
@@ -20,8 +22,16 @@ class MainActivity : AppCompatActivity() {
                     showFragment(DashboardFragment())
                     true
                 }
+                R.id.navigation_projects -> {
+                    showFragment(ProjectsFragment())
+                    true
+                }
                 R.id.navigation_editor -> {
                     showFragment(CodeEditorFragment())
+                    true
+                }
+                R.id.navigation_deployments -> {
+                    showFragment(DeploymentsFragment())
                     true
                 }
                 R.id.navigation_settings -> {
