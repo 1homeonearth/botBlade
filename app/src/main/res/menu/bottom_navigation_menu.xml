@@ -5,9 +5,17 @@
         android:icon="@drawable/ic_dashboard"
         android:title="@string/dashboard_nav_title" />
     <item
+        android:id="@+id/navigation_projects"
+        android:icon="@drawable/ic_projects"
+        android:title="@string/projects_nav_title" />
+    <item
         android:id="@+id/navigation_editor"
         android:icon="@drawable/ic_code_editor"
-        android:title="@string/code_editor_nav_title" />
+        android:title="@string/editor_nav_title" />
+    <item
+        android:id="@+id/navigation_deployments"
+        android:icon="@drawable/ic_deployments"
+        android:title="@string/deployments_nav_title" />
     <item
         android:id="@+id/navigation_settings"
         android:icon="@drawable/ic_settings"

@@ -17,6 +17,14 @@
             android:text="@string/dashboard_title"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
+        <TextView
+            android:id="@+id/active_project_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/active_project_none"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
