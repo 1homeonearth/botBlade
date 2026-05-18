@@ -39,6 +39,14 @@
   - Command: `gradle :app:compileDebugKotlin`
   - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
   - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T10:02:19Z:** Pre-session unresolved issue review repeated the Android SDK preflight before command-registration generation work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
+- **Repeat occurrence 2026-05-18T10:12:36Z:** Android validation UI changes were made, but Android SDK preflight still fails in this shell.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; Android Gradle checks must be rerun in an SDK-enabled environment or after configuring an approved Android SDK artifact mirror.
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 

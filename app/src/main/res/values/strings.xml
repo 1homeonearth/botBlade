@@ -38,6 +38,8 @@
     <string name="project_no_description">No description provided.</string>
     <string name="project_runtime_value">Runtime: %1$s</string>
     <string name="project_command_registration_value">Command registration: %1$s</string>
+    <string name="project_missing_application_id_warning">Warning: Discord application ID is required before command registration.</string>
+    <string name="project_missing_guild_id_warning">Warning: Discord guild ID is required for guild command registration.</string>
     <string name="project_archived_value">Archived: %1$s</string>
     <string name="project_updated_value">Last updated: %1$s</string>
     <string name="create_bot_project">Create Bot Project</string>

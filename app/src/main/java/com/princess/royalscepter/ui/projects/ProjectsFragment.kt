@@ -236,11 +236,26 @@ class ProjectsFragment : Fragment() {
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_command_count_value, project.commands.size) })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_github_value, project.github?.let { "${it.owner}/${it.repo}" } ?: getString(R.string.github_not_linked)) })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_command_registration_value, project.discord.commandRegistration) })
+        commandRegistrationWarnings(project).forEach { warning ->
+            content.addView(TextView(requireContext()).apply { text = warning })
+        }
         if (project.archivedAt != null) content.addView(TextView(requireContext()).apply { text = getString(R.string.project_archived_value, project.archivedAt) })
         content.addView(TextView(requireContext()).apply { text = getString(R.string.project_updated_value, project.updatedAt) })
         content.addView(Button(requireContext()).apply { text = getString(R.string.manage_commands); isAllCaps = false; setOnClickListener { showCommands(project) } })
         card.addView(content)
         return card
+    }
+
+    private fun commandRegistrationWarnings(project: BotProject): List<String> {
+        val warnings = mutableListOf<String>()
+        val mode = project.discord.commandRegistration
+        if ((mode == "guild" || mode == "global") && project.discord.applicationId.isNullOrBlank()) {
+            warnings.add(getString(R.string.project_missing_application_id_warning))
+        }
+        if (mode == "guild" && project.discord.defaultGuildId.isNullOrBlank()) {
+            warnings.add(getString(R.string.project_missing_guild_id_warning))
+        }
+        return warnings
     }
 
     private fun setButtonsEnabled(enabled: Boolean) { reloadButton.isEnabled = enabled; createButton.isEnabled = enabled }

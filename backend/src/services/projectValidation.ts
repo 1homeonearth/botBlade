@@ -71,6 +71,12 @@ export function validateProject(project: BotProject, secretExists: (secretId: st
   if (!["guild", "global"].includes(project.discord.commandRegistration)) {
     errors.push({ code: "INVALID_COMMAND_REGISTRATION", message: "Command registration must be guild or global.", field: "discord.commandRegistration" });
   }
+  if (["guild", "global"].includes(project.discord.commandRegistration) && !project.discord.applicationId) {
+    warnings.push({ code: "MISSING_DISCORD_APPLICATION_ID", message: "Discord application ID is required before registering commands.", field: "discord.applicationId" });
+  }
+  if (project.discord.commandRegistration === "guild" && !project.discord.defaultGuildId) {
+    warnings.push({ code: "MISSING_DISCORD_GUILD_ID", message: "Discord guild ID is required before registering guild commands.", field: "discord.defaultGuildId" });
+  }
   if (project.discord.commandRegistration === "global") {
     warnings.push({ code: "GLOBAL_COMMAND_PROPAGATION", message: "Global command registration can take longer to propagate.", field: "discord.commandRegistration" });
   }

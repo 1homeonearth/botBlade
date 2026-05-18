@@ -36,7 +36,17 @@ test("draft projects are valid with warnings", () => {
   assert.equal(result.valid, true);
   assert.equal(result.errors.length, 0);
   assert.ok(result.warnings.some((warning) => warning.code === "MISSING_DISCORD_TOKEN"));
+  assert.ok(result.warnings.some((warning) => warning.code === "MISSING_DISCORD_APPLICATION_ID"));
+  assert.ok(result.warnings.some((warning) => warning.code === "MISSING_DISCORD_GUILD_ID"));
   assert.ok(result.warnings.some((warning) => warning.code === "NO_COMMANDS_DEFINED"));
+});
+
+test("global command registration warns for missing application ID but not guild ID", () => {
+  const result = validateProject(draft({ discord: { ...draft().discord, commandRegistration: "global" } }));
+  assert.equal(result.valid, true);
+  assert.ok(result.warnings.some((warning) => warning.code === "MISSING_DISCORD_APPLICATION_ID"));
+  assert.equal(result.warnings.some((warning) => warning.code === "MISSING_DISCORD_GUILD_ID"), false);
+  assert.ok(result.warnings.some((warning) => warning.code === "GLOBAL_COMMAND_PROPAGATION"));
 });
 
 test("invalid command names return errors", () => {
