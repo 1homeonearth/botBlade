@@ -32,7 +32,7 @@ export class BuildService {
   private readonly jobs = new Map<string, BuildJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => void, private readonly commandRunner: CommandRunner = runCommand) {}
+  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void, private readonly commandRunner: CommandRunner = runCommand) {}
 
   list(projectId: string): BuildJob[] {
     return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
@@ -47,7 +47,7 @@ export class BuildService {
     return this.logs.get(buildId) ?? "";
   }
 
-  async create(project: BotProject, request: unknown, auditEventId = `audit_${randomUUID()}`, requestId = "system"): Promise<BuildJob> {
+  async create(project: BotProject, request: unknown, auditEventId = `audit_${randomUUID()}`, requestId = "system", actorId?: string): Promise<BuildJob> {
     const body = request && typeof request === "object" && !Array.isArray(request) ? request as Record<string, unknown> : {};
     const buildId = `build_${randomUUID()}`;
     const job: BuildJob = {
@@ -65,11 +65,11 @@ export class BuildService {
       errorMessage: null,
     };
     this.jobs.set(project.id, [job, ...(this.jobs.get(project.id) ?? [])]);
-    await this.run(project, job, requestId);
+    await this.run(project, job, requestId, actorId);
     return job;
   }
 
-  private async run(project: BotProject, job: BuildJob, requestId: string): Promise<void> {
+  private async run(project: BotProject, job: BuildJob, requestId: string, actorId?: string): Promise<void> {
     const append = (line: string) => this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(sanitizeUrlsInText(line))}\n`);
     try {
       job.status = "validating";
@@ -110,6 +110,7 @@ export class BuildService {
         resourceId: job.buildId,
         metadata: { status: job.status, source: job.source, runTests: job.runTests, createDockerImage: job.createDockerImage, errorMessage: job.errorMessage },
         requestId,
+        actorId,
       });
     }
   }

@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import crypto from "node:crypto";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
 import { AuditService } from "./services/auditService.js";
+import { assertGlobalAccess, assertProjectAccess, authenticateRequest, canAccessProject, hasGlobalProjectAccess } from "./services/authService.js";
 import { BuildService } from "./services/buildService.js";
 import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./services/commandDefinitions.js";
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
@@ -18,7 +19,7 @@ const projectStore = new ProjectStore();
 const secretStore = new SecretStore();
 const fileService = new ProjectFileService();
 const auditService = new AuditService();
-const auditFromService = (event: { action: Parameters<AuditService["record"]>[0]["action"]; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => auditService.record(event);
+const auditFromService = (event: { action: Parameters<AuditService["record"]>[0]["action"]; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => auditService.record(event);
 const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId), auditFromService);
 const runtimeService = new LocalProcessRuntimeService(fileService, (secretId) => secretStore.getValue(secretId));
 const targetStore = new DeploymentTargetStore();
@@ -52,16 +53,35 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
 
   if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
-  if (method === "GET" && path === "/api/audit-events") return writeJson(res, 200, { auditEvents: auditService.list() });
 
-  if (method === "GET" && path === "/api/github/status") return writeJson(res, 200, githubService.status());
-  if (method === "POST" && path === "/api/github/connect") return writeJson(res, 200, githubService.connect(await readJson(req)));
+  const actor = authenticateRequest(req);
 
-  if (method === "GET" && path === "/api/deployment-targets") return writeJson(res, 200, { targets: targetStore.list() });
-  if (method === "POST" && path === "/api/deployment-targets") return writeJson(res, 201, targetStore.create(await readJson(req)));
+  if (method === "GET" && path === "/api/audit-events") {
+    assertGlobalAccess(actor, "audit events");
+    return writeJson(res, 200, { auditEvents: auditService.list() });
+  }
+
+  if (method === "GET" && path === "/api/github/status") {
+    assertGlobalAccess(actor, "GitHub integration");
+    return writeJson(res, 200, githubService.status());
+  }
+  if (method === "POST" && path === "/api/github/connect") {
+    assertGlobalAccess(actor, "GitHub integration");
+    return writeJson(res, 200, githubService.connect(await readJson(req)));
+  }
+
+  if (method === "GET" && path === "/api/deployment-targets") {
+    assertGlobalAccess(actor, "deployment targets");
+    return writeJson(res, 200, { targets: targetStore.list() });
+  }
+  if (method === "POST" && path === "/api/deployment-targets") {
+    assertGlobalAccess(actor, "deployment targets");
+    return writeJson(res, 201, targetStore.create(await readJson(req)));
+  }
   const targetMatch = path.match(/^\/api\/deployment-targets\/([^/]+)(?:\/(test))?$/);
   if (targetMatch) {
     const [, targetId, action] = targetMatch;
+    assertGlobalAccess(actor, "deployment targets");
     const target = targetStore.get(targetId);
     if (!target) throw notFoundTarget(targetId);
     if (method === "GET" && !action) return writeJson(res, 200, target);
@@ -77,53 +97,65 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
 
   if (method === "GET" && path === "/api/bot-status/") {
     const project = projectStore.list()[0];
+    if (project) assertProjectAccess(actor, project.id);
     return writeJson(res, 200, project ? runtimeService.getStatus(project.id) : { projectId: "default", status: "stopped", running: false, pid: null, startedAt: null, lastExitCode: null, message: "No active/default project exists." });
   }
   if (method === "POST" && path === "/api/bot-toggle/") {
     const project = projectStore.list()[0];
     if (!project) throw { statusCode: 400, code: "NO_ACTIVE_PROJECT", message: "Create or select a project before toggling the bot runtime.", details: {} };
+    assertProjectAccess(actor, project.id);
     const action = parseToggleAction(await readJson(req));
     return writeJson(res, 200, action === "start" ? await runtimeService.start(project) : await runtimeService.stop(project.id));
   }
 
-  if (method === "GET" && path === "/api/secrets") return writeJson(res, 200, { secrets: secretStore.list() });
+  if (method === "GET" && path === "/api/secrets") return writeJson(res, 200, { secrets: secretStore.list().filter((secret) => canAccessProject(actor, secret.projectId)) });
   if (method === "POST" && path === "/api/secrets") {
-    const secret = secretStore.create(parseCreateSecretInput(await readJson(req)));
-    const audit = auditService.record({ action: "secret.create", projectId: secret.projectId, resourceType: "secret", resourceId: secret.id, metadata: { name: secret.name, type: secret.type, storageMode: secret.storageMode, fingerprint: secret.fingerprint }, requestId });
+    const input = parseCreateSecretInput(await readJson(req));
+    assertProjectAccess(actor, input.projectId);
+    const secret = secretStore.create(input);
+    const audit = auditService.record({ action: "secret.create", actorId: actor.id, projectId: secret.projectId, resourceType: "secret", resourceId: secret.id, metadata: { name: secret.name, type: secret.type, storageMode: secret.storageMode, fingerprint: secret.fingerprint }, requestId });
     return writeJson(res, 201, { ...secret, auditEventId: audit.id });
   }
   const secretMatch = path.match(/^\/api\/secrets\/([^/]+)(?:\/(rotate))?$/);
   if (secretMatch) {
     const [, secretId, action] = secretMatch;
-    if (method === "GET" && !action) return writeJson(res, 200, secretStore.get(secretId) ?? notFoundSecret(secretId));
-    if (method === "PATCH" && !action) return writeJson(res, 200, secretStore.update(secretId, parseUpdateSecretInput(await readJson(req))) ?? notFoundSecret(secretId));
+    const existingSecret = secretStore.get(secretId);
+    if (!existingSecret) throw notFoundSecret(secretId);
+    assertProjectAccess(actor, existingSecret.projectId);
+    if (method === "GET" && !action) return writeJson(res, 200, existingSecret);
+    if (method === "PATCH" && !action) {
+      const input = parseUpdateSecretInput(await readJson(req));
+      if (input.projectId !== undefined) assertProjectAccess(actor, input.projectId);
+      return writeJson(res, 200, secretStore.update(secretId, input) ?? notFoundSecret(secretId));
+    }
     if (method === "DELETE" && !action) {
-      const existing = secretStore.get(secretId);
+      const existing = existingSecret;
       if (!secretStore.delete(secretId)) throw notFoundSecret(secretId);
-      auditService.record({ action: "secret.delete", projectId: existing?.projectId ?? null, resourceType: "secret", resourceId: secretId, metadata: { name: existing?.name, type: existing?.type }, requestId });
+      auditService.record({ action: "secret.delete", actorId: actor.id, projectId: existing?.projectId ?? null, resourceType: "secret", resourceId: secretId, metadata: { name: existing?.name, type: existing?.type }, requestId });
       res.statusCode = 204;
       res.end();
       return;
     }
     if (method === "POST" && action === "rotate") {
       const secret = secretStore.rotate(secretId, parseRotateSecretInput(await readJson(req))) ?? notFoundSecret(secretId);
-      const audit = auditService.record({ action: "secret.rotate", projectId: secret.projectId, resourceType: "secret", resourceId: secret.id, metadata: { name: secret.name, type: secret.type, fingerprint: secret.fingerprint }, requestId });
+      const audit = auditService.record({ action: "secret.rotate", actorId: actor.id, projectId: secret.projectId, resourceType: "secret", resourceId: secret.id, metadata: { name: secret.name, type: secret.type, fingerprint: secret.fingerprint }, requestId });
       return writeJson(res, 200, { ...secret, auditEventId: audit.id });
     }
   }
 
-  if (method === "GET" && path === "/api/projects") return writeJson(res, 200, { projects: projectStore.list() });
+  if (method === "GET" && path === "/api/projects") return writeJson(res, 200, { projects: hasGlobalProjectAccess(actor) ? projectStore.list() : projectStore.list().filter((project) => canAccessProject(actor, project.id)) });
   if (method === "POST" && path === "/api/projects") {
     const input = parseCreateProjectInput(await readJson(req));
     if (input.discord?.tokenSecretRef && !secretStore.has(input.discord.tokenSecretRef)) throw new RequestValidationError([{ field: "discord.tokenSecretRef", message: "Secret reference does not exist." }]);
     const project = projectStore.create(input);
-    const audit = auditService.record({ action: "project.create", projectId: project.id, resourceType: "project", resourceId: project.id, metadata: { name: project.name, slug: project.slug, templateId: project.templateId }, requestId });
+    const audit = auditService.record({ action: "project.create", actorId: actor.id, projectId: project.id, resourceType: "project", resourceId: project.id, metadata: { name: project.name, slug: project.slug, templateId: project.templateId }, requestId });
     return writeJson(res, 201, { ...project, auditEventId: audit.id });
   }
 
   const auditMatch = path.match(/^\/api\/projects\/([^/]+)\/audit-events$/);
   if (auditMatch) {
     const [, projectId] = auditMatch;
+    assertProjectAccess(actor, projectId);
     if (!projectStore.get(projectId)) throw notFoundProject(projectId);
     if (method === "GET") return writeJson(res, 200, { auditEvents: auditService.list(projectId) });
   }
@@ -131,6 +163,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const fileMatch = path.match(/^\/api\/projects\/([^/]+)\/files(?:\/(.*))?$/);
   if (fileMatch) {
     const [, projectId, filePath] = fileMatch;
+    assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && filePath === undefined) return writeJson(res, 200, { files: await fileService.list(projectId) });
@@ -141,12 +174,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const buildMatch = path.match(/^\/api\/projects\/([^/]+)\/builds(?:\/([^/]+)(?:\/(logs))?)?$/);
   if (buildMatch) {
     const [, projectId, buildId, logs] = buildMatch;
+    assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && !buildId) {
       const body = await readJson(req);
-      const audit = auditService.record({ action: "build.start", projectId, resourceType: "build", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
-      const job = await buildService.create(project, body, audit.id, requestId);
+      const audit = auditService.record({ action: "build.start", actorId: actor.id, projectId, resourceType: "build", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
+      const job = await buildService.create(project, body, audit.id, requestId, actor.id);
       audit.resourceId = job.buildId;
       return writeJson(res, 201, job);
     }
@@ -158,24 +192,26 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const runtimeMatch = path.match(/^\/api\/projects\/([^/]+)\/runtime\/(status|start|stop|restart|logs)$/);
   if (runtimeMatch) {
     const [, projectId, action] = runtimeMatch;
+    assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && action === "status") return writeJson(res, 200, runtimeService.getStatus(projectId));
-    if (method === "POST" && action === "start") { const status = await runtimeService.start(project); const audit = auditService.record({ action: "runtime.start", projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "POST" && action === "stop") { const status = await runtimeService.stop(projectId); const audit = auditService.record({ action: "runtime.stop", projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "POST" && action === "restart") { const status = await runtimeService.restart(project); const audit = auditService.record({ action: "runtime.restart", projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "start") { const status = await runtimeService.start(project); const audit = auditService.record({ action: "runtime.start", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "stop") { const status = await runtimeService.stop(projectId); const audit = auditService.record({ action: "runtime.stop", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "restart") { const status = await runtimeService.restart(project); const audit = auditService.record({ action: "runtime.restart", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
     if (method === "GET" && action === "logs") return writeJson(res, 200, { logs: runtimeService.getLogs(projectId) });
   }
 
   const deploymentMatch = path.match(/^\/api\/projects\/([^/]+)\/deployments(?:\/([^/]+)(?:\/(logs|rollback))?)?$/);
   if (deploymentMatch) {
     const [, projectId, deploymentId, action] = deploymentMatch;
+    assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && !deploymentId) {
       const body = await readJson(req);
-      const audit = auditService.record({ action: "deployment.start", projectId, resourceType: "deployment", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
-      const job = await deploymentStore.create(project, body, audit.id, requestId);
+      const audit = auditService.record({ action: "deployment.start", actorId: actor.id, projectId, resourceType: "deployment", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
+      const job = await deploymentStore.create(project, body, audit.id, requestId, actor.id);
       audit.resourceId = job.deploymentId;
       return writeJson(res, 201, job);
     }
@@ -188,6 +224,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);
   if (commandsMatch) {
     const [, projectId, commandId] = commandsMatch;
+    assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && !commandId) return writeJson(res, 200, { commands: project.commands });
@@ -197,7 +234,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       validateCommands(commands);
       project.commands = commands;
       project.updatedAt = new Date().toISOString();
-      const audit = auditService.record({ action: "discord.commands.register", projectId, resourceType: "command", resourceId: command.id ?? command.name, metadata: { name: command.name, description: command.description }, requestId });
+      const audit = auditService.record({ action: "discord.commands.register", actorId: actor.id, projectId, resourceType: "command", resourceId: command.id ?? command.name, metadata: { name: command.name, description: command.description }, requestId });
       return writeJson(res, 201, { ...command, auditEventId: audit.id });
     }
     const index = project.commands.findIndex((command) => command.id === commandId);
@@ -223,12 +260,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const githubProjectMatch = path.match(/^\/api\/projects\/([^/]+)\/github\/(create-repo|push|create-workflow)$/);
   if (githubProjectMatch) {
     const [, projectId, action] = githubProjectMatch;
+    assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
     if (method === "POST" && action === "push") {
       const result = githubService.push(project);
-      auditService.record({ action: "github.push", projectId, resourceType: "github_repository", resourceId: `${project.github?.owner}/${project.github?.repo}`, metadata: { owner: project.github?.owner, repo: project.github?.repo }, requestId });
+      auditService.record({ action: "github.push", actorId: actor.id, projectId, resourceType: "github_repository", resourceId: `${project.github?.owner}/${project.github?.repo}`, metadata: { owner: project.github?.owner, repo: project.github?.repo }, requestId });
       return writeJson(res, 200, result);
     }
     if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
@@ -237,12 +275,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/(archive|clone|validate|generate|regenerate))?$/);
   if (projectMatch) {
     const [, projectId, action] = projectMatch;
+    assertProjectAccess(actor, projectId);
     if (method === "GET" && !action) return writeJson(res, 200, projectStore.get(projectId) ?? notFoundProject(projectId));
     if (method === "PATCH" && !action) {
       const input = parseUpdateProjectInput(await readJson(req));
       if (input.discord?.tokenSecretRef && !secretStore.has(input.discord.tokenSecretRef)) throw new RequestValidationError([{ field: "discord.tokenSecretRef", message: "Secret reference does not exist." }]);
       const project = projectStore.update(projectId, input) ?? notFoundProject(projectId);
-      const audit = auditService.record({ action: "project.update", projectId, resourceType: "project", resourceId: projectId, metadata: input as Record<string, unknown>, requestId });
+      const audit = auditService.record({ action: "project.update", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: input as Record<string, unknown>, requestId });
       return writeJson(res, 200, { ...project, auditEventId: audit.id });
     }
     if (method === "DELETE" && !action) {
@@ -251,8 +290,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       res.end();
       return;
     }
-    if (method === "POST" && action === "archive") { const project = projectStore.archive(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.archive", projectId, resourceType: "project", resourceId: projectId, metadata: { archivedAt: project.archivedAt }, requestId }); return writeJson(res, 200, { ...project, auditEventId: audit.id }); }
-    if (method === "POST" && action === "clone") { const clone = projectStore.clone(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.clone", projectId: clone.id, resourceType: "project", resourceId: clone.id, metadata: { sourceProjectId: projectId, name: clone.name, slug: clone.slug }, requestId }); return writeJson(res, 201, { ...clone, auditEventId: audit.id }); }
+    if (method === "POST" && action === "archive") { const project = projectStore.archive(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.archive", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: { archivedAt: project.archivedAt }, requestId }); return writeJson(res, 200, { ...project, auditEventId: audit.id }); }
+    if (method === "POST" && action === "clone") { const clone = projectStore.clone(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.clone", actorId: actor.id, projectId: clone.id, resourceType: "project", resourceId: clone.id, metadata: { sourceProjectId: projectId, name: clone.name, slug: clone.slug }, requestId }); return writeJson(res, 201, { ...clone, auditEventId: audit.id }); }
     if (method === "POST" && action === "validate") {
       const project = projectStore.get(projectId);
       if (!project) throw notFoundProject(projectId);
@@ -261,7 +300,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (method === "POST" && (action === "generate" || action === "regenerate")) {
       const project = projectStore.get(projectId);
       if (!project) throw notFoundProject(projectId);
-      const audit = auditService.record({ action: "generate.start", projectId, resourceType: "project", resourceId: projectId, metadata: { force: action === "regenerate" }, requestId });
+      const audit = auditService.record({ action: "generate.start", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: { force: action === "regenerate" }, requestId });
       const result = await fileService.generate(project, action === "regenerate");
       return writeJson(res, 200, { ...result, auditEventId: audit.id });
     }

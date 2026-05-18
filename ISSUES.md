@@ -15,6 +15,10 @@
   - `ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin` failed with `SDK location not found`.
   - `ANDROID_HOME=/path/to/android-sdk gradle :app:assembleDebug` failed with `SDK location not found`.
 - **Resolution notes:** Run `ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin` and `ANDROID_HOME=/path/to/android-sdk gradle :app:assembleDebug` in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T08:07:51Z:** Android client configuration changed for API authentication, but this shell still cannot run Android compilation because `ANDROID_HOME` is unset.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set.`
+  - Status: Incomplete — environment limitation remains; run Android Gradle checks in an SDK-enabled environment.
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 
