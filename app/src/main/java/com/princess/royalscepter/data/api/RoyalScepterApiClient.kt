@@ -39,7 +39,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class RoyalScepterApiClient(
-    private val baseUrl: String = ApiConfig.DEFAULT_BASE_URL,
+    private val baseUrl: String? = null,
     private val bearerToken: String = ApiConfig.DEFAULT_BEARER_TOKEN,
     private val sessionToken: String = ApiConfig.DEFAULT_SESSION_TOKEN,
 ) {
@@ -315,7 +315,8 @@ class RoyalScepterApiClient(
         method: String,
         requestBody: String? = null,
     ): String {
-        val connection = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
+        val requestBaseUrl = baseUrl?.let(ApiConfig::normalizeUrl) ?: ApiConfig.baseUrl
+        val connection = URL(requestBaseUrl + path).openConnection() as HttpURLConnection
         connection.requestMethod = method
         connection.connectTimeout = 2_000
         connection.readTimeout = 2_000

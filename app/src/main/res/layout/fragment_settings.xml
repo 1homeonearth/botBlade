@@ -22,6 +22,38 @@
             android:layout_marginTop="12dp"
             android:text="@string/secrets_loading" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/backend_settings_title"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:id="@+id/api_settings_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/backend_url_default_status" />
+
+        <EditText
+            android:id="@+id/backend_url_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/backend_url_hint"
+            android:inputType="textUri|textNoSuggestions" />
+
+        <Button
+            android:id="@+id/save_backend_url_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/save_backend_url" />
+
+        <Button
+            android:id="@+id/test_backend_connection_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/test_backend_connection" />
 
         <TextView
             android:layout_width="match_parent"
