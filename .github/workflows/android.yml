@@ -27,14 +27,44 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Configure Android SDK env & diagnostics
+        run: |
+          # If the setup action populated ANDROID_SDK_ROOT, make sure the repo and build tools can find it
+          if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+            echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+            export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+
+          # Fall back to ANDROID_HOME if set
+          if [ -n "${ANDROID_HOME:-}" ]; then
+            echo "ANDROID_HOME=$ANDROID_HOME"
+          fi
+
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+          echo "Listing SDK root contents (if present):"
+          ls -la "${ANDROID_HOME:-/tmp}" || true
+          echo "Listing platforms and build-tools (if present):"
+          ls -la "${ANDROID_HOME:-/tmp}/platforms" || true
+          ls -la "${ANDROID_HOME:-/tmp}/build-tools" || true
+
       - name: Install required Android SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+        run: sdkmanager --sdk_root "${ANDROID_SDK_ROOT:-$ANDROID_HOME}" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Preflight Android SDK packages
         run: ./scripts/android-sdk-preflight.sh
 
       - name: Compile debug Kotlin
-        run: gradle :app:compileDebugKotlin
+        run: |
+          if [ -x ./gradlew ]; then
+            ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
+          else
+            gradle :app:compileDebugKotlin --stacktrace
+          fi
 
       - name: Assemble debug APK
-        run: gradle :app:assembleDebug
+        run: |
+          if [ -x ./gradlew ]; then
+            ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          else
+            gradle :app:assembleDebug --stacktrace
+          fi
