@@ -311,11 +311,11 @@ class RoyalScepterApiClient(
 
     @Throws(IOException::class)
     fun getDeploymentStatus(projectId: String, deploymentId: String): DeploymentActionResponse =
-        request(path = "/api/projects/${projectId.urlPathSegment()}/deployments/${deploymentId.urlPathSegment()}/status", method = "GET").toDeploymentActionResponse()
+        request(path = "/api/projects/${projectId.encodedPathSegment()}/deployments/${deploymentId.encodedPathSegment()}/status", method = "GET").toDeploymentActionResponse()
 
     @Throws(IOException::class)
     fun deploymentAction(projectId: String, deploymentId: String, action: String): DeploymentActionResponse =
-        request(path = "/api/projects/${projectId.urlPathSegment()}/deployments/${deploymentId.urlPathSegment()}/${action.urlPathSegment()}", method = "POST", requestBody = "{}").toDeploymentActionResponse()
+        request(path = "/api/projects/${projectId.encodedPathSegment()}/deployments/${deploymentId.encodedPathSegment()}/${action.encodedPathSegment()}", method = "POST", requestBody = "{}").toDeploymentActionResponse()
 
     @Throws(IOException::class)
     fun getGitHubStatus(): GitHubStatusResponse =
