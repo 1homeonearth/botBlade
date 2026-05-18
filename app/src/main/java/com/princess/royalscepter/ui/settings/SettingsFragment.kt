@@ -23,6 +23,7 @@ import com.princess.royalscepter.data.model.GitHubLinkRepoRequest
 import com.princess.royalscepter.data.model.GitHubStatusResponse
 import com.princess.royalscepter.data.model.SecretCreateRequest
 import com.princess.royalscepter.data.model.SecretSummary
+import com.princess.royalscepter.data.model.displayNameOrNull
 import com.princess.royalscepter.data.repository.ProjectRepository
 import com.princess.royalscepter.data.repository.SecretRepository
 import com.princess.royalscepter.data.store.ActiveProjectStore
@@ -164,7 +165,8 @@ class SettingsFragment : Fragment() {
         if (github?.repo != null) githubRepoInput.setText(github.repo)
         githubBranchInput.setText(github?.defaultBranch ?: githubBranchInput.text.toString().ifBlank { "main" })
         val connected = statusValue?.connected == true
-        val repoLinked = !github?.owner.isNullOrBlank() && !github?.repo.isNullOrBlank()
+        val repoDisplayName = github?.displayNameOrNull()
+        val repoLinked = repoDisplayName != null
         pushGitHubButton.isEnabled = connected && repoLinked
         workflowButton.isEnabled = repoLinked
         pushGitHubButton.text = getString(if (pushGitHubButton.isEnabled) R.string.push_github else R.string.push_github_disabled)
@@ -172,7 +174,7 @@ class SettingsFragment : Fragment() {
             R.string.github_status_value,
             if (connected) getString(R.string.github_connected) else getString(R.string.github_not_connected),
             project?.name ?: getString(R.string.active_project_none),
-            github?.let { "${it.owner}/${it.repo}" } ?: getString(R.string.github_not_linked),
+            repoDisplayName ?: getString(R.string.github_not_linked),
         )
     }
 
