@@ -35,7 +35,7 @@ Sensitive keys such as token, secret, password, API key, authorization, and auth
 
 ## GitHub token handling
 
-GitHub integration stores only a `tokenSecretRef`, not the token value. Real push execution is future work and currently returns a not-implemented error. Production GitHub integration should request the narrowest possible scopes, rotate credentials regularly, and record audit events for successful pushes.
+GitHub integration stores only a `tokenSecretRef`, not the token value. Push execution resolves the secret value only in memory and sends generated project files plus the generated GitHub Actions workflow through the GitHub REST API without logging raw tokens. Production GitHub integration should request the narrowest possible scopes, rotate credentials regularly, and review success/failure audit events for push operations.
 
 ## Discord token handling
 

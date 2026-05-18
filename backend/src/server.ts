@@ -26,7 +26,7 @@ const buildService = new BuildService(fileService, (secretId) => secretStore.has
 const runtimeService = new LocalProcessRuntimeService(fileService, (secretId) => secretStore.getValue(secretId));
 const targetStore = new DeploymentTargetStore(persistence);
 const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService, persistence);
-const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
+const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), fileService);
 const port = Number(process.env.PORT ?? 8000);
 
 export function createRequestListener() {
@@ -267,9 +267,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
     if (method === "POST" && action === "push") {
-      const result = githubService.push(project);
-      auditService.record({ action: "github.push", actorId: actor.id, projectId, resourceType: "github_repository", resourceId: `${project.github?.owner}/${project.github?.repo}`, metadata: { owner: project.github?.owner, repo: project.github?.repo }, requestId });
-      return writeJson(res, 200, result);
+      try {
+        const result = await githubService.push(project);
+        projectStore.update(projectId, { github: { lastPushedAt: result.pushedAt } });
+        const audit = auditService.record({ action: "github.push", actorId: actor.id, projectId, resourceType: "github_repository", resourceId: `${project.github?.owner ?? "unknown"}/${project.github?.repo ?? "unknown"}`, metadata: { owner: project.github?.owner, repo: project.github?.repo, status: "succeeded", fileCount: result.files.length, pushedAt: result.pushedAt }, requestId });
+        return writeJson(res, 200, { ...result, auditEventId: audit.id });
+      } catch (error) {
+        auditService.record({ action: "github.push", actorId: actor.id, projectId, resourceType: "github_repository", resourceId: `${project.github?.owner ?? "unknown"}/${project.github?.repo ?? "unknown"}`, metadata: { owner: project.github?.owner, repo: project.github?.repo, status: "failed", errorCode: isHttpError(error) ? error.code : "INTERNAL_SERVER_ERROR" }, requestId });
+        throw error;
+      }
     }
     if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
   }

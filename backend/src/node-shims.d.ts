@@ -117,3 +117,12 @@ declare const process: {
   env: Record<string, string | undefined>;
   cwd(): string;
 };
+
+
+interface FetchResponse {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}
+
+declare function fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<FetchResponse>;
