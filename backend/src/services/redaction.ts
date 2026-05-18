@@ -1,7 +1,7 @@
 const knownSecretValues = new Set<string>();
 
 const tokenPatterns: RegExp[] = [
-  /[A-Za-z0-9_-]{23,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{20,}/g,
+  /[A-Za-z0-9_-]{23,32}\.[A-Za-z0-9_-]{6,12}\.[A-Za-z0-9_-]{20,64}/g,
   /gh[pousr]_[A-Za-z0-9_]{20,}/g,
   /(?:xox[baprs]-)[A-Za-z0-9-]{10,}/g,
   /https?:\/\/[^\s:@]+:[^\s@]+@[^\s]+/g,

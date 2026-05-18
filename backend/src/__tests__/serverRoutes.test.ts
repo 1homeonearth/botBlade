@@ -11,8 +11,9 @@ const { createRequestListener } = await import("../server.js");
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 
-async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean } = {}) {
-  const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
+async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean; chunkSize?: number } = {}) {
+  const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body));
+  const chunks = payload === undefined ? [] : chunkBuffer(payload, options.chunkSize);
   const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${Math.random().toString(16).slice(2)}` };
   if (!options.unauthenticated) {
     if (options.sessionToken) headers.cookie = `royalScepterSession=${encodeURIComponent(options.sessionToken)}`;
@@ -33,6 +34,12 @@ async function request(method: Method, url: string, body?: unknown, options: { t
   };
   await createRequestListener()(req as never, res as never);
   return { statusCode: res.statusCode, body: res.payload ? JSON.parse(res.payload) : null, headers: res.headers };
+}
+function chunkBuffer(buffer: Buffer, chunkSize?: number): Uint8Array[] {
+  if (!chunkSize || chunkSize <= 0) return [buffer];
+  const chunks: Uint8Array[] = [];
+  for (let offset = 0; offset < buffer.length; offset += chunkSize) chunks.push(buffer.subarray(offset, offset + chunkSize));
+  return chunks;
 }
 
 test("health route returns ok", async () => {
@@ -84,6 +91,36 @@ test("legacy bot toggle validates action", async () => {
   const response = await request("POST", "/api/bot-toggle/", { action: "bounce" });
   assert.equal(response.statusCode, 400);
   assert.equal(response.body.error.code, "VALIDATION_FAILED");
+});
+
+
+test("JSON requests below the default body limit are accepted", async () => {
+  const response = await request("POST", "/api/projects", { name: "Below JSON Limit", description: "x".repeat(1024 * 1024 - 128) }, { chunkSize: 16 * 1024 });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.body.name, "Below JSON Limit");
+});
+
+test("JSON requests above the default body limit return 413", async () => {
+  const response = await request("POST", "/api/projects", { name: "Above JSON Limit", description: "x".repeat(1024 * 1024) }, { chunkSize: 16 * 1024 });
+  assert.equal(response.statusCode, 413);
+  assert.equal(response.body.error.code, "PAYLOAD_TOO_LARGE");
+  assert.equal(response.body.error.details.limitBytes, 1024 * 1024);
+  assert.ok(response.body.error.details.receivedBytes > response.body.error.details.limitBytes);
+});
+
+test("project file writes use an explicit larger JSON body limit", async () => {
+  const created = await request("POST", "/api/projects", { name: "Large File Write" });
+  assert.equal(created.statusCode, 201);
+
+  const accepted = await request("PUT", `/api/projects/${created.body.id}/files/src/large.ts`, { content: "x".repeat(1024 * 1024 + 256) }, { chunkSize: 64 * 1024 });
+  assert.equal(accepted.statusCode, 200);
+  assert.equal(accepted.body.size, 1024 * 1024 + 256);
+
+  const rejected = await request("PUT", `/api/projects/${created.body.id}/files/src/too-large.ts`, { content: "x".repeat(8 * 1024 * 1024) }, { chunkSize: 64 * 1024 });
+  assert.equal(rejected.statusCode, 413);
+  assert.equal(rejected.body.error.code, "PAYLOAD_TOO_LARGE");
+  assert.equal(rejected.body.error.details.limitBytes, 8 * 1024 * 1024);
+  assert.ok(rejected.body.error.details.receivedBytes > rejected.body.error.details.limitBytes);
 });
 
 test("project creation validates name", async () => {

@@ -23,3 +23,9 @@ test("audit metadata redaction removes stored secrets", () => {
   assert.equal(JSON.stringify(metadata).includes(secret), false);
   unregisterSecretValue(secret);
 });
+
+
+test("redactSecrets handles long non-token strings quickly", () => {
+  const input = "x".repeat(1024 * 1024);
+  assert.equal(redactSecrets(input), input);
+});

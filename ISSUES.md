@@ -39,6 +39,10 @@
   - Command: `gradle :app:compileDebugKotlin`
   - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
   - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T10:02:30Z:** Pre-session unresolved issue review repeated the Android SDK preflight before backend JSON body-limit work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 
@@ -74,3 +78,19 @@
   - Replaced `import.meta.url` migration resolution with a `process.cwd()`-based lookup that works from repo root and `backend/` cwd.
   - Reran `npm --prefix backend run build` and `npm --prefix backend test` successfully.
 - **Resolution notes:** Complete; no dependency installation was needed.
+
+## 2026-05-18T10:02:30Z — Backend redaction regex stalls on long alphanumeric JSON content
+
+- **Status:** Complete — bounded the Discord-token redaction pattern and added a regression test covering a 1 MiB non-token string.
+- **Context:** While adding oversized JSON-body tests, `npm --prefix backend test` stalled in `serverRoutes.test.js` after a large project description response was passed through response redaction.
+- **Observed details:** The Node test worker consumed CPU for over two minutes on a long alphanumeric string because the Discord-token regex used unbounded pre-dot matching and backtracked while searching for a token separator that was not present.
+- **Relevant logs:**
+  - Command: `npm --prefix backend test`
+  - Process observation: `node /workspace/royalScepter/backend/dist/__tests__/serverRoutes.test.js` held approximately `99.9%` CPU for more than two minutes.
+  - Cleanup: killed the hung npm/node test processes before applying the fix.
+- **Troubleshooting steps taken:**
+  - Inspected `backend/src/services/redaction.ts` and identified the unbounded Discord token regex as the hotspot for long alphanumeric strings.
+  - Replaced unbounded Discord token segments with bounded segment lengths.
+  - Added `redactSecrets handles long non-token strings quickly` to `backend/src/__tests__/redaction.test.ts`.
+  - Reran `npm --prefix backend test` successfully.
+- **Resolution notes:** Complete; all backend tests pass after the regex bound and regression coverage.

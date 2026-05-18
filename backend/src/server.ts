@@ -28,6 +28,8 @@ const targetStore = new DeploymentTargetStore(persistence);
 const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService, persistence);
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
 const port = Number(process.env.PORT ?? 8000);
+const DEFAULT_JSON_BODY_LIMIT_BYTES = 1024 * 1024;
+const PROJECT_FILE_JSON_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
 
 export function createRequestListener() {
   return async (req: IncomingMessage, res: ServerResponse) => {
@@ -170,7 +172,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && filePath === undefined) return writeJson(res, 200, { files: await fileService.list(projectId) });
     if (method === "GET" && filePath !== undefined) return writeJson(res, 200, await fileService.read(projectId, filePath));
-    if (method === "PUT" && filePath !== undefined) return writeJson(res, 200, await fileService.write(projectId, filePath, parseFileWriteInput(await readJson(req)).content));
+    if (method === "PUT" && filePath !== undefined) return writeJson(res, 200, await fileService.write(projectId, filePath, parseFileWriteInput(await readJson(req, { limitBytes: PROJECT_FILE_JSON_BODY_LIMIT_BYTES })).content));
   }
 
   const buildMatch = path.match(/^\/api\/projects\/([^/]+)\/builds(?:\/([^/]+)(?:\/(logs))?)?$/);
@@ -310,9 +312,23 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   throw { statusCode: 404, code: "NOT_FOUND", message: "Route not found.", details: {} };
 }
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
+async function readJson(req: IncomingMessage, options: { limitBytes?: number } = {}): Promise<unknown> {
+  const limitBytes = options.limitBytes ?? DEFAULT_JSON_BODY_LIMIT_BYTES;
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  let receivedBytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    receivedBytes += buffer.length;
+    if (receivedBytes > limitBytes) {
+      throw {
+        statusCode: 413,
+        code: "PAYLOAD_TOO_LARGE",
+        message: "JSON request body is too large.",
+        details: { limitBytes, receivedBytes },
+      };
+    }
+    chunks.push(buffer);
+  }
   const body = Buffer.concat(chunks).toString("utf8").trim();
   if (!body) return {};
   try { return JSON.parse(body) as unknown; } catch { throw new RequestValidationError([{ field: "body", message: "Body must be valid JSON." }]); }
