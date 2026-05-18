@@ -8,12 +8,6 @@
 - Added backend tests for GitHub push not-configured, repo-not-linked, and success paths with a mock GitHub client.
 
 ## Remaining requested work
-1. **Generated bot command registration path**
-   - Update `backend/src/services/projectFiles.ts` to generate `src/register-commands.ts`.
-   - Include guild/global registration scripts in generated `package.json`.
-   - Require `DISCORD_APPLICATION_ID` (+ `DISCORD_GUILD_ID` for guild mode) in generated config when enabled.
-   - Update generated tests for command JSON serialization.
-
 2. **Android GitHub defer UX + validation**
    - If GitHub push remains deferred in UI flows, disable/hide push button and show copyable workflow/export instructions.
    - Warn for missing Discord IDs based on command registration mode.
@@ -41,4 +35,4 @@
    - Verify debug vs release backup/cleartext/network security behavior.
 
 ## Environment blockers to revisit first next session
-- Android SDK preflight currently fails in this shell (`ANDROID_HOME`/`sdk.dir` path invalid), blocking Android build/test verification.
+- None currently blocking: Android SDK preflight passes with `sdk.dir=/root/android-sdk` in `local.properties`.

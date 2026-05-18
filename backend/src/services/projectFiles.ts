@@ -115,13 +115,24 @@ export function templateFiles(project: BotProject): Record<string, string> {
   const commandImports = commands.map((command) => `import { ${commandExportName(command.name)} } from "./commands/${sanitizeCommandFile(command.name)}.js";`).join("\n");
   const commandTestImports = commands.map((command) => `import { ${commandExportName(command.name)} } from "./${sanitizeCommandFile(command.name)}.js";`).join("\n");
   const commandArray = commands.map((command) => commandExportName(command.name)).join(", ");
+  const requireApplicationId = project.discord.commandRegistration === "global" || project.discord.commandRegistration === "guild";
+  const requireGuildId = project.discord.commandRegistration === "guild";
+  const registrationModeMessage = project.discord.commandRegistration === "guild" ? "guild" : "global";
+
   const files: Record<string, string> = {
     "package.json": JSON.stringify({
       name: project.slug,
       version: "0.1.0",
       private: true,
       type: "module",
-      scripts: { build: "tsc -p tsconfig.json", start: "node dist/index.js", test: "node --test dist/**/*.test.js" },
+      scripts: {
+        build: "tsc -p tsconfig.json",
+        start: "node dist/index.js",
+        test: "node --test dist/**/*.test.js",
+        "register:commands": "node dist/register-commands.js",
+        "register:commands:guild": "DISCORD_COMMAND_REGISTRATION=guild node dist/register-commands.js",
+        "register:commands:global": "DISCORD_COMMAND_REGISTRATION=global node dist/register-commands.js",
+      },
       dependencies: { "discord.js": "14.15.3" },
       devDependencies: { typescript: "^5.4.5" },
     }, null, 2) + "\n",
@@ -161,11 +172,12 @@ Keep authentication tokens in your shell, CI secret store, or user-level npm con
 
 \`npm test\` includes a config validation test that confirms the bot fails clearly when DISCORD_TOKEN is missing.
 `,
-    ".env.example": "DISCORD_TOKEN=<secret reference resolved at runtime>\n",
+    ".env.example": `DISCORD_TOKEN=<secret reference resolved at runtime>\n${requireApplicationId ? "DISCORD_APPLICATION_ID=<discord app id>\n" : ""}${requireGuildId ? "DISCORD_GUILD_ID=<discord guild id>\n" : ""}`,
     "src/node-env.d.ts": `declare const process: { env: Record<string, string | undefined> };\n\ndeclare namespace NodeJS {\n  interface ProcessEnv {\n    [key: string]: string | undefined;\n  }\n}\n\ndeclare module "node:test" {\n  const test: (name: string, fn: () => void | Promise<void>) => void;\n  export default test;\n}\n\ndeclare module "node:assert/strict" {\n  const assert: {\n    ok(value: unknown, message?: string): void;\n    throws(fn: () => unknown, expected?: RegExp): void;\n  };\n  export default assert;\n}\n`,
-    "src/config.ts": `export interface BotConfig {\n  discordToken: string;\n}\n\nexport function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {\n  const discordToken = env.DISCORD_TOKEN;\n  if (!discordToken) {\n    throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef in royalScepter or set DISCORD_TOKEN before starting the bot.");\n  }\n  return { discordToken };\n}\n`,
+    "src/config.ts": `export interface BotConfig {\n  discordToken: string;\n  discordApplicationId: string;\n  discordGuildId: string | null;\n}\n\nexport function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {\n  const discordToken = env.DISCORD_TOKEN;\n  if (!discordToken) {\n    throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef in royalScepter or set DISCORD_TOKEN before starting the bot.");\n  }\n  const discordApplicationId = env.DISCORD_APPLICATION_ID;\n  if (!discordApplicationId) {\n    throw new Error("DISCORD_APPLICATION_ID is required for command registration.");\n  }\n  const commandRegistration = env.DISCORD_COMMAND_REGISTRATION ?? ${JSON.stringify(project.discord.commandRegistration)};\n  const discordGuildId = env.DISCORD_GUILD_ID ?? null;\n  if (commandRegistration === "guild" && !discordGuildId) {\n    throw new Error("DISCORD_GUILD_ID is required when command registration mode is guild.");\n  }\n  return { discordToken, discordApplicationId, discordGuildId };\n}\n`,
     "src/config.test.ts": `import test from "node:test";\nimport assert from "node:assert/strict";\nimport { loadConfig } from "./config.js";\n\ntest("config validation fails without required env vars", () => {\n  assert.throws(() => loadConfig({}), /DISCORD_TOKEN is required/);\n});\n`,
-    "src/commands/load.test.ts": `${commandTestImports}\nimport test from "node:test";\nimport assert from "node:assert/strict";\n\nconst commands = [${commandArray}];\n\ntest("command modules load", () => {\n  assert.ok(commands.length > 0);\n  assert.ok(commands.every((command) => command.data.name));\n});\n`,
+    "src/commands/load.test.ts": `${commandTestImports}\nimport test from "node:test";\nimport assert from "node:assert/strict";\n\nconst commands = [${commandArray}];\n\ntest("command modules load", () => {\n  assert.ok(commands.length > 0);\n  assert.ok(commands.every((command) => command.data.name));\n});\n\ntest("command payloads are serializable for registration", () => {\n  const payload = commands.map((command) => command.data);\n  const serialized = JSON.stringify(payload);\n  assert.ok(serialized.includes(commands[0].data.name));\n});\n`,
+    "src/register-commands.ts": `${commandImports}\nimport { REST, Routes } from "discord.js";\nimport { loadConfig } from "./config.js";\n\nconst commands = [${commandArray}].map((command) => command.data);\nconst config = loadConfig();\nconst registrationMode = process.env.DISCORD_COMMAND_REGISTRATION ?? ${JSON.stringify(project.discord.commandRegistration)};\n\nasync function registerCommands(): Promise<void> {\n  const rest = new REST({ version: "10" }).setToken(config.discordToken);\n  const route = registrationMode === "guild"\n    ? Routes.applicationGuildCommands(config.discordApplicationId, config.discordGuildId ?? "")\n    : Routes.applicationCommands(config.discordApplicationId);\n  await rest.put(route, { body: commands });\n  console.log(\`Registered \${commands.length} command(s) in ${registrationModeMessage} mode.\`);\n}\n\nregisterCommands().catch((error) => {\n  console.error("Failed to register commands", error);\n  process.exitCode = 1;\n});\n`,
     "src/index.ts": `${commandImports}\nimport { Client, GatewayIntentBits } from "discord.js";\nimport { loadConfig } from "./config.js";\n\nconst commands = [${commandArray}];\nconst config = loadConfig();\n\nconst client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });\nclient.once("ready", () => {\n  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);\n});\nclient.login(config.discordToken);\n`,
   };
   for (const command of commands) files[`src/commands/${sanitizeCommandFile(command.name)}.ts`] = commandFile(command);

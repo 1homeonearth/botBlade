@@ -43,13 +43,18 @@ function projectFixture(id = "project_generated_bot_install_test"): BotProject {
 
 test("generated package files pin discord.js and include a reproducible lockfile", () => {
   const files = templateFiles(projectFixture());
-  const packageJson = JSON.parse(files["package.json"]) as { dependencies: Record<string, string> };
+  const packageJson = JSON.parse(files["package.json"]) as { dependencies: Record<string, string>; scripts: Record<string, string> };
   const lockfile = JSON.parse(files["package-lock.json"]) as { packages: Record<string, { version?: string; dependencies?: Record<string, string> }> };
 
   assert.equal(packageJson.dependencies["discord.js"], "14.15.3");
   assert.equal(lockfile.packages[""].dependencies?.["discord.js"], "14.15.3");
   assert.equal(lockfile.packages["node_modules/discord.js"].version, "14.15.3");
   assert.equal(files["README.md"].includes("NPM_CONFIG_REGISTRY=https://npm.example.corp/repository/npm/ npm ci"), true);
+  assert.equal(packageJson.scripts["register:commands"], "node dist/register-commands.js");
+  assert.equal(files[".env.example"].includes("DISCORD_APPLICATION_ID"), true);
+  assert.equal(files[".env.example"].includes("DISCORD_GUILD_ID"), true);
+  assert.equal(files["src/register-commands.ts"].includes("Routes.applicationGuildCommands"), true);
+  assert.equal(files["src/commands/load.test.ts"].includes("serializable for registration"), true);
 });
 
 test("build install step uses npm ci when the generated lockfile is present", async () => {
