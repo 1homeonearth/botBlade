@@ -27,6 +27,7 @@ class DeploymentsFragment : Fragment() {
     private var projectId: String? = null
     private var latestSuccessfulBuild: BuildSummary? = null
     private var selectedTarget: DeploymentTargetSummary? = null
+    private var targetsById: Map<String, DeploymentTargetSummary> = emptyMap()
     private lateinit var status: TextView
     private lateinit var list: LinearLayout
     private lateinit var logs: TextView
@@ -61,6 +62,7 @@ class DeploymentsFragment : Fragment() {
         if (projectId == null) {
             status.text = getString(R.string.select_project_first)
         }
+        list.removeAllViews()
         loadBuilds()
         loadTargets()
         loadDeployments()
@@ -88,7 +90,7 @@ class DeploymentsFragment : Fragment() {
 
     private fun loadTargets() = lifecycleScope.launch {
         when (val result = deploymentRepository.listTargets()) {
-            is ApiResult.Success -> { selectedTarget = result.data.firstOrNull(); renderTargets(result.data); updateDeployButton() }
+            is ApiResult.Success -> { targetsById = result.data.associateBy { it.id }; selectedTarget = result.data.firstOrNull(); renderTargets(result.data); updateDeployButton() }
             is ApiResult.Error -> status.text = "Target error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -135,7 +137,9 @@ class DeploymentsFragment : Fragment() {
     private fun renderTargets(targets: List<DeploymentTargetSummary>) {
         targets.forEach { target ->
             val row = Button(requireContext()).apply {
-                text = "Target: ${target.name} (${target.type})\nTap to test/select"
+                val unsupported = target.capabilities.actions.filterValues { supported -> !supported }.keys.sorted().joinToString(", ").ifBlank { "none" }
+                val supported = target.capabilities.actions.filterValues { supported -> supported }.keys.sorted().joinToString(", ").ifBlank { "none" }
+                text = "Target: ${target.name} (${target.type})\nSupported: $supported\nUnsupported: $unsupported\nTap to test/select"
                 isAllCaps = false
                 setOnClickListener { selectedTarget = target; updateDeployButton(); testTarget(target) }
             }
@@ -154,21 +158,57 @@ class DeploymentsFragment : Fragment() {
     private fun renderDeployments(deployments: List<DeploymentJobSummary>) {
         deployments.forEach { deployment ->
             val row = Button(requireContext()).apply {
-                text = "Deployment: ${deployment.deploymentId}\nStatus: ${deployment.status}\nBuild: ${deployment.buildId}\n${deployment.errorMessage ?: ""}"
+                val target = targetsById[deployment.targetId]
+                val caps = target?.capabilities?.actions.orEmpty()
+                val restartSupport = if (caps["restart"] == true) "Restart supported" else "Restart unsupported"
+                val rollbackSupport = if (caps["rollback"] == true) "Rollback supported" else "Rollback unsupported"
+                text = "Deployment: ${deployment.deploymentId}\nStatus: ${deployment.status}\nBuild: ${deployment.buildId}\n$restartSupport · $rollbackSupport\nTap for logs/status"
                 isAllCaps = false
                 if (deployment.status == "failed") setTextColor(Color.RED)
-                setOnClickListener { loadDeploymentLogs(deployment) }
+                setOnClickListener { loadDeploymentDetails(deployment) }
             }
             list.addView(row)
         }
         status.text = "Loaded deployment data. Latest successful build: ${latestSuccessfulBuild?.buildId ?: "none"}."
     }
 
-    private fun loadDeploymentLogs(deployment: DeploymentJobSummary) = lifecycleScope.launch {
+    private fun loadDeploymentDetails(deployment: DeploymentJobSummary) = lifecycleScope.launch {
         val id = projectId ?: return@launch
-        when (val result = deploymentRepository.getDeploymentLogs(id, deployment.deploymentId)) {
-            is ApiResult.Success -> logs.text = result.data.ifBlank { "No logs captured." }
-            is ApiResult.Error -> logs.text = "Error: ${result.message}"
+        val target = targetsById[deployment.targetId]
+        val canRestart = target?.capabilities?.actions?.get("restart") == true
+        val canRollback = target?.capabilities?.actions?.get("rollback") == true
+        val statusResult = deploymentRepository.getDeploymentStatus(id, deployment.deploymentId)
+        val logResult = deploymentRepository.getDeploymentLogs(id, deployment.deploymentId)
+        val statusText = when (statusResult) {
+            is ApiResult.Success -> "Adapter status: ${statusResult.data.status ?: "unknown"} ${statusResult.data.message.orEmpty()}"
+            is ApiResult.Error -> "Adapter status unavailable: ${statusResult.message}"
+            ApiResult.Loading -> "Adapter status loading…"
+        }
+        val logText = when (logResult) {
+            is ApiResult.Success -> logResult.data.ifBlank { "No logs captured." }
+            is ApiResult.Error -> "Error: ${logResult.message}"
+            ApiResult.Loading -> "Logs loading…"
+        }
+        logs.text = "$statusText\nActions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}\n\n$logText"
+        if (!canRestart || !canRollback) status.text = "Unsupported deployment actions are disabled by adapter capabilities."
+    }
+
+    private fun restartDeployment(deployment: DeploymentJobSummary) = lifecycleScope.launch {
+        val id = projectId ?: return@launch
+        if (targetsById[deployment.targetId]?.capabilities?.actions?.get("restart") != true) { status.text = "Restart is unsupported by this adapter."; return@launch }
+        when (val result = deploymentRepository.restartDeployment(id, deployment.deploymentId)) {
+            is ApiResult.Success -> status.text = result.data.message ?: "Restart requested."
+            is ApiResult.Error -> status.text = "Restart failed: ${result.message}"
+            ApiResult.Loading -> Unit
+        }
+    }
+
+    private fun rollbackDeployment(deployment: DeploymentJobSummary) = lifecycleScope.launch {
+        val id = projectId ?: return@launch
+        if (targetsById[deployment.targetId]?.capabilities?.actions?.get("rollback") != true) { status.text = "Rollback is unsupported by this adapter."; return@launch }
+        when (val result = deploymentRepository.rollbackDeployment(id, deployment.deploymentId)) {
+            is ApiResult.Success -> { status.text = "Rollback result: ${result.data.status}"; loadDeployments() }
+            is ApiResult.Error -> status.text = "Rollback failed: ${result.message}"
             ApiResult.Loading -> Unit
         }
     }

@@ -225,11 +225,11 @@ Returns `{ "logs": "..." }` with redaction applied.
 
 ### `GET /api/deployment-targets`
 
-Requires admin/all-project access. Returns `{ "targets": DeploymentTarget[] }`.
+Requires admin/all-project access. Returns `{ "targets": DeploymentTarget[] }`. Each target includes derived adapter `capabilities` so clients can show supported and unsupported deployment actions.
 
 ### `POST /api/deployment-targets`
 
-Creates a target. Types: `local_process` or `local_docker`. Secret-like config keys are rejected; use `secretRefs`.
+Creates a target. Types: `local_process` or `local_docker`. Secret-like config keys are rejected; use `secretRefs`. `local_docker` accepts non-secret `config.image` and `config.dockerfile`.
 
 ### `GET|PATCH|DELETE /api/deployment-targets/:targetId`
 
@@ -253,13 +253,21 @@ Returns `{ "deployments": DeploymentJob[] }`.
 
 Returns one deployment job.
 
+### `GET /api/projects/:projectId/deployments/:deploymentId/status`
+
+Returns adapter runtime status for the selected deployment.
+
 ### `GET /api/projects/:projectId/deployments/:deploymentId/logs`
 
-Returns redacted logs.
+Returns adapter runtime logs with redaction applied.
+
+### `POST /api/projects/:projectId/deployments/:deploymentId/start|stop|restart`
+
+Runs the corresponding adapter action when the selected target supports it. Unsupported actions return `DEPLOYMENT_ACTION_UNSUPPORTED`.
 
 ### `POST /api/projects/:projectId/deployments/:deploymentId/rollback`
 
-Currently returns `ROLLBACK_UNSUPPORTED`.
+Rolls back when the adapter supports rollback. `local_docker` replaces the current container with the most recent previous image for the same project and target; `local_process` reports the action as unsupported.
 
 ## GitHub
 

@@ -23,6 +23,8 @@ import com.princess.royalscepter.data.model.DeploymentTargetCreateRequest
 import com.princess.royalscepter.data.model.DeploymentTargetTestResponse
 import com.princess.royalscepter.data.model.DeploymentJobSummary
 import com.princess.royalscepter.data.model.DeploymentCreateRequest
+import com.princess.royalscepter.data.model.DeploymentActionResponse
+import com.princess.royalscepter.data.model.DeploymentAdapterCapabilities
 import com.princess.royalscepter.data.model.GitHubStatusResponse
 import com.princess.royalscepter.data.model.BotCommand
 import com.princess.royalscepter.data.model.BotCommandHandler
@@ -306,6 +308,14 @@ class RoyalScepterApiClient(
     }
 
     @Throws(IOException::class)
+    fun getDeploymentStatus(projectId: String, deploymentId: String): DeploymentActionResponse =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/deployments/${deploymentId.urlPathSegment()}/status", method = "GET").toDeploymentActionResponse()
+
+    @Throws(IOException::class)
+    fun deploymentAction(projectId: String, deploymentId: String, action: String): DeploymentActionResponse =
+        request(path = "/api/projects/${projectId.urlPathSegment()}/deployments/${deploymentId.urlPathSegment()}/${action.urlPathSegment()}", method = "POST", requestBody = "{}").toDeploymentActionResponse()
+
+    @Throws(IOException::class)
     fun getGitHubStatus(): GitHubStatusResponse =
         request(path = "/api/github/status", method = "GET").toGitHubStatusResponse()
 
@@ -471,13 +481,25 @@ class RoyalScepterApiClient(
 
     private fun String.toDeploymentTargetSummary(): DeploymentTargetSummary = requireNotNull(asJsonOrNull()) { "Invalid deployment target response." }.toDeploymentTargetSummary()
 
-    private fun JSONObject.toDeploymentTargetSummary(): DeploymentTargetSummary = DeploymentTargetSummary(
-        id = optString("id"),
-        name = optString("name"),
-        type = optString("type"),
-        createdAt = optionalString("createdAt"),
-        updatedAt = optionalString("updatedAt"),
-    )
+    private fun JSONObject.toDeploymentTargetSummary(): DeploymentTargetSummary {
+        val capabilitiesJson = optJSONObject("capabilities") ?: JSONObject()
+        val actionsJson = capabilitiesJson.optJSONObject("actions") ?: JSONObject()
+        val actions = actionsJson.keys().asSequence().associateWith { actionsJson.optBoolean(it) }
+        val notesArray = capabilitiesJson.optJSONArray("notes") ?: JSONArray()
+        val notes = (0 until notesArray.length()).map { index -> notesArray.optString(index) }
+        return DeploymentTargetSummary(
+            id = optString("id"),
+            name = optString("name"),
+            type = optString("type"),
+            capabilities = DeploymentAdapterCapabilities(
+                supported = capabilitiesJson.optBoolean("supported"),
+                actions = actions,
+                notes = notes,
+            ),
+            createdAt = optionalString("createdAt"),
+            updatedAt = optionalString("updatedAt"),
+        )
+    }
 
     private fun String.toDeploymentTargetTestResponse(): DeploymentTargetTestResponse {
         val json = requireNotNull(asJsonOrNull()) { "Invalid deployment target test response." }
@@ -485,6 +507,15 @@ class RoyalScepterApiClient(
     }
 
     private fun String.toDeploymentJobSummary(): DeploymentJobSummary = requireNotNull(asJsonOrNull()) { "Invalid deployment response." }.toDeploymentJobSummary()
+
+    private fun String.toDeploymentActionResponse(): DeploymentActionResponse {
+        val json = requireNotNull(asJsonOrNull()) { "Invalid deployment action response." }
+        return DeploymentActionResponse(
+            status = json.optionalString("status"),
+            running = json.optBoolean("running"),
+            message = json.optionalString("message"),
+        )
+    }
 
     private fun JSONObject.toDeploymentJobSummary(): DeploymentJobSummary = DeploymentJobSummary(
         deploymentId = optString("deploymentId"),
