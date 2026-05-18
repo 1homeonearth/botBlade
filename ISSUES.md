@@ -15,3 +15,23 @@
   - `ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin` failed with `SDK location not found`.
   - `ANDROID_HOME=/path/to/android-sdk gradle :app:assembleDebug` failed with `SDK location not found`.
 - **Resolution notes:** Run `ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin` and `ANDROID_HOME=/path/to/android-sdk gradle :app:assembleDebug` in an SDK-enabled environment.
+
+## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
+
+- **Status:** Complete — generated bot installs now pin `discord.js`, include a generated lockfile, document registry mirror configuration, and emit redacted registry diagnostics for install failures.
+- **Context:** While hardening generated bot installs from `backend/src/services/projectFiles.ts`, this environment returned `403 Forbidden` when attempting to resolve `discord.js@14.15.3` from the public npm registry.
+- **Observed details:**
+  - `npm install --package-lock-only --ignore-scripts --audit=false --fund=false` failed for a temporary generated bot package.
+  - npm version: `11.4.2`.
+  - Node version: `v20.20.2` in this shell; generated bots still target Node 22 through their template/Dockerfile.
+- **Relevant logs:**
+  - `npm error code E403`
+  - `npm error 403 403 Forbidden - GET https://registry.npmjs.org/discord.js`
+  - `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`
+- **Troubleshooting steps taken:**
+  - Reproduced the 403 with both the default registry and `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`.
+  - Added generated README instructions for `NPM_CONFIG_REGISTRY` and local `.npmrc` registry mirror usage.
+  - Added a backend-side generated bot lockfile template and verified the generated `package-lock.json` is accepted by `npm ci --package-lock-only --ignore-scripts --audit=false --fund=false` without registry metadata resolution.
+  - Added build-service install diagnostics that log the configured registry, HTTP status/code, and failing URL with credentials/query values redacted.
+  - Added backend tests for generated `package.json`/lockfile contents, `npm ci` install-command selection, and redacted registry diagnostics.
+- **Resolution notes:** Use `NPM_CONFIG_REGISTRY=<approved mirror> npm ci` or an uncommitted `.npmrc` registry line in networks where the public registry returns 403.
