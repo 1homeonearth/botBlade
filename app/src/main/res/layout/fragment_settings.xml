@@ -15,6 +15,14 @@
             android:text="@string/settings_title"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
+        <ProgressBar
+            android:id="@+id/settings_progress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/secrets_status"
             android:layout_width="match_parent"

@@ -40,6 +40,16 @@
   - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
   - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
 
+- **Repeat occurrence 2026-05-18T10:06:06Z:** Pre-session unresolved issue review repeated the Android SDK preflight before Android release UX work.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
+
+- **Repeat occurrence 2026-05-18T10:21:12Z:** Android compilation verification for Android release UX changes hit the same missing SDK limitation.
+  - Command: `gradle :app:compileDebugKotlin`
+  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in local.properties.`
+  - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
+
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 
 - **Status:** Complete — generated bot installs now pin `discord.js`, include a generated lockfile, document registry mirror configuration, and emit redacted registry diagnostics for install failures.

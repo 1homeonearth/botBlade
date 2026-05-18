@@ -16,6 +16,14 @@
             android:text="@string/code_editor_title"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
+        <ProgressBar
+            android:id="@+id/editor_progress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/editor_status"
             android:layout_width="match_parent"
@@ -96,6 +104,14 @@
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:text="@string/revert_file" />
+
+            <Button
+                android:id="@+id/copy_file_path_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/copy_path" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

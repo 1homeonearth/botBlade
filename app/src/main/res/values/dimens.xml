@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="release_card_corner_radius">20dp</dimen>
+    <dimen name="release_card_elevation">2dp</dimen>
+</resources>

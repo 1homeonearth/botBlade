@@ -9,11 +9,16 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
+import com.princess.royalscepter.ui.common.addBodyText
+import com.princess.royalscepter.ui.common.copyToClipboard
+import com.princess.royalscepter.ui.common.materialListCard
+import com.princess.royalscepter.ui.common.visibleWhen
 import com.princess.royalscepter.R
 import com.princess.royalscepter.data.api.ApiResult
 import com.princess.royalscepter.data.model.BotCommand
@@ -31,6 +36,7 @@ class ProjectsFragment : Fragment() {
     private lateinit var activeProjectStore: ActiveProjectStore
     private lateinit var statusText: TextView
     private lateinit var projectsContainer: LinearLayout
+    private lateinit var progress: ProgressBar
     private lateinit var reloadButton: Button
     private lateinit var createButton: Button
 
@@ -42,6 +48,7 @@ class ProjectsFragment : Fragment() {
         activeProjectStore = ActiveProjectStore(requireContext())
         statusText = view.findViewById(R.id.projects_status_text)
         projectsContainer = view.findViewById(R.id.projects_container)
+        progress = view.findViewById(R.id.projects_progress)
         reloadButton = view.findViewById(R.id.reload_projects_button)
         createButton = view.findViewById(R.id.create_project_button)
 
@@ -65,8 +72,8 @@ class ProjectsFragment : Fragment() {
         val form = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 16, 48, 0) }
         val nameInput = EditText(requireContext()).apply { hint = getString(R.string.project_name_hint); setSingleLine(true) }
         val descriptionInput = EditText(requireContext()).apply { hint = getString(R.string.project_description_hint); minLines = 2 }
-        val templateInput = EditText(requireContext()).apply { hint = getString(R.string.project_template_hint); setText("template_blank_discord_ts"); setSingleLine(true) }
-        val runtimeInput = EditText(requireContext()).apply { hint = getString(R.string.project_runtime_hint); setText("node22"); setSingleLine(true) }
+        val templateInput = EditText(requireContext()).apply { hint = getString(R.string.project_template_hint); setText(getString(R.string.default_project_template)); setSingleLine(true) }
+        val runtimeInput = EditText(requireContext()).apply { hint = getString(R.string.project_runtime_hint); setText(getString(R.string.default_project_runtime)); setSingleLine(true) }
         form.addView(nameInput); form.addView(descriptionInput); form.addView(templateInput); form.addView(runtimeInput)
 
         AlertDialog.Builder(requireContext())
@@ -84,7 +91,7 @@ class ProjectsFragment : Fragment() {
                             return@setOnClickListener
                         }
                         dismiss()
-                        createProject(ProjectCreateRequest(name, descriptionInput.text.toString().trim(), templateInput.text.toString().trim().ifBlank { "template_blank_discord_ts" }, runtimeInput.text.toString().trim().ifBlank { "node22" }))
+                        createProject(ProjectCreateRequest(name, descriptionInput.text.toString().trim(), templateInput.text.toString().trim().ifBlank { getString(R.string.default_project_template) }, runtimeInput.text.toString().trim().ifBlank { getString(R.string.default_project_runtime) }))
                     }
                 }
             }
@@ -127,13 +134,14 @@ class ProjectsFragment : Fragment() {
         content.addView(status)
         project.commands.forEach { command ->
             content.addView(TextView(requireContext()).apply {
-                text = "/${command.name} — ${command.description}\n${command.handler.kind}: ${command.handler.content ?: "custom handler placeholder"}"
+                text = getString(R.string.command_summary, command.name, command.description, command.handler.kind, command.handler.content ?: getString(R.string.custom_handler_placeholder))
             })
             val actions = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL }
             actions.addView(Button(requireContext()).apply { text = getString(R.string.edit_command); setOnClickListener { showCommandEditor(project, command) } })
             actions.addView(Button(requireContext()).apply { text = getString(R.string.delete_command); setOnClickListener { confirmDeleteCommand(project, command) } })
             content.addView(actions)
         }
+        if (project.commands.isEmpty()) content.addView(TextView(requireContext()).apply { text = getString(R.string.commands_empty) })
         content.addView(Button(requireContext()).apply { text = getString(R.string.create_command); setOnClickListener { showCommandEditor(project, null) } })
         AlertDialog.Builder(requireContext())
             .setTitle(getString(R.string.project_commands_title, project.name))
@@ -209,12 +217,20 @@ class ProjectsFragment : Fragment() {
         }
     }
 
-    private fun renderLoading() { setButtonsEnabled(false); statusText.text = getString(R.string.projects_loading_message) }
+    private fun renderLoading() { progress.visibleWhen(true); setButtonsEnabled(false); statusText.text = getString(R.string.projects_loading_message) }
 
     private fun renderProjects(projects: List<BotProject>) {
+        progress.visibleWhen(false)
         setButtonsEnabled(true)
         projectsContainer.removeAllViews()
-        if (projects.isEmpty()) { statusText.text = getString(R.string.projects_empty_message); return }
+        if (projects.isEmpty()) {
+            statusText.text = getString(R.string.projects_empty_message)
+            projectsContainer.addView(requireContext().materialListCard {
+                addBodyText(getString(R.string.projects_empty_detail))
+                addView(Button(requireContext()).apply { text = getString(R.string.reload_projects); setOnClickListener { loadProjects() } })
+            })
+            return
+        }
         statusText.text = getString(R.string.projects_loaded_message, projects.size)
         projects.forEach { project -> projectsContainer.addView(createProjectCard(project)) }
     }
@@ -225,21 +241,33 @@ class ProjectsFragment : Fragment() {
         }
     }
 
-    private fun renderError(message: String) { setButtonsEnabled(true); projectsContainer.removeAllViews(); statusText.text = getString(R.string.projects_error_message, message) }
+    private fun renderError(message: String) {
+        progress.visibleWhen(false)
+        setButtonsEnabled(true)
+        projectsContainer.removeAllViews()
+        statusText.text = getString(R.string.projects_error_message, message)
+        projectsContainer.addView(requireContext().materialListCard {
+            addBodyText(getString(R.string.error_value, message))
+            addView(Button(requireContext()).apply { text = getString(R.string.retry); setOnClickListener { loadProjects() } })
+        })
+    }
 
     private fun createProjectCard(project: BotProject): View {
-        val card = MaterialCardView(requireContext()).apply { tag = project.id; radius = 20f; cardElevation = 2f; useCompatPadding = true; strokeWidth = if (activeProjectStore.getActiveProjectId() == project.id) 4 else 0; setOnClickListener { selectProject(project) } }
-        val content = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(28, 24, 28, 24) }
-        content.addView(TextView(requireContext()).apply { text = project.name; textSize = 20f })
-        content.addView(TextView(requireContext()).apply { text = project.description.ifBlank { getString(R.string.project_no_description) } })
-        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_runtime_value, project.runtime) })
-        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_command_count_value, project.commands.size) })
-        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_github_value, project.github?.let { "${it.owner}/${it.repo}" } ?: getString(R.string.github_not_linked)) })
-        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_command_registration_value, project.discord.commandRegistration) })
-        if (project.archivedAt != null) content.addView(TextView(requireContext()).apply { text = getString(R.string.project_archived_value, project.archivedAt) })
-        content.addView(TextView(requireContext()).apply { text = getString(R.string.project_updated_value, project.updatedAt) })
-        content.addView(Button(requireContext()).apply { text = getString(R.string.manage_commands); isAllCaps = false; setOnClickListener { showCommands(project) } })
-        card.addView(content)
+        val card = requireContext().materialListCard {
+            addBodyText(project.name).textSize = 20f
+            addBodyText(project.description.ifBlank { getString(R.string.project_no_description) })
+            addBodyText(getString(R.string.project_runtime_value, project.runtime))
+            addBodyText(getString(R.string.project_command_count_value, project.commands.size))
+            addBodyText(getString(R.string.project_github_value, project.github?.let { "${it.owner}/${it.repo}" } ?: getString(R.string.github_not_linked)))
+            addBodyText(getString(R.string.project_command_registration_value, project.discord.commandRegistration))
+            if (project.archivedAt != null) addBodyText(getString(R.string.project_archived_value, project.archivedAt))
+            addBodyText(getString(R.string.project_updated_value, project.updatedAt))
+            addView(Button(requireContext()).apply { text = getString(R.string.copy_id); isAllCaps = false; setOnClickListener { requireContext().copyToClipboard(getString(R.string.copy_id), project.id) } })
+            addView(Button(requireContext()).apply { text = getString(R.string.manage_commands); isAllCaps = false; setOnClickListener { showCommands(project) } })
+        }
+        card.tag = project.id
+        card.strokeWidth = if (activeProjectStore.getActiveProjectId() == project.id) 4 else 0
+        card.setOnClickListener { selectProject(project) }
         return card
     }
 

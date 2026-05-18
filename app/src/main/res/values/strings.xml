@@ -143,4 +143,84 @@ Repository: %3$s</string>
     <string name="github_workflow_created">Workflow preview available at %1$s. Push remains disabled unless the backend implements real GitHub push.</string>
     <string name="github_push_starting">Starting GitHub push…</string>
     <string name="github_error">GitHub: %1$s</string>
+
+    <string name="first_run_checklist_title">First-run release checklist</string>
+    <string name="first_run_backend_url_done">✓ Backend URL configured</string>
+    <string name="first_run_backend_url_todo">○ Configure backend URL in Settings</string>
+    <string name="first_run_project_done">✓ Project selected: %1$s</string>
+    <string name="first_run_project_todo">○ Create or select a project</string>
+    <string name="first_run_secret_todo">○ Add DISCORD_TOKEN secret</string>
+    <string name="first_run_discord_ids_todo">○ Configure Discord application, client, and guild IDs</string>
+    <string name="first_run_generate_todo">○ Generate project files in Editor</string>
+    <string name="first_run_build_todo">○ Start a build</string>
+    <string name="first_run_run_deploy_todo">○ Run locally or deploy latest successful build</string>
+    <string name="copy">Copy</string>
+    <string name="copy_id">Copy ID</string>
+    <string name="copy_path">Copy Path</string>
+    <string name="copy_logs">Copy Logs</string>
+    <string name="copy_workflow">Copy Workflow</string>
+    <string name="copied_to_clipboard">Copied %1$s.</string>
+    <string name="loading_files">Loading files…</string>
+    <string name="generating_project_files">Generating project files…</string>
+    <string name="generated_files_message">Generated %1$d file(s).</string>
+    <string name="loading_file_path">Loading %1$s…</string>
+    <string name="saving_file_path">Saving %1$s…</string>
+    <string name="starting_build">Starting build…</string>
+    <string name="files_loaded_message">Loaded %1$d file(s).</string>
+    <string name="editor_empty_files">No files yet. Generate project files to create the Discord bot scaffold.</string>
+    <string name="error_value">Error: %1$s</string>
+    <string name="file_path_label">File: %1$s</string>
+    <string name="retry">Retry</string>
+    <string name="projects_empty_detail">Create your first Discord bot project to continue the release checklist.</string>
+    <string name="dashboard_retry_detail">Check the backend URL in Settings, then retry the runtime status request.</string>
+    <string name="dashboard_copy_active_project_id">Copy Active Project ID</string>
+    <string name="commands_empty">No slash commands configured yet.</string>
+    <string name="command_summary">/%1$s — %2$s
+%3$s: %4$s</string>
+    <string name="custom_handler_placeholder">custom handler placeholder</string>
+    <string name="deployments_loading">Loading deployments…</string>
+    <string name="build_error_value">Build error: %1$s</string>
+    <string name="target_error_value">Target error: %1$s</string>
+    <string name="deployment_error_value">Deployment error: %1$s</string>
+    <string name="github_status_unavailable">GitHub status unavailable: %1$s</string>
+    <string name="github_status_line">GitHub: %1$s. %2$s</string>
+    <string name="created_target">Created target %1$s.</string>
+    <string name="deployment_started_value">Deployment %1$s: %2$s</string>
+    <string name="target_card_value">Target: %1$s (%2$s)</string>
+    <string name="tap_to_test_select">Tap to test/select</string>
+    <string name="target_test_value">Target test: %1$s - %2$s</string>
+    <string name="target_test_failed">Target test failed: %1$s</string>
+    <string name="deployment_card_value">Deployment: %1$s
+Status: %2$s
+Build: %3$s
+%4$s</string>
+    <string name="deployment_data_loaded">Loaded deployment data. Latest successful build: %1$s.</string>
+    <string name="none">none</string>
+    <string name="no_logs_captured">No logs captured.</string>
+    <string name="deployments_empty_detail">Create a build and deployment target, then deploy the latest successful build.</string>
+    <string name="targets_empty_detail">No deployment targets yet. Create a local_process or local_docker target.</string>
+    <string name="connected_lower">connected</string>
+    <string name="disconnected_lower">disconnected</string>
+    <string name="settings_busy">Working…</string>
+    <string name="save_secret_progress">Saving secret reference…</string>
+    <string name="enter_new_secret_value">Enter the new secret value in the secret value field first.</string>
+    <string name="rotating_secret">Rotating %1$s…</string>
+    <string name="delete_secret_reference_title">Delete secret reference?</string>
+    <string name="delete_secret_reference_message">Delete %1$s? The full value will remain hidden and cannot be recovered from this app.</string>
+    <string name="deleting_secret">Deleting %1$s…</string>
+    <string name="secrets_empty_detail">No secrets saved. Add a DISCORD_TOKEN secret before generating release-ready projects.</string>
+    <string name="secret_card_value">%1$s • %2$s
+%3$s • %4$s
+Updated: %5$s
+Project: %6$s</string>
+    <string name="global">global</string>
+    <string name="secrets_loaded_message">Loaded %1$d secret reference(s). Values stay hidden.</string>
+    <string name="workflow_content_label">Workflow content</string>
+    <string name="default_project_template">template_blank_discord_ts</string>
+    <string name="default_project_runtime">node22</string>
+    <string name="default_custom_secret_type">custom</string>
+    <string name="default_discord_token_type">discord_bot_token</string>
+    <string name="default_github_branch">main</string>
+    <string name="default_local_process_name">Local Process</string>
+    <string name="default_local_process_type">local_process</string>
 </resources>

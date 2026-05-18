@@ -22,6 +22,14 @@
             android:layout_marginTop="8dp"
             android:text="@string/active_project_none" />
 
+        <ProgressBar
+            android:id="@+id/deployments_progress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/deployments_status"
             android:layout_width="match_parent"
@@ -85,6 +93,13 @@
             android:layout_marginTop="16dp"
             android:text="@string/build_logs"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <Button
+            android:id="@+id/copy_build_logs_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/copy_logs" />
 
         <TextView
             android:id="@+id/build_logs_text"
