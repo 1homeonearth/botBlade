@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { BotProject } from "../models/project.js";
 import { RequestValidationError } from "./projectStore.js";
+import { generatedBotPackageLock } from "./generatedBotLockfile.js";
 
 export interface ProjectFileSummary {
   path: string;
@@ -87,7 +88,7 @@ export function parseFileWriteInput(value: unknown): { content: string } {
   return { content: object.content };
 }
 
-function templateFiles(project: BotProject): Record<string, string> {
+export function templateFiles(project: BotProject): Record<string, string> {
   const intents = project.permissions.intents.length > 0 ? project.permissions.intents : ["Guilds"];
   const commands = project.commands.length > 0 ? project.commands : [{
     id: "cmd_ping",
@@ -108,13 +109,45 @@ function templateFiles(project: BotProject): Record<string, string> {
       private: true,
       type: "module",
       scripts: { build: "tsc -p tsconfig.json", start: "node dist/index.js", test: "node --test dist/**/*.test.js" },
-      dependencies: { "discord.js": "^14.15.3" },
+      dependencies: { "discord.js": "14.15.3" },
       devDependencies: { typescript: "^5.4.5" },
     }, null, 2) + "\n",
+    "package-lock.json": generatedBotPackageLock(project.slug),
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", outDir: "dist", rootDir: "src", strict: true, skipLibCheck: true }, include: ["src/**/*.ts"] }, null, 2) + "\n",
     "Dockerfile": `FROM node:22-alpine AS deps\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev || npm install --omit=dev\n\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci || npm install\nCOPY tsconfig.json ./\nCOPY src ./src\nRUN npm run build\n\nFROM node:22-alpine AS runtime\nWORKDIR /app\nENV NODE_ENV=production\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY --from=build /app/dist ./dist\nCOPY package.json ./package.json\nCMD ["node", "dist/index.js"]\n`,
     ".dockerignore": "node_modules\ndist\n.env\n*.log\n",
-    "README.md": `# ${project.name}\n\nGenerated bot project for royalScepter. Configure DISCORD_TOKEN through a secret reference or your local shell environment; no secret values are written here.\n\n## Run manually\n\n\`\`\`bash\nnpm install\nnpm run build\nDISCORD_TOKEN=<placeholder-from-secret-manager> npm start\n\`\`\`\n\n## Validate config\n\n\`npm test\` includes a config validation test that confirms the bot fails clearly when DISCORD_TOKEN is missing.\n`,
+    "README.md": `# ${project.name}
+
+Generated bot project for royalScepter. Configure DISCORD_TOKEN through a secret reference or your local shell environment; no secret values are written here.
+
+## Run manually
+
+\`\`\`bash
+npm ci
+npm run build
+DISCORD_TOKEN=<placeholder-from-secret-manager> npm start
+\`\`\`
+
+## Install through a registry mirror
+
+This project includes a generated package-lock.json so npm can perform a reproducible install with \`npm ci\`. If the public npm registry returns \`403 Forbidden\` in your network, point npm at your approved corporate mirror before installing:
+
+\`\`\`bash
+NPM_CONFIG_REGISTRY=https://npm.example.corp/repository/npm/ npm ci
+\`\`\`
+
+You can also persist the mirror in a local, uncommitted \`.npmrc\` file:
+
+\`\`\`ini
+registry=https://npm.example.corp/repository/npm/
+\`\`\`
+
+Keep authentication tokens in your shell, CI secret store, or user-level npm config; do not commit registry credentials to this generated bot.
+
+## Validate config
+
+\`npm test\` includes a config validation test that confirms the bot fails clearly when DISCORD_TOKEN is missing.
+`,
     ".env.example": "DISCORD_TOKEN=<secret reference resolved at runtime>\n",
     "src/node-env.d.ts": `declare const process: { env: Record<string, string | undefined> };\n\ndeclare namespace NodeJS {\n  interface ProcessEnv {\n    [key: string]: string | undefined;\n  }\n}\n\ndeclare module "node:test" {\n  const test: (name: string, fn: () => void | Promise<void>) => void;\n  export default test;\n}\n\ndeclare module "node:assert/strict" {\n  const assert: {\n    ok(value: unknown, message?: string): void;\n    throws(fn: () => unknown, expected?: RegExp): void;\n  };\n  export default assert;\n}\n`,
     "src/config.ts": `export interface BotConfig {\n  discordToken: string;\n}\n\nexport function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {\n  const discordToken = env.DISCORD_TOKEN;\n  if (!discordToken) {\n    throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef in royalScepter or set DISCORD_TOKEN before starting the bot.");\n  }\n  return { discordToken };\n}\n`,
@@ -167,5 +200,5 @@ function sanitizeId(value: string): string {
 }
 
 function isGeneratedPath(relativePath: string): boolean {
-  return ["package.json", "tsconfig.json", "README.md", ".env.example", "Dockerfile", ".dockerignore"].includes(normalizeRelativePath(relativePath)) || normalizeRelativePath(relativePath).startsWith("src/");
+  return ["package.json", "package-lock.json", "tsconfig.json", "README.md", ".env.example", "Dockerfile", ".dockerignore"].includes(normalizeRelativePath(relativePath)) || normalizeRelativePath(relativePath).startsWith("src/");
 }

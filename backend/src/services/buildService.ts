@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import type { BotProject } from "../models/project.js";
 import { redactSecrets } from "./redaction.js";
 import { ProjectFileService } from "./projectFiles.js";
@@ -9,6 +9,9 @@ import { validateProject } from "./projectValidation.js";
 import type { AuditAction } from "./auditService.js";
 
 export type BuildStatus = "queued" | "validating" | "installing" | "building" | "testing" | "packaging" | "succeeded" | "failed" | "canceled";
+
+type LogAppender = (line: string) => void;
+export type CommandRunner = (command: string, args: string[], cwd: string, append: LogAppender) => Promise<void>;
 
 export interface BuildJob {
   buildId: string;
@@ -29,7 +32,7 @@ export class BuildService {
   private readonly jobs = new Map<string, BuildJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => void) {}
+  constructor(private readonly files: ProjectFileService, private readonly secretExists: (secretId: string) => boolean, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string }) => void, private readonly commandRunner: CommandRunner = runCommand) {}
 
   list(projectId: string): BuildJob[] {
     return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
@@ -67,7 +70,7 @@ export class BuildService {
   }
 
   private async run(project: BotProject, job: BuildJob, requestId: string): Promise<void> {
-    const append = (line: string) => this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(line)}\n`);
+    const append = (line: string) => this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(sanitizeUrlsInText(line))}\n`);
     try {
       job.status = "validating";
       const validation = validateProject(project, this.secretExists);
@@ -78,19 +81,25 @@ export class BuildService {
       if (!cwdResolved.includes(`${path.sep}generated-projects${path.sep}`)) throw new Error("Refusing to build outside generated-projects workspace.");
       if (job.clean) await fs.rm(path.join(cwd, "dist"), { recursive: true, force: true });
       job.status = "installing";
-      await runCommand("npm", [await fileExists(path.join(cwd, "package-lock.json")) ? "ci" : "install"], cwd, append);
+      const installArgs = [await fileExists(path.join(cwd, "package-lock.json")) ? "ci" : "install"];
+      try {
+        await this.commandRunner("npm", installArgs, cwd, append);
+      } catch (error) {
+        await appendNpmInstallDiagnostics(cwd, error, append);
+        throw error;
+      }
       job.status = "building";
-      await runCommand("npm", ["run", "build"], cwd, append);
+      await this.commandRunner("npm", ["run", "build"], cwd, append);
       if (job.runTests && await hasTestScript(cwd)) {
         job.status = "testing";
-        await runCommand("npm", ["test"], cwd, append);
+        await this.commandRunner("npm", ["test"], cwd, append);
       }
       job.status = "packaging";
       append("Packaging step completed (Docker image creation disabled for local phase).")
       job.status = "succeeded";
     } catch (error) {
       job.status = "failed";
-      job.errorMessage = redactSecrets(error instanceof Error ? error.message : String(error));
+      job.errorMessage = redactSecrets(sanitizeUrlsInText(error instanceof Error ? error.message : String(error)));
       append(`Build failed: ${job.errorMessage}`);
     } finally {
       job.finishedAt = new Date().toISOString();
@@ -106,22 +115,59 @@ export class BuildService {
   }
 }
 
-function runCommand(command: string, args: string[], cwd: string, append: (line: string) => void): Promise<void> {
+class CommandExecutionError extends Error {
+  constructor(message: string, public readonly output: string) {
+    super(message);
+    this.name = "CommandExecutionError";
+  }
+}
+
+function runCommand(command: string, args: string[], cwd: string, append: LogAppender): Promise<void> {
   return new Promise((resolve, reject) => {
-    append(`$ ${command} ${args.join(" ")}`);
+    let output = "";
+    const capture = (line: string) => {
+      output += `${line}\n`;
+      append(line);
+    };
+    capture(`$ ${command} ${args.join(" ")}`);
     const child = spawn(command, args, { cwd, shell: false, env: { ...process.env } });
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`${command} timed out.`));
+      reject(new CommandExecutionError(`${command} timed out.`, output));
     }, 120_000);
-    child.stdout.on("data", (chunk) => append(String(chunk).trimEnd()));
-    child.stderr.on("data", (chunk) => append(String(chunk).trimEnd()));
-    child.on("error", (error) => { clearTimeout(timeout); reject(error); });
+    child.stdout.on("data", (chunk) => capture(String(chunk).trimEnd()));
+    child.stderr.on("data", (chunk) => capture(String(chunk).trimEnd()));
+    child.on("error", (error) => { clearTimeout(timeout); reject(new CommandExecutionError(error.message, output)); });
     child.on("close", (code) => {
       clearTimeout(timeout);
-      if (code === 0) resolve(); else reject(new Error(`${command} exited with code ${code}.`));
+      if (code === 0) resolve(); else reject(new CommandExecutionError(`${command} exited with code ${code}.`, output));
     });
   });
+}
+
+async function appendNpmInstallDiagnostics(cwd: string, error: unknown, append: LogAppender): Promise<void> {
+  const output = error instanceof CommandExecutionError ? error.output : error instanceof Error ? error.message : String(error);
+  const status = output.match(/\b([1-5][0-9]{2})\b/)?.[1] ?? output.match(/\b(E[0-9]{3})\b/)?.[1] ?? "unknown";
+  const url = output.match(/https?:\/\/[^\s)]+/)?.[0] ?? "unknown";
+  const registry = await configuredRegistry(cwd);
+  append(`npm install registry diagnostics: registry=${registry}; status=${status}; url=${sanitizeUrl(url)}`);
+}
+
+async function configuredRegistry(cwd: string): Promise<string> {
+  const envRegistry = process.env.NPM_CONFIG_REGISTRY ?? process.env.npm_config_registry;
+  if (envRegistry) return sanitizeUrl(envRegistry);
+  const npmrc = await fs.readFile(path.join(cwd, ".npmrc"), "utf8").catch(() => "");
+  const registryLine = npmrc.split(/\r?\n/).find((line) => line.trim().startsWith("registry="));
+  if (registryLine) return sanitizeUrl(registryLine.split("=").slice(1).join("=").trim());
+  return "https://registry.npmjs.org/";
+}
+
+function sanitizeUrl(value: string): string {
+  return value.replace(/^(https?:\/\/)([^\s/@:]+):([^\s/@]+)@/i, "$1[REDACTED_CREDENTIALS]@").replace(/\?.*$/, "?[REDACTED_QUERY]");
+}
+
+function sanitizeUrlsInText(value: string): string {
+  return value.replace(/https?:\/\/[^\s)]+/g, (url) => sanitizeUrl(url));
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
