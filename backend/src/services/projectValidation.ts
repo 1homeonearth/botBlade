@@ -89,7 +89,8 @@ export function validateProject(project: BotProject, secretExists: (secretId: st
     }
     commandNames.add(command.name);
     requireField(command.description, "MISSING_COMMAND_DESCRIPTION", "Command description is required.", `${base}.description`, errors);
-    requireField(command.handler, "MISSING_COMMAND_HANDLER", "Command handler must exist.", `${base}.handler`, errors);
+    if (typeof command.handler === "string") requireField(command.handler, "MISSING_COMMAND_HANDLER", "Command handler must exist.", `${base}.handler`, errors);
+    else if (!command.handler?.kind) errors.push({ code: "MISSING_COMMAND_HANDLER", message: "Command handler must exist.", field: `${base}.handler` });
     (command.options ?? []).forEach((option, optionIndex) => {
       const optionBase = `${base}.options.${optionIndex}`;
       if (!discordNameRegex.test(option.name)) {

@@ -2,6 +2,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import crypto from "node:crypto";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
 import { BuildService } from "./services/buildService.js";
+import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./services/commandDefinitions.js";
+import { DeploymentJobStore } from "./services/deploymentJobs.js";
+import { DeploymentTargetStore, testDeploymentTarget } from "./services/deploymentTargets.js";
+import { GitHubIntegrationService } from "./services/githubIntegration.js";
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
 import { ProjectFileService, parseFileWriteInput } from "./services/projectFiles.js";
 import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUpdateProjectInput, ProjectStore, RequestValidationError } from "./services/projectStore.js";
@@ -14,6 +18,9 @@ const secretStore = new SecretStore();
 const fileService = new ProjectFileService();
 const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId));
 const runtimeService = new LocalProcessRuntimeService(fileService, (secretId) => secretStore.getValue(secretId));
+const targetStore = new DeploymentTargetStore();
+const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService);
+const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
 const port = Number(process.env.PORT ?? 8000);
 
 createServer(async (req, res) => {
@@ -35,6 +42,27 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
+
+  if (method === "GET" && path === "/api/github/status") return writeJson(res, 200, githubService.status());
+  if (method === "POST" && path === "/api/github/connect") return writeJson(res, 200, githubService.connect(await readJson(req)));
+
+  if (method === "GET" && path === "/api/deployment-targets") return writeJson(res, 200, { targets: targetStore.list() });
+  if (method === "POST" && path === "/api/deployment-targets") return writeJson(res, 201, targetStore.create(await readJson(req)));
+  const targetMatch = path.match(/^\/api\/deployment-targets\/([^/]+)(?:\/(test))?$/);
+  if (targetMatch) {
+    const [, targetId, action] = targetMatch;
+    const target = targetStore.get(targetId);
+    if (!target) throw notFoundTarget(targetId);
+    if (method === "GET" && !action) return writeJson(res, 200, target);
+    if (method === "PATCH" && !action) return writeJson(res, 200, targetStore.update(targetId, await readJson(req)) ?? notFoundTarget(targetId));
+    if (method === "DELETE" && !action) {
+      if (!targetStore.delete(targetId)) throw notFoundTarget(targetId);
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    if (method === "POST" && action === "test") return writeJson(res, 200, await testDeploymentTarget(target));
+  }
 
   if (method === "GET" && path === "/api/bot-status/") {
     const project = projectStore.list()[0];
@@ -103,6 +131,62 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (method === "GET" && action === "logs") return writeJson(res, 200, { logs: runtimeService.getLogs(projectId) });
   }
 
+  const deploymentMatch = path.match(/^\/api\/projects\/([^/]+)\/deployments(?:\/([^/]+)(?:\/(logs|rollback))?)?$/);
+  if (deploymentMatch) {
+    const [, projectId, deploymentId, action] = deploymentMatch;
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (method === "POST" && !deploymentId) return writeJson(res, 201, await deploymentStore.create(project, await readJson(req)));
+    if (method === "GET" && !deploymentId) return writeJson(res, 200, { deployments: deploymentStore.list(projectId) });
+    if (method === "GET" && deploymentId && !action) return writeJson(res, 200, deploymentStore.get(projectId, deploymentId) ?? notFoundDeployment(deploymentId));
+    if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, { logs: deploymentStore.getLogs(projectId, deploymentId) ?? notFoundDeployment(deploymentId) });
+    if (method === "POST" && deploymentId && action === "rollback") return writeJson(res, 200, deploymentStore.rollback(project, deploymentId));
+  }
+
+  const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);
+  if (commandsMatch) {
+    const [, projectId, commandId] = commandsMatch;
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (method === "GET" && !commandId) return writeJson(res, 200, { commands: project.commands });
+    if (method === "POST" && !commandId) {
+      const command = parseCommandDefinition(await readJson(req));
+      const commands = [...project.commands, command];
+      validateCommands(commands);
+      project.commands = commands;
+      project.updatedAt = new Date().toISOString();
+      return writeJson(res, 201, command);
+    }
+    const index = project.commands.findIndex((command) => command.id === commandId);
+    if (index < 0) throw notFoundCommand(commandId ?? "");
+    if (method === "PATCH" && commandId) {
+      const updated = parseCommandPatch(await readJson(req), project.commands[index]);
+      const commands = [...project.commands];
+      commands[index] = updated;
+      validateCommands(commands);
+      project.commands = commands;
+      project.updatedAt = new Date().toISOString();
+      return writeJson(res, 200, updated);
+    }
+    if (method === "DELETE" && commandId) {
+      project.commands = project.commands.filter((command) => command.id !== commandId);
+      project.updatedAt = new Date().toISOString();
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+  }
+
+  const githubProjectMatch = path.match(/^\/api\/projects\/([^/]+)\/github\/(create-repo|push|create-workflow)$/);
+  if (githubProjectMatch) {
+    const [, projectId, action] = githubProjectMatch;
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
+    if (method === "POST" && action === "push") return writeJson(res, 200, githubService.push(project));
+    if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
+  }
+
   const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/(archive|clone|validate|generate|regenerate))?$/);
   if (projectMatch) {
     const [, projectId, action] = projectMatch;
@@ -169,6 +253,18 @@ function notFoundSecret(secretId: string): never {
 
 function notFoundBuild(buildId: string): never {
   throw { statusCode: 404, code: "NOT_FOUND", message: `Build '${buildId}' was not found.`, details: {} };
+}
+
+function notFoundTarget(targetId: string): never {
+  throw { statusCode: 404, code: "NOT_FOUND", message: `Deployment target '${targetId}' was not found.`, details: {} };
+}
+
+function notFoundDeployment(deploymentId: string): never {
+  throw { statusCode: 404, code: "NOT_FOUND", message: `Deployment '${deploymentId}' was not found.`, details: {} };
+}
+
+function notFoundCommand(commandId: string): never {
+  throw { statusCode: 404, code: "NOT_FOUND", message: `Command '${commandId}' was not found.`, details: {} };
 }
 
 function isHttpError(value: unknown): value is { statusCode: number; code: string; message: string; details: unknown } {

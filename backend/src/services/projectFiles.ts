@@ -89,10 +89,18 @@ export function parseFileWriteInput(value: unknown): { content: string } {
 
 function templateFiles(project: BotProject): Record<string, string> {
   const intents = project.permissions.intents.length > 0 ? project.permissions.intents : ["Guilds"];
-  const commandLines = project.commands.length > 0
-    ? project.commands.map((command) => `  { name: ${JSON.stringify(command.name)}, description: ${JSON.stringify(command.description)} },`).join("\n")
-    : `  { name: "ping", description: "Replies with pong." },`;
-  return {
+  const commands = project.commands.length > 0 ? project.commands : [{
+    id: "cmd_ping",
+    name: "ping",
+    description: "Replies with pong.",
+    type: "chat_input" as const,
+    options: [],
+    permissions: { defaultMemberPermissions: null, dmPermission: false },
+    handler: { kind: "static_response" as const, ephemeral: true, content: "Pong." },
+  }];
+  const commandImports = commands.map((command) => `import { ${commandExportName(command.name)} } from "./commands/${sanitizeCommandFile(command.name)}.js";`).join("\n");
+  const commandArray = commands.map((command) => commandExportName(command.name)).join(", ");
+  const files: Record<string, string> = {
     "package.json": JSON.stringify({
       scripts: { build: "tsc -p tsconfig.json", start: "node dist/index.js", test: "node --test dist/**/*.test.js" },
       dependencies: { "discord.js": "^14.15.3" },
@@ -101,8 +109,23 @@ function templateFiles(project: BotProject): Record<string, string> {
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", outDir: "dist", rootDir: "src", strict: true, skipLibCheck: true }, include: ["src/**/*.ts"] }, null, 2) + "\n",
     "README.md": `# ${project.name}\n\nGenerated bot project for royalScepter. Configure DISCORD_TOKEN through a secret reference; no secret values are written here.\n`,
     ".env.example": "DISCORD_TOKEN=<secret reference resolved at runtime>\n",
-    "src/index.ts": `import { Client, GatewayIntentBits } from "discord.js";\n\nconst commands = [\n${commandLines}\n];\n\nconst token = process.env.DISCORD_TOKEN;\nif (!token) {\n  throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef on the project.");\n}\n\nconst client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });\nclient.once("ready", () => {\n  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);\n});\nclient.login(token);\n`,
+    "src/index.ts": `${commandImports}\nimport { Client, GatewayIntentBits } from "discord.js";\n\nconst commands = [${commandArray}];\n\nconst token = process.env.DISCORD_TOKEN;\nif (!token) {\n  throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef on the project.");\n}\n\nconst client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });\nclient.once("ready", () => {\n  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);\n});\nclient.login(token);\n`,
   };
+  for (const command of commands) files[`src/commands/${sanitizeCommandFile(command.name)}.ts`] = commandFile(command);
+  return files;
+}
+
+function commandFile(command: BotProject["commands"][number]): string {
+  const response = typeof command.handler === "object" && command.handler.kind === "static_response" ? command.handler.content ?? "" : "TODO: implement custom TypeScript handler.";
+  return `export const ${commandExportName(command.name)} = {\n  data: {\n    name: ${JSON.stringify(command.name)},\n    description: ${JSON.stringify(command.description)},\n    type: ${JSON.stringify(command.type ?? "chat_input")},\n    options: ${JSON.stringify(command.options ?? [])},\n    defaultMemberPermissions: ${JSON.stringify(command.permissions?.defaultMemberPermissions ?? null)},\n    dmPermission: ${JSON.stringify(command.permissions?.dmPermission ?? false)}\n  },\n  handler: {\n    kind: ${JSON.stringify(typeof command.handler === "object" ? command.handler.kind : "custom_typescript_placeholder")},\n    ephemeral: ${JSON.stringify(Boolean(typeof command.handler === "object" ? command.handler.ephemeral : false))},\n    content: ${JSON.stringify(response)}\n  }\n};\n`;
+}
+
+function sanitizeCommandFile(name: string): string {
+  return name.replace(/[^a-z0-9_-]/g, "_");
+}
+
+function commandExportName(name: string): string {
+  return `${sanitizeCommandFile(name).replace(/(^|[-_])(\w)/g, (_match, _prefix, letter: string) => letter.toUpperCase())}Command`;
 }
 
 async function walk(root: string, current: string, output: ProjectFileSummary[]): Promise<void> {

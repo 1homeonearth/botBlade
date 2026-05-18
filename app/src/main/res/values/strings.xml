@@ -71,4 +71,16 @@
     <string name="delete_secret">Delete</string>
     <string name="build_logs">Build logs</string>
     <string name="build_logs_empty">Select a build to view logs.</string>
+
+    <string name="start_runtime">Start</string>
+    <string name="stop_runtime">Stop</string>
+    <string name="restart_runtime">Restart</string>
+    <string name="view_logs">View Logs</string>
+    <string name="open_deployments_for_logs">Open Deployments to view runtime and deployment logs.</string>
+    <string name="dashboard_legacy_status_loaded">Status loaded from legacy /api/bot-status/.</string>
+    <string name="dashboard_project_status_loaded">Status loaded from project runtime endpoint.</string>
+    <string name="deployment_target_name_hint">Target name (for example Local Process)</string>
+    <string name="deployment_target_type_hint">Target type: local_process or local_docker</string>
+    <string name="create_deployment_target">Create Deployment Target</string>
+    <string name="deploy_latest_build">Deploy Latest Successful Build</string>
 </resources>

@@ -1,0 +1,93 @@
+import { randomUUID } from "node:crypto";
+import type { BotProject } from "../models/project.js";
+import type { BuildService } from "./buildService.js";
+import { RequestValidationError } from "./projectStore.js";
+import { redactSecrets } from "./redaction.js";
+import type { DeploymentTargetStore } from "./deploymentTargets.js";
+import type { LocalProcessRuntimeService } from "./localProcessRuntimeService.js";
+import { adapterFor } from "./deploymentAdapters.js";
+
+export type DeploymentStatus = "queued" | "preparing" | "deploying" | "deployed" | "running" | "failed" | "rolled_back" | "canceled";
+
+export interface DeploymentJob {
+  deploymentId: string;
+  projectId: string;
+  targetId: string;
+  buildId: string;
+  status: DeploymentStatus;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+  errorMessage: string | null;
+  logUrl: string;
+}
+
+export class DeploymentJobStore {
+  private readonly jobs = new Map<string, DeploymentJob[]>();
+  private readonly logs = new Map<string, string>();
+
+  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService) {}
+
+  list(projectId: string): DeploymentJob[] { return [...(this.jobs.get(projectId) ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
+  get(projectId: string, deploymentId: string): DeploymentJob | undefined { return this.jobs.get(projectId)?.find((job) => job.deploymentId === deploymentId); }
+  getLogs(projectId: string, deploymentId: string): string | undefined { return this.get(projectId, deploymentId) ? this.logs.get(deploymentId) ?? "" : undefined; }
+
+  async create(project: BotProject, request: unknown): Promise<DeploymentJob> {
+    const body = asRecord(request);
+    const targetId = stringField(body, "targetId");
+    const buildId = stringField(body, "buildId");
+    const target = this.targetStore.get(targetId);
+    if (!target) throw { statusCode: 404, code: "TARGET_NOT_FOUND", message: `Deployment target '${targetId}' was not found.`, details: {} };
+    const build = this.buildService.get(project.id, buildId);
+    if (!build) throw { statusCode: 404, code: "BUILD_NOT_FOUND", message: `Build '${buildId}' was not found.`, details: {} };
+    if (build.status !== "succeeded") throw { statusCode: 400, code: "BUILD_NOT_DEPLOYABLE", message: "Only succeeded builds can be deployed.", details: { buildId, status: build.status } };
+
+    const now = new Date().toISOString();
+    const job: DeploymentJob = { deploymentId: `deployment_${randomUUID()}`, projectId: project.id, targetId, buildId, status: "queued", createdAt: now, updatedAt: now, finishedAt: null, errorMessage: null, logUrl: `/api/projects/${project.id}/deployments/deployment_${randomUUID()}/logs` };
+    job.logUrl = `/api/projects/${project.id}/deployments/${job.deploymentId}/logs`;
+    this.jobs.set(project.id, [job, ...(this.jobs.get(project.id) ?? [])]);
+    await this.run(project, job);
+    return job;
+  }
+
+  rollback(project: BotProject, deploymentId: string): DeploymentJob {
+    const job = this.get(project.id, deploymentId);
+    if (!job) throw { statusCode: 404, code: "DEPLOYMENT_NOT_FOUND", message: `Deployment '${deploymentId}' was not found.`, details: {} };
+    throw { statusCode: 400, code: "ROLLBACK_UNSUPPORTED", message: "Rollback is not supported by the selected deployment adapter yet.", details: { deploymentId } };
+  }
+
+  private async run(project: BotProject, job: DeploymentJob): Promise<void> {
+    const append = (line: string) => this.logs.set(job.deploymentId, `${this.logs.get(job.deploymentId) ?? ""}${redactSecrets(line)}\n`);
+    try {
+      const target = this.targetStore.get(job.targetId);
+      const build = this.buildService.get(project.id, job.buildId);
+      if (!target || !build) throw new Error("Deployment dependency disappeared.");
+      const adapter = adapterFor(target);
+      adapter.validateTarget(target);
+      job.status = "preparing"; job.updatedAt = new Date().toISOString();
+      for (const line of await adapter.prepare({ project, target, build, runtime: this.runtime })) append(line);
+      job.status = "deploying"; job.updatedAt = new Date().toISOString();
+      for (const line of await adapter.deploy({ project, target, build, runtime: this.runtime })) append(line);
+      job.status = "deployed";
+      project.deployment = { targetId: target.id, lastDeploymentId: job.deploymentId };
+      project.updatedAt = new Date().toISOString();
+      append("Deployment completed.");
+    } catch (error) {
+      job.status = "failed";
+      job.errorMessage = redactSecrets(error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : String(error));
+      append(`Deployment failed: ${job.errorMessage}`);
+    } finally {
+      job.updatedAt = new Date().toISOString();
+      job.finishedAt = new Date().toISOString();
+    }
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringField(object: Record<string, unknown>, field: string): string {
+  if (typeof object[field] === "string" && object[field].trim()) return object[field].trim();
+  throw new RequestValidationError([{ field, message: `${field} is required.` }]);
+}

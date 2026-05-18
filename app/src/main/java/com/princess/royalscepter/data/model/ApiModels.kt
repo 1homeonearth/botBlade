@@ -133,3 +133,51 @@ data class BuildSummary(
     val finishedAt: String?,
     val errorMessage: String?,
 )
+
+data class RuntimeStatusResponse(
+    val projectId: String,
+    val status: String,
+    val running: Boolean = false,
+    val message: String? = null,
+)
+
+data class DeploymentTargetSummary(
+    val id: String,
+    val name: String,
+    val type: String,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+)
+
+data class DeploymentTargetCreateRequest(
+    val name: String,
+    val type: String,
+)
+
+data class DeploymentTargetTestResponse(
+    val ok: Boolean,
+    val status: String,
+    val message: String,
+)
+
+data class DeploymentJobSummary(
+    val deploymentId: String,
+    val projectId: String,
+    val targetId: String,
+    val buildId: String,
+    val status: String,
+    val createdAt: String? = null,
+    val finishedAt: String? = null,
+    val errorMessage: String? = null,
+)
+
+data class DeploymentCreateRequest(
+    val targetId: String,
+    val buildId: String,
+)
+
+data class GitHubStatusResponse(
+    val connected: Boolean,
+    val tokenSecretRef: String? = null,
+    val message: String? = null,
+)
