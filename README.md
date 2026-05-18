@@ -45,6 +45,18 @@ If your environment only provides a system Gradle install:
 gradle :app:assembleDebug
 ```
 
+Run Android-side unit tests with JUnit and Robolectric from the repository root:
+
+```bash
+./gradlew :app:testDebugUnitTest
+```
+
+With a system Gradle install, use:
+
+```bash
+gradle :app:testDebugUnitTest
+```
+
 The API base URL is resolved from Android configuration instead of being hard-coded:
 
 - Debug emulator builds default to `http://10.0.2.2:8000`, which reaches a backend running on the development host.

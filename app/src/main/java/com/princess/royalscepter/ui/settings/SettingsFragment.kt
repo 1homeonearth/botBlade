@@ -26,6 +26,7 @@ import com.princess.royalscepter.data.model.SecretSummary
 import com.princess.royalscepter.data.repository.ProjectRepository
 import com.princess.royalscepter.data.repository.SecretRepository
 import com.princess.royalscepter.data.store.ActiveProjectStore
+import com.princess.royalscepter.util.GitHubDisplayFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -172,7 +173,7 @@ class SettingsFragment : Fragment() {
             R.string.github_status_value,
             if (connected) getString(R.string.github_connected) else getString(R.string.github_not_connected),
             project?.name ?: getString(R.string.active_project_none),
-            github?.let { "${it.owner}/${it.repo}" } ?: getString(R.string.github_not_linked),
+            GitHubDisplayFormatter.repositoryName(github),
         )
     }
 
