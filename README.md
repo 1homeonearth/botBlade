@@ -4,9 +4,9 @@
 
 ## Download Royal Scepter for Android
 
-- **Recommended:** [`royal-scepter.apk`](./releases/latest/download/royal-scepter.apk) from the [Latest Release](./releases/latest).
-- Direct APK download: [./releases/latest/download/royal-scepter.apk](./releases/latest/download/royal-scepter.apk)
-- Checksums: [./releases/latest/download/SHA256SUMS.txt](./releases/latest/download/SHA256SUMS.txt)
+- **Recommended:** [`royal-scepter.apk`](https://github.com/1homeonearth/botBlade/releases/latest/download/royal-scepter.apk) from the [Latest Release](https://github.com/1homeonearth/botBlade/releases/latest).
+- Direct APK download: [https://github.com/1homeonearth/botBlade/releases/latest/download/royal-scepter.apk](https://github.com/1homeonearth/botBlade/releases/latest/download/royal-scepter.apk)
+- Checksums: [https://github.com/1homeonearth/botBlade/releases/latest/download/SHA256SUMS.txt](https://github.com/1homeonearth/botBlade/releases/latest/download/SHA256SUMS.txt)
 
 Regular users should download `royal-scepter.apk`. Debug APKs are for testers. Unsigned APKs are for developers/testers only.
 
@@ -29,26 +29,33 @@ botBlade is an Android-based Discord bot builder and deployment console. The rep
 
 ## Current status
 
-Implemented today:
+botBlade is an early-stage Android + backend control plane for creating, editing, building, and running Discord bot projects from a mobile-first interface.
 
-- Android shell with Dashboard, Projects, Editor, Deployments, Settings, and reachable project/secret/deployment flows wired through a centralized API client.
-- Backend on port `8000` by default.
-- Legacy local compatibility endpoints: `GET /api/bot-status/` and `POST /api/bot-toggle/`.
-- Project CRUD, archive, clone, validation, command management, and generated file list/read/save.
-- Secret metadata storage with in-memory local-dev secret values, fingerprints, and redacted responses.
-- Build jobs for generated TypeScript bots.
-- Local-process runtime start/stop/restart controls when a generated project and Discord token secret reference are configured.
-- Deployment target skeleton with `local_process` behavior and explicit `local_docker` future limitations.
-- Audit event recording and listing for important project, secret, generation, build, deployment, runtime, GitHub, and command-registration actions.
+Implemented:
 
-Future / not complete yet:
+- Native Android client with Dashboard, Projects, Editor, Deployments, and Settings screens.
+- Backend API on port `8000` by default.
+- Bearer/session-token authentication for protected API routes.
+- Project CRUD, archive, clone, validation, command management, generated file list/read/save, and bot generation.
+- SQLite-backed persistence for projects, secret metadata, encrypted secret values, audit events, build jobs, deployment targets, deployment jobs, and logs.
+- Local process runtime controls for generated bots.
+- Local Docker deployment adapter with build/run/status/start/stop/restart/logs/rollback support.
+- Audit event recording for sensitive project, secret, build, deployment, runtime, GitHub, and command-registration actions.
+- GitHub Actions APK build/release pipeline with deterministic APK artifacts and SHA256 checksums.
 
-- Persistent database storage.
-- Real GitHub push execution.
-- Real Docker deployment execution.
+Still experimental:
+
+- Phone-hosted runtime reliability under Android background limits.
+- Production identity provider integration.
 - Remote/cloud deployment adapters.
-- Production authentication/authorization.
-- Encrypted production secret vault integration.
+- Real GitHub push execution.
+- Hardened build isolation for untrusted generated bot code.
+
+## Naming
+
+- **botBlade** is the repository, backend service, and developer platform name.
+- **Royal Scepter** is the Android application and APK distribution name.
+- `com.princess.botblade` is the Android package namespace.
 
 ## Featured mobile IDE capabilities
 
@@ -120,6 +127,16 @@ Public release assets:
 
 See [docs/releases.md](docs/releases.md) for full release workflow and recovery steps.
 
+## Deployment model
+
+botBlade supports three layers:
+
+1. Android app: mobile control surface.
+2. Backend: builder, editor, secret manager, audit log, deployment orchestrator.
+3. Runtime target: where generated bots actually run.
+
+Local process mode is for development. Local Docker is for stronger local/runtime isolation. Remote/cloud adapters are the production direction.
+
 ## Backend setup
 
 The backend lives in `backend/` and requires Node 22 or newer.
@@ -145,7 +162,7 @@ curl http://localhost:8000/api/health
 
 ## Local development mode
 
-Local development intentionally uses in-memory stores. Restarting the backend clears projects, secret metadata, secret values, build jobs, deployment targets, runtime records, and audit events.
+By default, non-test backend startup uses SQLite-backed persistence (see [docs/persistence.md](docs/persistence.md)). Test mode can still use in-memory adapters when explicitly configured for isolated test runs.
 
 Local compatibility endpoints remain available for early Android dashboard integration:
 
@@ -202,6 +219,9 @@ curl -X POST http://localhost:8000/api/projects/<projectId>/runtime/start
 Stop or restart with `/runtime/stop` and `/runtime/restart`.
 
 ## Security notes
+
+For route-level auth requirements and threat model details, see [SECURITY.md](SECURITY.md).
+
 
 - Secret API responses return metadata and fingerprints only, never secret values.
 - Secret values are stored in memory for local development only.
