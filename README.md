@@ -40,6 +40,14 @@ Future / not complete yet:
 - Production authentication/authorization.
 - Encrypted production secret vault integration.
 
+## Featured mobile IDE capabilities
+
+The app now prioritizes readability and IDE-like daily workflows:
+
+- High-contrast day/night theme tuning for easier reading on dark backgrounds.
+- Project creation, file list browsing, inline code editing, save/revert actions, and build/start controls from one mobile workflow.
+- GitHub repository linking and workflow preview actions for pushing generated bot projects into CI-ready repos.
+
 ## Android app setup
 
 The Android app is in `app/` and uses Kotlin, AndroidX, AppCompat, Material Components, and native Android views. The package namespace is `com.princess.botblade`.
@@ -54,6 +62,12 @@ If your environment only provides a system Gradle install:
 
 ```bash
 gradle :app:assembleDebug
+```
+
+Android unit tests (flavor-specific):
+
+```bash
+gradle :app:testLocalDevDebugUnitTest
 ```
 
 The API base URL is resolved from Android configuration instead of being hard-coded:

@@ -1,5 +1,8 @@
 package com.princess.botblade.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Bundle
 import android.text.InputType
 import android.view.LayoutInflater
@@ -10,6 +13,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -50,6 +54,9 @@ class SettingsFragment : Fragment() {
     private lateinit var githubBranchInput: EditText
     private lateinit var pushGitHubButton: Button
     private lateinit var workflowButton: Button
+    private lateinit var workflowHelpText: TextView
+    private lateinit var copyWorkflowHelpButton: Button
+    private lateinit var apkDownloadsText: TextView
     private var activeProject: BotProject? = null
     private var currentGitHubStatus: GitHubStatusResponse? = null
 
@@ -84,6 +91,9 @@ class SettingsFragment : Fragment() {
         githubBranchInput = view.findViewById(R.id.github_branch_input)
         pushGitHubButton = view.findViewById(R.id.push_github_button)
         workflowButton = view.findViewById(R.id.create_github_workflow_button)
+        workflowHelpText = view.findViewById(R.id.github_workflow_help_text)
+        copyWorkflowHelpButton = view.findViewById(R.id.copy_github_workflow_help_button)
+        apkDownloadsText = view.findViewById(R.id.apk_downloads_text)
 
         valueInput.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         backendUrlInput.setText(ApiConfig.baseUrl)
@@ -96,7 +106,9 @@ class SettingsFragment : Fragment() {
         view.findViewById<Button>(R.id.connect_github_button).setOnClickListener { connectGitHub() }
         view.findViewById<Button>(R.id.link_github_repo_button).setOnClickListener { linkGitHubRepo() }
         workflowButton.setOnClickListener { createWorkflow() }
+        copyWorkflowHelpButton.setOnClickListener { copyWorkflowInstructions() }
         pushGitHubButton.setOnClickListener { pushGitHub() }
+        apkDownloadsText.text = getString(R.string.apk_download_links, "princessraven/royalScepter")
         loadSecrets()
         loadGitHubSection()
     }
@@ -169,6 +181,8 @@ class SettingsFragment : Fragment() {
         val repoLinked = repoDisplayName != null
         pushGitHubButton.isEnabled = connected && repoLinked
         workflowButton.isEnabled = repoLinked
+        workflowHelpText.visibility = if (pushGitHubButton.isEnabled) View.GONE else View.VISIBLE
+        copyWorkflowHelpButton.visibility = if (pushGitHubButton.isEnabled) View.GONE else View.VISIBLE
         pushGitHubButton.text = getString(if (pushGitHubButton.isEnabled) R.string.push_github else R.string.push_github_disabled)
         githubStatus.text = getString(
             R.string.github_status_value,
@@ -229,6 +243,18 @@ class SettingsFragment : Fragment() {
             is ApiResult.Error -> githubStatus.text = getString(R.string.github_error, result.message)
             ApiResult.Loading -> Unit
         }
+    }
+
+
+    private fun copyWorkflowInstructions() {
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val instructions = buildString {
+            append(getString(R.string.github_workflow_help))
+            append("\n")
+            append(getString(R.string.apk_download_links, "princessraven/royalScepter").replace(Regex("<[^>]+>"), ""))
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("workflow_help", instructions))
+        Toast.makeText(requireContext(), getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
     }
 
     private fun createSecret() = lifecycleScope.launch {

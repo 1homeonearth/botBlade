@@ -1,0 +1,10 @@
+<resources>
+    <color name="botblade_purple">#B892FF</color>
+    <color name="botblade_purple_dark">#8E63F7</color>
+    <color name="botblade_gold">#F2C94C</color>
+    <color name="botblade_surface">#121216</color>
+    <color name="bottom_nav_item_color">#C9B6FF</color>
+    <color name="botblade_surface_variant">#1D1D24</color>
+    <color name="botblade_on_surface">#F4F4F8</color>
+    <color name="ic_launcher_background">#1D1D24</color>
+</resources>

@@ -122,6 +122,28 @@
             android:text="@string/push_github_disabled" />
 
         <TextView
+            android:id="@+id/github_workflow_help_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/github_workflow_help" />
+
+        <Button
+            android:id="@+id/copy_github_workflow_help_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/copy_workflow_help" />
+
+        <TextView
+            android:id="@+id/apk_downloads_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:autoLink="web"
+            android:linksClickable="true"
+            android:text="@string/apk_download_links" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"

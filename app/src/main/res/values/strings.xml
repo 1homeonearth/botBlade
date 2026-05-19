@@ -1,6 +1,5 @@
 <resources>
-    <string name="app_name">Royal Scepter</string>
-    <string name="app_name">botBlade</string>
+        <string name="app_name">botBlade</string>
     <string name="dashboard_nav_title">Dashboard</string>
     <string name="projects_nav_title">Projects</string>
     <string name="editor_nav_title">Editor</string>
@@ -144,4 +143,10 @@ Repository: %3$s</string>
     <string name="github_workflow_created">Workflow preview available at %1$s. Push remains disabled unless the backend implements real GitHub push.</string>
     <string name="github_push_starting">Starting GitHub push…</string>
     <string name="github_error">GitHub: %1$s</string>
+    <string name="github_workflow_help">If GitHub push is unavailable, create the workflow preview, then copy this guidance and commit the generated workflow in your repo. Push will enable after token + repository are configured.</string>
+    <string name="copy_workflow_help">Copy workflow instructions</string>
+    <string name="copied_to_clipboard">Copied to clipboard.</string>
+    <string name="apk_download_links"><![CDATA[Download latest debug APK: <a href="https://github.com/%1$s/releases/latest/download/botBlade-debug.apk">botBlade-debug.apk</a>
+Download latest unsigned release APK: <a href="https://github.com/%1$s/releases/latest/download/botBlade-release-unsigned.apk">botBlade-release-unsigned.apk</a>]]></string>
+
 </resources>
