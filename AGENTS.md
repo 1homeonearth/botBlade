@@ -1,47 +1,48 @@
-# Agent Workflow Notes
+# Repository Agent Guide
 
-## ISSUES.md usage
+## Session workflow (run in order)
+1. Read `docs/project/ISSUES.md` and `docs/project/LEFTOVERS.md` before making changes.
+2. Resolve unresolved issue chains when practical before starting new prompt work.
+3. Log every troubleshooting attempt under the latest matching issue chain with UTC timestamp, commands, outputs/errors, versions/environment details, and `Complete`/`Incomplete` status.
+4. Verify presumed fixes with relevant tests/checks before marking an issue resolved.
+5. If session work cannot be finished, update `docs/project/LEFTOVERS.md` with exact continuation steps, commands already run, blockers, and remaining scope.
 
-- Always review `docs/project/ISSUES.md` before starting new work.
-- If there are unresolved issues, attempt resolution first and log each attempt with:
-  - UTC timestamp
-  - command(s) run
-  - observed output/errors
-  - status (`Complete` or `Incomplete`)
-- If a repeated issue occurs, add the new entry directly below the most recent entry in that issue chain.
-- When an issue is confirmed resolved by rerunning relevant checks, remove the resolved issue chain from `docs/project/ISSUES.md`.
+## ISSUES.md entry template
+Use this template for each new attempt entry under the latest matching issue chain:
 
-## LEFTOVERS.md usage
+```md
+### <UTC timestamp> — <short attempt label>
+- Context:
+- Commands run:
+  - `...`
+- Observed output/errors:
+- Versions/environment:
+- Status: Complete | Incomplete
+- Next action:
+```
 
-- Review `docs/project/LEFTOVERS.md` (if present) before new work.
-- Complete listed tasks before starting new prompt work.
-- If you cannot finish all requested work in one session, update/create `docs/project/LEFTOVERS.md` with concrete next steps.
-# Agent Instructions
+## Instruction precedence and scope
+- Root `AGENTS.md` applies repository-wide.
+- A nested `AGENTS.md` overrides root instructions for files in that subdirectory tree.
+- If `AGENTS.override.md` exists at a directory level, treat it as the active instruction file for that level instead of `AGENTS.md`.
+- Example: `app/mobile/AGENTS.md` overrides root guidance only for `app/mobile/**`.
 
-## ISSUES.md workflow
+## Repository expectations
+- Keep instructions concise and action-oriented; avoid duplicating code-level details available in source files.
+- Prefer targeted edits and preserve existing project conventions.
+- Use existing tooling/package managers already used by the repo.
 
-- Keep `docs/project/ISSUES.md` as the troubleshooting history file for troubleshooting history.
-- Before starting new work in this repository, review `docs/project/ISSUES.md` and `docs/project/LEFTOVERS.md` under `docs/project/`.
-- Resolve incomplete issues before beginning new requested work when practical, and record each resolution attempt with a UTC timestamp, context, logs or key error messages, software versions, and status.
-- Group repeat occurrences directly under the most recent equivalent issue chain rather than creating unrelated duplicate sections.
-- When a problem is confirmed resolved by a successful test, mark it complete and remove obsolete raw error-log chains that are no longer useful.
-- If work cannot be completed before the session ends, update root-level `docs/project/LEFTOVERS.md` with enough context and next steps for the next agent to continue safely.
+## Common build/test/lint checks
+- Android SDK preflight: `./scripts/android-sdk-preflight.sh`
+- Android debug assemble: `gradle :app:assembleDebug`
+- Android unit tests (flavor-specific): `gradle :app:testLocalDevDebugUnitTest`
+- Backend build: `npm run build`
 
+## Avoid
+- Creating a new issue chain for a known repeat; append to the most recent equivalent chain.
+- Claiming resolution without recording the exact verification command/result.
+- Leaving large stale raw error logs once a fix is validated (retain final useful resolution notes).
+- Starting unrelated feature work before triaging unresolved blockers when practical.
 
-## How to use ISSUES.md
-
-- Treat `docs/project/ISSUES.md` as the canonical troubleshooting journal for this repository.
-- At session start, read both `docs/project/ISSUES.md` and `docs/project/LEFTOVERS.md` before making code changes.
-- For each issue or validation failure, append a UTC-stamped attempt entry under the most recent matching issue chain, including commands run, relevant logs/errors, versions, and current status.
-- After a fix is validated by a passing test, mark that issue chain complete and prune obsolete raw logs that are no longer useful for future debugging.
-- If work is not finished, write clear continuation steps in `docs/project/LEFTOVERS.md` so the next agent can resume safely.
-
-## Required GitHub Actions secrets for Android release signing
-
-Configure these repository secrets for signed release APK output in `.github/workflows/android.yml`:
-
-- `KEYSTORE_BASE64`: Base64-encoded Android signing keystore file contents.
-- `KEYSTORE_PASSWORD`: Keystore password (also used as key password in the workflow).
-- `KEY_ALIAS`: Alias name of the signing key entry inside the keystore.
-
-If any of these secrets are missing, the signing step is skipped automatically and release uploads fall back to the unsigned APK.
+## Android release signing secrets
+For required GitHub Actions signing secrets and setup notes, see `docs/ci/android-signing.md`.
