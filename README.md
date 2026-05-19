@@ -2,14 +2,24 @@
 
 [![Android APK workflow](../../actions/workflows/android.yml/badge.svg)](../../actions/workflows/android.yml)
 
-## Download latest release files
+## Download Royal Scepter for Android
 
-The latest GitHub Release publishes stable Android artifact links from the automated APK workflow:
+- **Recommended:** [`royal-scepter.apk`](./releases/latest/download/royal-scepter.apk) from the [Latest Release](./releases/latest).
+- Direct APK download: [./releases/latest/download/royal-scepter.apk](./releases/latest/download/royal-scepter.apk)
+- Checksums: [./releases/latest/download/SHA256SUMS.txt](./releases/latest/download/SHA256SUMS.txt)
 
-- [Download debug APK](../../releases/latest/download/botBlade-debug.apk) for emulator, device, and local backend testing.
-- [Download unsigned release APK](../../releases/latest/download/botBlade-release-unsigned.apk) for release-candidate validation before signing.
-- [Download SHA256 checksums](../../releases/latest/download/SHA256SUMS.txt) to verify APK integrity.
-- [View the latest release](../../releases/latest) for release notes and all attached files.
+Regular users should download `royal-scepter.apk`. Debug APKs are for testers. Unsigned APKs are for developers/testers only.
+
+### Development builds
+- Pull requests automatically build APK artifacts through GitHub Actions.
+- Open the PR, open the Android workflow run, and download artifacts from the **Artifacts** section.
+- Use debug artifacts for testing.
+
+### Verify downloads
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+Run from the folder containing downloaded release files.
 
 botBlade is an Android-based Discord bot builder and deployment console. The repository contains:
 
@@ -94,15 +104,21 @@ Release packaging, signing, versioning, icon, privacy, and network-security chec
 
 ## GitHub Actions APK builds and releases
 
-The repository includes `.github/workflows/android.yml`, which automatically prepares Java, Gradle, and the Android SDK on GitHub-hosted Ubuntu runners. On pushes to `main` and on pull requests, the workflow compiles Kotlin, assembles both debug and unsigned release APKs, stages them under `dist/apk/`, writes `SHA256SUMS.txt`, and uploads the APK set as a workflow artifact named `botBlade-apks-<commit-sha>`.
+The repository includes `.github/workflows/android.yml` with a preflight job, APK build job, and conditional release job.
 
-Pushing a tag that starts with `v` (for example `v0.1.0`) also publishes or updates a GitHub Release for that tag, marks it as the latest release, and attaches stable asset names so the front-page links keep working:
+- Pull requests build debug and unsigned release APKs and upload clearly named artifacts in the run’s **Artifacts** section.
+- Pushes to `main` publish/update the rolling `latest` prerelease channel.
+- Pushes to `v*` tags publish versioned releases and require signing secrets before publication.
+- `workflow_dispatch` supports `build-only`, `prerelease`, and `versioned-release`.
 
-- [`botBlade-debug.apk`](../../releases/latest/download/botBlade-debug.apk)
-- [`botBlade-release-unsigned.apk`](../../releases/latest/download/botBlade-release-unsigned.apk)
-- [`SHA256SUMS.txt`](../../releases/latest/download/SHA256SUMS.txt)
+Public release assets:
+- `royal-scepter.apk`
+- `royal-scepter-vVERSION-VERSIONCODE-signed.apk`
+- `royal-scepter-debug.apk`
+- `royal-scepter-vVERSION-VERSIONCODE-debug.apk`
+- `SHA256SUMS.txt`, `release.json`, `INSTALL.md`
 
-The generated release APK is unsigned until a release-signing step and signing secrets are added.
+See [docs/releases.md](docs/releases.md) for full release workflow and recovery steps.
 
 ## Backend setup
 

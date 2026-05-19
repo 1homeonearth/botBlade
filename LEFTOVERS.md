@@ -1,46 +1,8 @@
 # LEFTOVERS
 
-## Session date
-2026-05-18 (UTC)
-
-## Completed in this session
-- Implemented backend GitHub push path with token secret reference resolution, generated workflow inclusion, audit success/failure recording, and `lastPushedAt` update only after successful push.
-- Added backend tests for GitHub push not-configured, repo-not-linked, and success paths with a mock GitHub client.
-
-## Remaining requested work
-2. **Android GitHub defer UX + validation**
-   - ✅ Implemented: push-disabled mode now shows copyable workflow/export instructions and helper text in Settings.
-   - Warn for missing Discord IDs based on command registration mode.
-
-3. **Android release UX sweep**
-   - First-run checklist, loading/progress guards, card/list redesign for multiline rows, copy buttons, empty/retry states.
-   - Ensure all text is moved to `strings.xml`.
-
-4. **Android tests expansion**
-   - Add/verify Robolectric/JUnit deps in `app/build.gradle.kts`.
-   - Add tests for `BotBladeApiClient` parsing helpers, `ActiveProjectStore` persistence, URL encoding, redaction, GitHub display formatting.
-   - Document Android test command in `README.md`.
-
-5. **Production deployment path completion**
-   - Confirm one adapter as primary target and add full deploy lifecycle semantics + tests.
-   - Ensure secrets remain in `secretRefs` only.
-   - Update Android Deployments UI capability/unsupported messaging as needed.
-
-6. **Android release packaging polish**
-   - Launcher/adaptive icons across densities.
-   - Release signing docs.
-   - Build types/flavors for local vs prod API config.
-   - Versioning policy.
-   - Privacy/data-safety/screenshot docs.
-   - Verify debug vs release backup/cleartext/network security behavior.
-
-## Environment blockers to revisit first next session
-- Android SDK validation is blocked in this container: no SDK variables/local.properties are present, and `./scripts/android-sdk-bootstrap.sh` cannot download command-line tools because `dl.google.com` returns HTTP 403. Retry with network access to Google downloads or set `ANDROID_CMDLINE_TOOLS_URL` to an approved mirror, then run `./scripts/android-sdk-preflight.sh` and `gradle :app:assembleDebug :app:assembleRelease --stacktrace`.
-
-
-## 2026-05-19 follow-up from readability + IDE expansion request
-- Implement searchable file tree with folder expansion and quick-open.
-- Add syntax highlighting + line numbers + find/replace in editor panel.
-- Add GitHub repository browser (list/select templates/repos) with one-tap import/generate for bot templates.
-- ⚠️ Partial: added in-app APK download links panel in Settings; checksum display still pending.
-- Add CI verification that README homepage links resolve to current release assets after each main/tag build.
+## Remaining work requiring GitHub-hosted execution
+1. Trigger the Android workflow on GitHub for `pull_request`, `push` to `main`, and a `v*` tag and record run URLs as evidence.
+2. Verify live release assets and checksums in a real run (`royal-scepter.apk`, versioned aliases, `SHA256SUMS.txt`, `release.json`, `INSTALL.md`).
+3. Verify live attestation behavior in signed runs.
+4. Complete the separate Android UI polish pass and attach screenshots in README.
+5. Optional: add emulator smoke test if stable on runners.

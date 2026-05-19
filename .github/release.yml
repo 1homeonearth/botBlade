@@ -1,0 +1,18 @@
+changelog:
+  categories:
+    - title: 🚀 Features
+      labels: [feature, enhancement]
+    - title: 🐛 Fixes
+      labels: [fix, bug]
+    - title: 🤖 Android / Build / CI
+      labels: [android, build, ci]
+    - title: 📚 Documentation
+      labels: [documentation, docs]
+    - title: 🔒 Security
+      labels: [security]
+    - title: 📦 Dependencies
+      labels: [dependencies]
+    - title: 🧰 Maintenance
+      labels: [maintenance, chore, refactor]
+    - title: Other Changes
+      labels: ['*']
