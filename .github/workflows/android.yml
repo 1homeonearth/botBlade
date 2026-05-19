@@ -94,6 +94,46 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Publish main branch release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT_SHA=${{ github.sha }}
+          COMMIT_SHA_SHORT=${COMMIT_SHA:0:7}
+          TIMESTAMP=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          RELEASE_TAG="main-${COMMIT_SHA_SHORT}"
+          
+          # Create release notes
+          {
+            echo "# botBlade Continuous Release"
+            echo ""
+            echo "Automated APK build from commit \`${COMMIT_SHA_SHORT}\` on $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "## Download"
+            echo ""
+            echo "- **[botBlade-debug.apk](../../releases/download/${RELEASE_TAG}/botBlade-debug.apk)** — debug APK for emulator, device, and local backend testing."
+            echo "- **[botBlade-release-unsigned.apk](../../releases/download/${RELEASE_TAG}/botBlade-release-unsigned.apk)** — unsigned release APK; signing is still required before store distribution."
+            echo "- **[SHA256SUMS.txt](../../releases/download/${RELEASE_TAG}/SHA256SUMS.txt)** — checksums for verifying APK integrity."
+            echo ""
+            echo "## Build information"
+            echo ""
+            echo "- **Commit:** [$COMMIT_SHA_SHORT](../../commit/${COMMIT_SHA})"
+            echo "- **Built:** $TIMESTAMP"
+            echo "- **Workflow:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > release-notes.md
+          
+          # Delete the old main release if it exists
+          gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+          
+          # Create new release with latest artifacts
+          gh release create "$RELEASE_TAG" dist/apk/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "botBlade Main (${COMMIT_SHA_SHORT})" \
+            --notes-file release-notes.md \
+            --latest \
+            --prerelease
+
       - name: Publish tagged GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -101,12 +141,15 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           {
+            echo "# botBlade Release $TAG_NAME"
+            echo ""
             echo "Automated botBlade APK release for $TAG_NAME."
-            echo
-            echo "Download files attached to this release:"
-            echo "- botBlade-debug.apk — debug APK for local testing."
-            echo "- botBlade-release-unsigned.apk — unsigned release APK; signing is still required before store distribution."
-            echo "- SHA256SUMS.txt — checksums for the APK files."
+            echo ""
+            echo "## Download"
+            echo ""
+            echo "- **[botBlade-debug.apk](../../releases/download/$TAG_NAME/botBlade-debug.apk)** — debug APK for local testing."
+            echo "- **[botBlade-release-unsigned.apk](../../releases/download/$TAG_NAME/botBlade-release-unsigned.apk)** — unsigned release APK; signing is still required before store distribution."
+            echo "- **[SHA256SUMS.txt](../../releases/download/$TAG_NAME/SHA256SUMS.txt)** — checksums for the APK files."
           } > release-notes.md
 
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
