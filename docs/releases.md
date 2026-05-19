@@ -23,9 +23,9 @@ If missing, PR builds still succeed. Versioned release publishing fails before p
 - `INSTALL.md`
 
 ## PR artifacts
-- `royalScepter-...-debug-apk`
-- `royalScepter-...-release-unsigned-apk`
-- `royalScepter-...-checksums`
+- `botBlade-...-debug-apk`
+- `botBlade-...-release-unsigned-apk`
+- `botBlade-...-checksums`
 
 Artifacts are available in the workflow run **Artifacts** section.
 
