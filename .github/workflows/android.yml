@@ -148,9 +148,9 @@ jobs:
           echo "app_version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "app_version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "debug_file=royal-scepter-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-debug.apk" >> "$GITHUB_OUTPUT"
-          echo "release_unsigned_file=royal-scepter-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-unsigned.apk" >> "$GITHUB_OUTPUT"
-          echo "release_signed_file=royal-scepter-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-signed.apk" >> "$GITHUB_OUTPUT"
+          echo "debug_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-debug.apk" >> "$GITHUB_OUTPUT"
+          echo "release_unsigned_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-unsigned.apk" >> "$GITHUB_OUTPUT"
+          echo "release_signed_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-signed.apk" >> "$GITHUB_OUTPUT"
       - name: Build debug and release APKs
         shell: bash
         run: |
@@ -241,7 +241,7 @@ jobs:
         continue-on-error: true
         with:
           script: |
-            const marker = '<!-- royal-scepter-apk-build-comment -->';
+            const marker = '<!-- bot-blade-apk-build-comment -->';
             const body = `${marker}
             ✅ **APK build succeeded**
             - \`botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk\`
@@ -296,22 +296,22 @@ jobs:
           SHORT_SHA="${{ needs.build.outputs.short_sha }}"
           SIGNING_STATUS="${{ needs.build.outputs.signing_status }}"
 
-          DEBUG_VERSIONED="royal-scepter-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-debug.apk"
+          DEBUG_VERSIONED="bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-debug.apk"
           cp "dist/release/${{ needs.build.outputs.debug_file }}" "dist/release/${DEBUG_VERSIONED}"
-          cp "dist/release/${{ needs.build.outputs.debug_file }}" dist/release/royal-scepter-debug.apk
+          cp "dist/release/${{ needs.build.outputs.debug_file }}" dist/release/bot-blade-debug.apk
 
           if [[ "$SIGNING_STATUS" != "signed" && "${{ needs.preflight.outputs.release_kind }}" == "versioned" ]]; then
             echo "::error::Versioned release requires signing secrets."; exit 1
           fi
 
           if [[ "$SIGNING_STATUS" == "signed" ]]; then
-            SIGNED_VERSIONED="royal-scepter-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-signed.apk"
+            SIGNED_VERSIONED="bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-signed.apk"
             cp "dist/release/${{ needs.build.outputs.release_signed_file }}" "dist/release/${SIGNED_VERSIONED}"
-            cp "dist/release/${SIGNED_VERSIONED}" dist/release/royal-scepter.apk
-            FINAL_APK_ASSETS=("royal-scepter.apk" "$SIGNED_VERSIONED" "royal-scepter-debug.apk" "$DEBUG_VERSIONED")
+            cp "dist/release/${SIGNED_VERSIONED}" dist/release/bot-blade.apk
+            FINAL_APK_ASSETS=("bot-blade.apk" "$SIGNED_VERSIONED" "bot-blade-debug.apk" "$DEBUG_VERSIONED")
           else
-            cp "dist/release/${{ needs.build.outputs.release_unsigned_file }}" dist/release/royal-scepter-release-unsigned.apk
-            FINAL_APK_ASSETS=("royal-scepter-release-unsigned.apk" "royal-scepter-debug.apk" "$DEBUG_VERSIONED")
+            cp "dist/release/${{ needs.build.outputs.release_unsigned_file }}" dist/release/bot-blade-release-unsigned.apk
+            FINAL_APK_ASSETS=("bot-blade-release-unsigned.apk" "bot-blade-debug.apk" "$DEBUG_VERSIONED")
           fi
 
           (cd dist/release && sha256sum "${FINAL_APK_ASSETS[@]}" > SHA256SUMS.txt)
@@ -320,11 +320,11 @@ jobs:
           cat > dist/release/INSTALL.md <<'EOF'
           # Install Royal Scepter on Android
 
-          1. Download **royal-scepter.apk** from the latest release.
+          1. Download **bot-blade.apk** from the latest release.
           2. Open the APK on your Android phone.
           3. If asked, allow installs from your browser or file manager.
           4. Continue and install Royal Scepter.
-          5. For updates, download the newest **royal-scepter.apk** from the latest release.
+          5. For updates, download the newest **bot-blade.apk** from the latest release.
 
           Optional verification: download `SHA256SUMS.txt` and run `sha256sum -c SHA256SUMS.txt`.
           Debug APKs are for testers and developers.
@@ -363,7 +363,7 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/release/royal-scepter.apk
+            dist/release/bot-blade.apk
             dist/release/SHA256SUMS.txt
             dist/release/release.json
       - name: Publish release
@@ -378,10 +378,10 @@ jobs:
           cat > "$NOTES_FILE" <<EOF
           | File | Who it is for |
           | --- | --- |
-          | royal-scepter.apk | Normal users. Download this. |
-          | royal-scepter-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-signed.apk | Same signed release APK with version in the filename. |
-          | royal-scepter-debug.apk | Testers and developers only. |
-          | royal-scepter-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-debug.apk | Versioned debug APK for testers and developers. |
+          | bot-blade.apk | Normal users. Download this. |
+          | bot-blade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-signed.apk | Same signed release APK with version in the filename. |
+          | bot-blade-debug.apk | Testers and developers only. |
+          | bot-blade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-debug.apk | Versioned debug APK for testers and developers. |
           | SHA256SUMS.txt | Verifies downloaded APKs. |
           | release.json | Build/version metadata for automation. |
           | INSTALL.md | Android install instructions. |
@@ -406,7 +406,7 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## Release checklist
           - Signed APK created: ${{ needs.build.outputs.signing_status == 'signed' && 'yes' || 'no' }}
-          - Public APK selected: ${{ needs.build.outputs.signing_status == 'signed' && 'royal-scepter.apk' || 'n/a (unsigned flow)' }}
+          - Public APK selected: ${{ needs.build.outputs.signing_status == 'signed' && 'bot-blade.apk' || 'n/a (unsigned flow)' }}
           - SHA256SUMS generated after final asset selection: yes
           - sha256sum -c passed: yes
           - release.json generated and validated: yes
@@ -414,7 +414,7 @@ jobs:
           - Release assets uploaded: yes
           - Artifact attestation generated: ${{ needs.build.outputs.signing_status == 'signed' && 'yes' || 'no' }}
           - Latest release link: ./releases/latest
-          - Direct APK download: ./releases/latest/download/royal-scepter.apk
+          - Direct APK download: ./releases/latest/download/bot-blade.apk
           EOF
 
   pr-comment-on-failure:
@@ -430,7 +430,7 @@ jobs:
         continue-on-error: true
         with:
           script: |
-            const marker = '<!-- royal-scepter-apk-build-comment -->';
+            const marker = '<!-- bot-blade-apk-build-comment -->';
             const body = `${marker}
             ❌ **APK build failed**
             - Failed job: build
