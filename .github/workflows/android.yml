@@ -197,18 +197,18 @@ jobs:
           (cd dist/apk && sha256sum *.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
+          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
           path: dist/apk/${{ steps.meta.outputs.debug_file }}
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
+          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
           path: dist/apk/${{ steps.meta.outputs.release_unsigned_file }}
           retention-days: 14
       - uses: actions/upload-artifact@v4
         if: steps.sign.outputs.signing_status == 'signed'
         with:
-          name: royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-signed-apk
+          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-signed-apk
           path: |
             dist/apk/${{ steps.meta.outputs.release_signed_file }}
             dist/apk/apksigner-verify.txt
@@ -216,7 +216,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'pull_request'
         with:
-          name: royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-checksums
+          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-checksums
           path: dist/apk/SHA256SUMS.txt
           retention-days: 14
       - name: Write workflow summary
@@ -231,8 +231,8 @@ jobs:
           - App version code: ${{ steps.meta.outputs.app_version_code }}
           - Commit SHA: $GITHUB_SHA
           - Artifact names:
-            - royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
-            - royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
+            - botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
+            - botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
           - Downloads: Use this run's **Artifacts** section. Debug APK is for testers; unsigned release APK is test-only.
           EOF
       - name: Sticky PR artifact comment (best effort)
@@ -244,8 +244,8 @@ jobs:
             const marker = '<!-- royal-scepter-apk-build-comment -->';
             const body = `${marker}
             ✅ **APK build succeeded**
-            - \`royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk\`
-            - \`royalScepter-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk\`
+            - \`botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk\`
+            - \`botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk\`
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Download the debug APK from this workflow run’s **Artifacts** section.`;
             const issue_number = context.payload.pull_request.number;
