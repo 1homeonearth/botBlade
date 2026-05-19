@@ -395,3 +395,20 @@ Failed to download Android command-line tools.
 - Versions/environment: UTC shell in `/workspace/royalScepter` on 2026-05-19.
 - Status: Complete
 - Next action: Run repository build/test checks relevant to changed surfaces in a fully provisioned Android+Node environment when needed.
+
+- **Repeat occurrence 2026-05-19T08:31:02Z:** Pre-session unresolved issue review reran Android SDK preflight before release-link remediation.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation persists in this container; Android SDK-dependent checks remain blocked.
+
+## 2026-05-19T08:31:02Z — README release download links pointed to non-existent asset names
+
+### 2026-05-19T08:31:02Z — Release/action artifact naming reconciliation
+- Context: User reported README release download links returned 404. Investigation found README expected `bot-blade*.apk` while workflow still published `royal-scepter*.apk` assets, causing `releases/latest/download/bot-blade.apk` to fail.
+- Commands run:
+  - `rg -n "github.com/.*/releases|actions/runs|download|apk|bot-blade|botBlade" README.md .github/workflows/android.yml docs/releases.md`
+  - `python - <<'PY' ...` (normalize `.github/workflows/android.yml` release artifact/output filenames from `royal-scepter` to `bot-blade`)
+- Observed output/errors: README links and docs already targeted `bot-blade` naming, but workflow emitted `royal-scepter` assets and release-install text; updated workflow naming to align with README/docs.
+- Versions/environment: UTC shell in `/workspace/royalScepter` on 2026-05-19.
+- Status: Complete
+- Next action: Validate workflow YAML parses and confirm no stale `royal-scepter` release-link references remain.
