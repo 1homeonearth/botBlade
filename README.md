@@ -58,8 +58,8 @@ gradle :app:assembleDebug
 
 The API base URL is resolved from Android configuration instead of being hard-coded:
 
-- Debug emulator builds default to `http://10.0.2.2:8000`, which reaches a backend running on the development host.
-- Other builds default to the `BuildConfig.API_BASE_URL` value from `app/build.gradle.kts`.
+- `localDev` variants default to `http://10.0.2.2:8000`, which reaches a backend running on the development host from an emulator.
+- `prod` variants default to the production HTTPS `BuildConfig.API_BASE_URL` value from `app/build.gradle.kts`; override packaging endpoints with `-PPROD_API_BASE_URL=https://...`.
 - The Settings tab includes a Backend API field that validates `http://` or `https://` URLs, rejects embedded credentials/query strings/fragments, saves only the URL in app `SharedPreferences`, and provides a **Test Connection** button that calls `/api/health`.
 
 Emulator example:
@@ -76,6 +76,7 @@ http://192.168.1.25:8000
 
 For a real device, start the backend on an address reachable from your LAN and enter `http://<host-lan-ip>:8000` in Settings. Keep this on a trusted development network; do not put credentials, tokens, query parameters, or fragments in the backend URL.
 
+Release packaging, signing, versioning, icon, privacy, and network-security checklists are documented in [docs/android-release.md](docs/android-release.md), [docs/privacy-policy.md](docs/privacy-policy.md), and [docs/android-screens.md](docs/android-screens.md).
 
 ## GitHub Actions APK builds and releases
 
