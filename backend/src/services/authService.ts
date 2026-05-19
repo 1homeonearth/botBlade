@@ -25,7 +25,7 @@ export function authenticateRequest(req: IncomingMessage): AuthenticatedActor {
   const credentials = configuredCredentials();
   const match = credentials.find((credential) => credential.token === bearerToken || credential.token === sessionToken);
   if (!match) {
-    throw { statusCode: 401, code: "AUTHENTICATION_REQUIRED", message: "A valid bearer token or session credential is required.", details: { schemes: ["Bearer", "royalScepterSession"] } };
+    throw { statusCode: 401, code: "AUTHENTICATION_REQUIRED", message: "A valid bearer token or session credential is required.", details: { schemes: ["Bearer", "botBladeSession"] } };
   }
   return {
     id: match.actorId,
@@ -69,15 +69,15 @@ function readSessionToken(req: IncomingMessage): string | undefined {
   if (typeof cookieHeader !== "string") return undefined;
   for (const cookie of cookieHeader.split(";")) {
     const [name, ...valueParts] = cookie.trim().split("=");
-    if (name === "royalScepterSession") return decodeURIComponent(valueParts.join("=")).trim();
+    if (name === "botBladeSession") return decodeURIComponent(valueParts.join("=")).trim();
   }
   return undefined;
 }
 
 function configuredCredentials(): AuthCredential[] {
-  const credentials = [...parseJsonCredentials(process.env.ROYALSCEPTER_AUTH_TOKENS, "bearer"), ...parseJsonCredentials(process.env.ROYALSCEPTER_SESSION_TOKENS, "session")];
+  const credentials = [...parseJsonCredentials(process.env.BOTBLADE_AUTH_TOKENS, "bearer"), ...parseJsonCredentials(process.env.BOTBLADE_SESSION_TOKENS, "session")];
   if (credentials.length > 0) return credentials;
-  const legacyTokens = splitTokens(process.env.ROYALSCEPTER_API_TOKENS ?? process.env.ROYALSCEPTER_API_TOKEN);
+  const legacyTokens = splitTokens(process.env.BOTBLADE_API_TOKENS ?? process.env.BOTBLADE_API_TOKEN);
   return legacyTokens.map((token, index) => ({ token, actorId: index === 0 ? "local_admin" : `local_user_${index + 1}`, tokenId: `env_token_${index + 1}`, roles: ["admin"], projectIds: [GLOBAL_PROJECT], authMethod: "bearer" }));
 }
 

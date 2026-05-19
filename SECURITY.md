@@ -1,8 +1,8 @@
-# royalScepter Security
+# botBlade Security
 
 ## API authentication and authorization
 
-All backend API routes except `GET /api/health` and `GET /api/version` require a bearer token or session credential. Configure bearer credentials with `ROYALSCEPTER_AUTH_TOKENS` (preferred JSON format) or the legacy `ROYALSCEPTER_API_TOKEN` / `ROYALSCEPTER_API_TOKENS` variables. Configure session credentials with `ROYALSCEPTER_SESSION_TOKENS`, then send them as `Cookie: royalScepterSession=<session-token>` or `x-session-token: <session-token>`.
+All backend API routes except `GET /api/health` and `GET /api/version` require a bearer token or session credential. Configure bearer credentials with `BOTBLADE_AUTH_TOKENS` (preferred JSON format) or the legacy `BOTBLADE_API_TOKEN` / `BOTBLADE_API_TOKENS` variables. Configure session credentials with `BOTBLADE_SESSION_TOKENS`, then send them as `Cookie: botBladeSession=<session-token>` or `x-session-token: <session-token>`.
 
 Credential objects should include `token`, `actorId` or `userId`, optional `tokenId`, `roles`, and `projectIds`. Use `roles: ["admin"]` or `projectIds: ["*"]` only for trusted local administrators. Project-scoped credentials must list allowed project IDs and are denied before project routes, runtime/deployment/build/GitHub routes, audit records, project secrets, and other protected resources are accessed.
 
@@ -15,6 +15,14 @@ Secret values must never appear in API responses, generated example files, logs,
 ## Android local storage
 
 The Android app stores the active project ID locally through `ActiveProjectStore`. It should not persist Discord tokens, GitHub tokens, deployment private keys, or API credentials in plain SharedPreferences. Future production Android secret handling should use Android Keystore-backed storage or avoid local secret persistence entirely.
+
+## Android backup policy
+
+Production Android builds disable platform backup with `android:allowBackup="false"`. This is the reviewed release stance because the app may handle project selections, API URLs, authentication material, secret metadata, and logs that must not be copied to user cloud backups or device-transfer archives.
+
+Do not enable Android backup for production without a security review. If a future product requirement needs backup, add explicit `backup_rules` / `data_extraction_rules` resources before enabling it, and exclude at minimum SharedPreferences, secret metadata, active project selections, API base URLs, bearer/session tokens, generated logs, and any cache or file path that can contain project or deployment data.
+
+Debug builds keep their local-development network exception scoped to the checked-in debug network security config. Cleartext traffic is denied by default and permitted only for the emulator/host loopback endpoints listed in `app/src/debug/res/xml/debug_network_security_config.xml`.
 
 ## Backend secret storage
 
@@ -51,4 +59,4 @@ Deployment targets accept `secretRefs` for credentials. Target `config` rejects 
 
 ## Android API client configuration
 
-`RoyalScepterApiClient` accepts a bearer token or a session token in its constructor and applies it to every API call. Leave `ApiConfig.DEFAULT_BEARER_TOKEN` and `ApiConfig.DEFAULT_SESSION_TOKEN` empty in committed source; for local debug builds, inject a short-lived development token through local-only Gradle, IDE, or dependency-injection configuration. Prefer bearer tokens for API tooling and session tokens only when the backend has issued a session credential.
+`BotBladeApiClient` accepts a bearer token or a session token in its constructor and applies it to every API call. Leave `ApiConfig.DEFAULT_BEARER_TOKEN` and `ApiConfig.DEFAULT_SESSION_TOKEN` empty in committed source; for local debug builds, inject a short-lived development token through local-only Gradle, IDE, or dependency-injection configuration. Prefer bearer tokens for API tooling and session tokens only when the backend has issued a session credential.

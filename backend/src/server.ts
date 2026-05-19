@@ -6,7 +6,7 @@ import { assertGlobalAccess, assertProjectAccess, authenticateRequest, canAccess
 import { BuildService } from "./services/buildService.js";
 import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./services/commandDefinitions.js";
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
-import { DeploymentTargetStore, testDeploymentTarget } from "./services/deploymentTargets.js";
+import { DeploymentTargetStore, deploymentTargetWithCapabilities, testDeploymentTarget } from "./services/deploymentTargets.js";
 import { GitHubIntegrationService } from "./services/githubIntegration.js";
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
 import { ProjectFileService, parseFileWriteInput } from "./services/projectFiles.js";
@@ -16,7 +16,7 @@ import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput,
 import { validateProject } from "./services/projectValidation.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
-const persistence = process.env.NODE_ENV === "test" && !process.env.ROYALSCEPTER_DATABASE_URL && !process.env.DATABASE_URL ? undefined : SqlitePersistence.fromUrl();
+const persistence = process.env.NODE_ENV === "test" && !process.env.BOTBLADE_DATABASE_URL && !process.env.DATABASE_URL ? undefined : SqlitePersistence.fromUrl();
 const projectStore = new ProjectStore(persistence);
 const secretStore = new SecretStore(persistence);
 const fileService = new ProjectFileService();
@@ -25,8 +25,12 @@ const auditFromService = (event: { action: Parameters<AuditService["record"]>[0]
 const buildService = new BuildService(fileService, (secretId) => secretStore.has(secretId), auditFromService, undefined, persistence);
 const runtimeService = new LocalProcessRuntimeService(fileService, (secretId) => secretStore.getValue(secretId));
 const targetStore = new DeploymentTargetStore(persistence);
-const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService, persistence);
-const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId));
+const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtimeService, auditFromService, persistence, (secretId) => {
+  const summary = secretStore.get(secretId);
+  const value = secretStore.getValue(secretId);
+  return summary && value !== undefined ? { id: summary.id, name: summary.name, value } : undefined;
+});
+const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
 const port = Number(process.env.PORT ?? 8000);
 
 export function createRequestListener() {
@@ -45,13 +49,12 @@ export function createRequestListener() {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  createServer(createRequestListener()).listen(port, () => console.info(JSON.stringify({ level: "info", message: "royalScepter backend listening", port })));
+  createServer(createRequestListener()).listen(port, () => console.info(JSON.stringify({ level: "info", message: "botBlade backend listening", port })));
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, requestId: string): Promise<void> {
   const method = req.method ?? "GET";
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  const path = url.pathname;
+  const path = extractPathname(req.url);
 
   if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
@@ -74,11 +77,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
 
   if (method === "GET" && path === "/api/deployment-targets") {
     assertGlobalAccess(actor, "deployment targets");
-    return writeJson(res, 200, { targets: targetStore.list() });
+    return writeJson(res, 200, { targets: targetStore.list().map(deploymentTargetWithCapabilities) });
   }
   if (method === "POST" && path === "/api/deployment-targets") {
     assertGlobalAccess(actor, "deployment targets");
-    return writeJson(res, 201, targetStore.create(await readJson(req)));
+    return writeJson(res, 201, deploymentTargetWithCapabilities(targetStore.create(await readJson(req))));
   }
   const targetMatch = path.match(/^\/api\/deployment-targets\/([^/]+)(?:\/(test))?$/);
   if (targetMatch) {
@@ -86,8 +89,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     assertGlobalAccess(actor, "deployment targets");
     const target = targetStore.get(targetId);
     if (!target) throw notFoundTarget(targetId);
-    if (method === "GET" && !action) return writeJson(res, 200, target);
-    if (method === "PATCH" && !action) return writeJson(res, 200, targetStore.update(targetId, await readJson(req)) ?? notFoundTarget(targetId));
+    if (method === "GET" && !action) return writeJson(res, 200, deploymentTargetWithCapabilities(target));
+    if (method === "PATCH" && !action) return writeJson(res, 200, deploymentTargetWithCapabilities(targetStore.update(targetId, await readJson(req)) ?? notFoundTarget(targetId)));
     if (method === "DELETE" && !action) {
       if (!targetStore.delete(targetId)) throw notFoundTarget(targetId);
       res.statusCode = 204;
@@ -204,7 +207,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (method === "GET" && action === "logs") return writeJson(res, 200, { logs: runtimeService.getLogs(projectId) });
   }
 
-  const deploymentMatch = path.match(/^\/api\/projects\/([^/]+)\/deployments(?:\/([^/]+)(?:\/(logs|rollback))?)?$/);
+  const deploymentMatch = path.match(/^\/api\/projects\/([^/]+)\/deployments(?:\/([^/]+)(?:\/(logs|rollback|status|start|stop|restart))?)?$/);
   if (deploymentMatch) {
     const [, projectId, deploymentId, action] = deploymentMatch;
     assertProjectAccess(actor, projectId);
@@ -219,8 +222,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     }
     if (method === "GET" && !deploymentId) return writeJson(res, 200, { deployments: deploymentStore.list(projectId) });
     if (method === "GET" && deploymentId && !action) return writeJson(res, 200, deploymentStore.get(projectId, deploymentId) ?? notFoundDeployment(deploymentId));
-    if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, { logs: deploymentStore.getLogs(projectId, deploymentId) ?? notFoundDeployment(deploymentId) });
-    if (method === "POST" && deploymentId && action === "rollback") return writeJson(res, 200, deploymentStore.rollback(project, deploymentId));
+    if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "logs"));
+    if (method === "GET" && deploymentId && action === "status") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "status"));
+    if (method === "POST" && deploymentId && (action === "start" || action === "stop" || action === "restart" || action === "rollback")) return writeJson(res, 200, await deploymentStore.action(project, deploymentId, action));
   }
 
   const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);
@@ -267,8 +271,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
     if (method === "POST" && action === "push") {
-      const result = githubService.push(project);
-      auditService.record({ action: "github.push", actorId: actor.id, projectId, resourceType: "github_repository", resourceId: `${project.github?.owner}/${project.github?.repo}`, metadata: { owner: project.github?.owner, repo: project.github?.repo }, requestId });
+      const result = await githubService.push(project, requestId);
       return writeJson(res, 200, result);
     }
     if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
@@ -316,6 +319,16 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   const body = Buffer.concat(chunks).toString("utf8").trim();
   if (!body) return {};
   try { return JSON.parse(body) as unknown; } catch { throw new RequestValidationError([{ field: "body", message: "Body must be valid JSON." }]); }
+}
+
+
+function extractPathname(rawUrl: string | undefined): string {
+  const candidate = typeof rawUrl === "string" && rawUrl.length > 0 ? rawUrl : "/";
+  try {
+    return new URL(candidate, "http://localhost").pathname;
+  } catch {
+    throw { statusCode: 400, code: "INVALID_REQUEST_URL", message: "Request URL is invalid.", details: {} };
+  }
 }
 
 function writeJson(res: ServerResponse, statusCode: number, body: unknown): void {

@@ -20,12 +20,12 @@ val hasReleaseSigningConfig = listOf(
 ).all { !it.isNullOrBlank() }
 
 android {
-    namespace = "com.princess.royalscepter"
+    namespace = "com.princess.botblade"
     compileSdk = 35
     buildToolsVersion = "35.0.0"
 
     defaultConfig {
-        applicationId = "com.princess.royalscepter"
+        applicationId = "com.princess.botblade"
         minSdk = 26
         targetSdk = 35
 
@@ -93,6 +93,9 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")

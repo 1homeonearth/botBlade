@@ -1,15 +1,15 @@
 {
-  "name": "royalscepter-backend",
+  "name": "botblade-backend",
   "version": "0.1.0",
-  "description": "Local builder service skeleton for royalScepter Discord bot projects.",
+  "description": "Local builder service skeleton for botBlade Discord bot projects.",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "dev": "npm run build && node dist/server.js",
+    "dev": "tsc -p tsconfig.json && node dist/server.js",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "npm run build && node --test dist/__tests__/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test dist/__tests__/*.test.js"
   }
 }

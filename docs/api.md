@@ -1,4 +1,4 @@
-# royalScepter API
+# botBlade API
 
 Base URL in local development: `http://localhost:8000`.
 
@@ -10,20 +10,20 @@ Every endpoint except `GET /api/health` and `GET /api/version` requires an authe
 Authorization: Bearer <token>
 ```
 
-or a session credential via `Cookie: royalScepterSession=<session-token>` or `x-session-token: <session-token>`.
+or a session credential via `Cookie: botBladeSession=<session-token>` or `x-session-token: <session-token>`.
 
 Configure backend credentials with one of these environment variables before starting the API:
 
-- `ROYALSCEPTER_AUTH_TOKENS`: JSON credential or array of credentials for bearer tokens.
-- `ROYALSCEPTER_SESSION_TOKENS`: JSON credential or array of credentials for session credentials.
-- `ROYALSCEPTER_API_TOKEN` / `ROYALSCEPTER_API_TOKENS`: comma-separated legacy bearer token fallback; these tokens receive admin access.
+- `BOTBLADE_AUTH_TOKENS`: JSON credential or array of credentials for bearer tokens.
+- `BOTBLADE_SESSION_TOKENS`: JSON credential or array of credentials for session credentials.
+- `BOTBLADE_API_TOKEN` / `BOTBLADE_API_TOKENS`: comma-separated legacy bearer token fallback; these tokens receive admin access.
 
 Credential objects support `token`, `actorId` (or `userId`), `tokenId`, `roles`, and `projectIds`. Use `roles: ["admin"]` or `projectIds: ["*"]` for all-project administrative access; otherwise list specific project IDs in `projectIds`. Project-scoped tokens can access only authorized `/api/projects/:projectId/*` resources and project-owned secrets. Global resources such as `/api/audit-events`, `/api/github/*`, and `/api/deployment-targets` require admin/all-project access.
 
 Example:
 
 ```bash
-export ROYALSCEPTER_AUTH_TOKENS='[{"token":"dev-admin-token","actorId":"local_admin","roles":["admin"],"projectIds":["*"]}]'
+export BOTBLADE_AUTH_TOKENS='[{"token":"dev-admin-token","actorId":"local_admin","roles":["admin"],"projectIds":["*"]}]'
 ```
 
 Errors use:
@@ -46,7 +46,7 @@ Errors use:
 Returns:
 
 ```json
-{ "ok": true, "service": "royalScepter-backend", "version": "0.1.0" }
+{ "ok": true, "service": "botBlade-backend", "version": "0.1.0" }
 ```
 
 ### `GET /api/version`
@@ -225,11 +225,11 @@ Returns `{ "logs": "..." }` with redaction applied.
 
 ### `GET /api/deployment-targets`
 
-Requires admin/all-project access. Returns `{ "targets": DeploymentTarget[] }`.
+Requires admin/all-project access. Returns `{ "targets": DeploymentTarget[] }`. Each target includes derived adapter `capabilities` so clients can show supported and unsupported deployment actions.
 
 ### `POST /api/deployment-targets`
 
-Creates a target. Types: `local_process` or `local_docker`. Secret-like config keys are rejected; use `secretRefs`.
+Creates a target. Types: `local_process` or `local_docker`. Secret-like config keys are rejected; use `secretRefs`. `local_docker` accepts non-secret `config.image` and `config.dockerfile`.
 
 ### `GET|PATCH|DELETE /api/deployment-targets/:targetId`
 
@@ -253,13 +253,21 @@ Returns `{ "deployments": DeploymentJob[] }`.
 
 Returns one deployment job.
 
+### `GET /api/projects/:projectId/deployments/:deploymentId/status`
+
+Returns adapter runtime status for the selected deployment.
+
 ### `GET /api/projects/:projectId/deployments/:deploymentId/logs`
 
-Returns redacted logs.
+Returns adapter runtime logs with redaction applied.
+
+### `POST /api/projects/:projectId/deployments/:deploymentId/start|stop|restart`
+
+Runs the corresponding adapter action when the selected target supports it. Unsupported actions return `DEPLOYMENT_ACTION_UNSUPPORTED`.
 
 ### `POST /api/projects/:projectId/deployments/:deploymentId/rollback`
 
-Currently returns `ROLLBACK_UNSUPPORTED`.
+Rolls back when the adapter supports rollback. `local_docker` replaces the current container with the most recent previous image for the same project and target; `local_process` reports the action as unsupported.
 
 ## GitHub
 

@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { BotProject } from "../models/project.js";
-import type { BuildService } from "./buildService.js";
+import type { BuildService, CommandRunner } from "./buildService.js";
+import { runCommand } from "./buildService.js";
 import { RequestValidationError } from "./projectStore.js";
 import { redactSecrets } from "./redaction.js";
 import type { DeploymentTargetStore } from "./deploymentTargets.js";
 import type { LocalProcessRuntimeService } from "./localProcessRuntimeService.js";
-import { adapterFor } from "./deploymentAdapters.js";
+import { adapterFor, type DeploymentAction, type ResolvedSecret } from "./deploymentAdapters.js";
 import type { AuditAction } from "./auditService.js";
 import type { DeploymentJobStorePersistence } from "./persistence.js";
 
@@ -29,7 +30,7 @@ export class DeploymentJobStore {
   private readonly jobs = new Map<string, DeploymentJob[]>();
   private readonly logs = new Map<string, string>();
 
-  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void, private readonly persistence?: DeploymentJobStorePersistence) {
+  constructor(private readonly buildService: BuildService, private readonly targetStore: DeploymentTargetStore, private readonly runtime: LocalProcessRuntimeService, private readonly audit?: (event: { action: AuditAction; projectId: string; resourceType: string; resourceId: string; metadata: Record<string, unknown>; requestId: string; actorId?: string }) => void, private readonly persistence?: DeploymentJobStorePersistence, private readonly resolveSecretRef: (secretId: string) => ResolvedSecret | undefined = () => undefined, private readonly commandRunner: CommandRunner = runCommand) {
     for (const { job, logs } of persistence?.loadDeploymentJobs() ?? []) {
       this.jobs.set(job.projectId, [job, ...(this.jobs.get(job.projectId) ?? [])]);
       this.logs.set(job.deploymentId, logs);
@@ -59,10 +60,31 @@ export class DeploymentJobStore {
     return job;
   }
 
-  rollback(project: BotProject, deploymentId: string): DeploymentJob {
+  async action(project: BotProject, deploymentId: string, action: Exclude<DeploymentAction, "deploy">): Promise<unknown> {
     const job = this.get(project.id, deploymentId);
     if (!job) throw { statusCode: 404, code: "DEPLOYMENT_NOT_FOUND", message: `Deployment '${deploymentId}' was not found.`, details: {} };
-    throw { statusCode: 400, code: "ROLLBACK_UNSUPPORTED", message: "Rollback is not supported by the selected deployment adapter yet.", details: { deploymentId } };
+    const target = this.targetStore.get(job.targetId);
+    const build = this.buildService.get(project.id, job.buildId);
+    if (!target || !build) throw new Error("Deployment dependency disappeared.");
+    const adapter = adapterFor(target, this.commandRunner);
+    adapter.validateTarget(target);
+    if (!adapter.capabilities.actions[action]) throw { statusCode: 400, code: "DEPLOYMENT_ACTION_UNSUPPORTED", message: `${action} is not supported by ${target.type}.`, details: { action, targetType: target.type } };
+    const context = { project, target, build, runtime: this.runtime, resolveSecretRef: this.resolveSecretRef, previousBuild: this.previousSuccessfulBuild(project.id, job), commandRunner: this.commandRunner };
+    if (action === "logs") return { logs: await adapter.logs(context) };
+    if (action === "rollback") {
+      const lines = await adapter.rollback?.(context);
+      job.status = "rolled_back";
+      job.updatedAt = new Date().toISOString();
+      job.finishedAt = new Date().toISOString();
+      this.logs.set(job.deploymentId, `${this.logs.get(job.deploymentId) ?? ""}${(lines ?? []).map(redactSecrets).join("\n")}\n`);
+      this.persist(job);
+      return job;
+    }
+    return adapter[action](context);
+  }
+
+  rollback(project: BotProject, deploymentId: string): Promise<unknown> {
+    return this.action(project, deploymentId, "rollback");
   }
 
   private async run(project: BotProject, job: DeploymentJob, requestId: string, actorId?: string): Promise<void> {
@@ -74,12 +96,13 @@ export class DeploymentJobStore {
       const target = this.targetStore.get(job.targetId);
       const build = this.buildService.get(project.id, job.buildId);
       if (!target || !build) throw new Error("Deployment dependency disappeared.");
-      const adapter = adapterFor(target);
+      const adapter = adapterFor(target, this.commandRunner);
       adapter.validateTarget(target);
+      const context = { project, target, build, runtime: this.runtime, resolveSecretRef: this.resolveSecretRef, previousBuild: this.previousSuccessfulBuild(project.id, job), commandRunner: this.commandRunner };
       job.status = "preparing"; job.updatedAt = new Date().toISOString();
-      for (const line of await adapter.prepare({ project, target, build, runtime: this.runtime })) append(line);
+      for (const line of await adapter.prepare(context)) append(line);
       job.status = "deploying"; job.updatedAt = new Date().toISOString();
-      for (const line of await adapter.deploy({ project, target, build, runtime: this.runtime })) append(line);
+      for (const line of await adapter.deploy(context)) append(line);
       job.status = "deployed";
       project.deployment = { targetId: target.id, lastDeploymentId: job.deploymentId };
       project.updatedAt = new Date().toISOString();
@@ -102,6 +125,11 @@ export class DeploymentJobStore {
         actorId,
       });
     }
+  }
+
+  private previousSuccessfulBuild(projectId: string, current: DeploymentJob) {
+    const previousJob = this.list(projectId).find((job) => job.deploymentId !== current.deploymentId && job.targetId === current.targetId && (job.status === "deployed" || job.status === "rolled_back"));
+    return previousJob ? this.buildService.get(projectId, previousJob.buildId) : undefined;
   }
 
   private persist(job: DeploymentJob): void {

@@ -24,6 +24,7 @@ export interface BuildJob {
   clean: boolean;
   runTests: boolean;
   createDockerImage: boolean;
+  artifactPath: string | null;
   startedAt: string;
   finishedAt: string | null;
   errorMessage: string | null;
@@ -66,6 +67,7 @@ export class BuildService {
       clean: typeof body.clean === "boolean" ? body.clean : true,
       runTests: typeof body.runTests === "boolean" ? body.runTests : true,
       createDockerImage: typeof body.createDockerImage === "boolean" ? body.createDockerImage : false,
+      artifactPath: null,
       startedAt: new Date().toISOString(),
       finishedAt: null,
       errorMessage: null,
@@ -86,9 +88,9 @@ export class BuildService {
       const validation = validateProject(project, this.secretExists);
       if (!validation.valid) throw new Error(validation.errors.map((issue) => `${issue.field ?? "project"}: ${issue.message}`).join("; "));
       await this.files.ensureGenerated(project);
-      const cwd = this.files.workspace(project.id);
-      const cwdResolved = path.resolve(cwd);
-      if (!cwdResolved.includes(`${path.sep}generated-projects${path.sep}`)) throw new Error("Refusing to build outside generated-projects workspace.");
+      const { root, workspace: cwd } = this.files.resolveWorkspace(project.id);
+      const relativeWorkspace = path.relative(root, cwd);
+      if (relativeWorkspace.startsWith("..") || path.isAbsolute(relativeWorkspace)) throw new Error("Refusing to build outside generated-projects workspace.");
       if (job.clean) await fs.rm(path.join(cwd, "dist"), { recursive: true, force: true });
       job.status = "installing";
       const installArgs = [await fileExists(path.join(cwd, "package-lock.json")) ? "ci" : "install"];
@@ -105,7 +107,12 @@ export class BuildService {
         await this.commandRunner("npm", ["test"], cwd, append);
       }
       job.status = "packaging";
-      append("Packaging step completed (Docker image creation disabled for local phase).")
+      const artifactDir = path.join(cwd, "artifacts");
+      await fs.mkdir(artifactDir, { recursive: true });
+      const artifactPath = path.join(artifactDir, `${job.buildId}.tgz`);
+      await this.commandRunner("tar", ["--exclude", "node_modules", "--exclude", "artifacts", "-czf", artifactPath, "."], cwd, append);
+      job.artifactPath = artifactPath;
+      append(`Packaged build artifact at ${artifactPath}.`);
       job.status = "succeeded";
     } catch (error) {
       job.status = "failed";
@@ -138,7 +145,7 @@ class CommandExecutionError extends Error {
   }
 }
 
-function runCommand(command: string, args: string[], cwd: string, append: LogAppender): Promise<void> {
+export function runCommand(command: string, args: string[], cwd: string, append: LogAppender): Promise<void> {
   return new Promise((resolve, reject) => {
     let output = "";
     const capture = (line: string) => {

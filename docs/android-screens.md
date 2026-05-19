@@ -20,6 +20,10 @@ Shows build/deployment controls and target/deployment status. Deploy actions sho
 
 Central place for local backend configuration and future account/environment settings. The API base URL should remain centralized rather than duplicated across screens.
 
+### GitHub display manual verification
+
+When verifying the Projects and Settings GitHub UI manually, load or stub an active project whose GitHub object has only one repository identifier populated, such as `owner = "princess"` with `repo = ""` or `owner = ""` with `repo = "bot-blade"`. Both the Projects card GitHub row and the Settings GitHub status line should show the `github_not_linked` text (`not linked`) instead of a partial `owner/repo` value, and the GitHub push/workflow actions should remain disabled until both owner and repo are non-blank.
+
 ## Secrets UI
 
 Secrets UI is reachable through the project/deployment/settings flows where implemented. It should create, rotate, and delete secret metadata without displaying stored secret values. Secret entry fields should be cleared after successful save/rotate.

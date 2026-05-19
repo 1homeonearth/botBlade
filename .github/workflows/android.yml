@@ -1,40 +1,213 @@
-name: Android
+name: BotBlade Android APKs
 
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
-  android-debug-build:
+  android-apk-build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.14.3'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+
+      - name: Configure Android SDK env & diagnostics
+        run: |
+          # If the setup action populated ANDROID_SDK_ROOT, make sure the repo and build tools can find it
+          if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+            echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+            export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+
+          # Fall back to ANDROID_HOME if set
+          if [ -n "${ANDROID_HOME:-}" ]; then
+            echo "ANDROID_HOME=$ANDROID_HOME"
+          fi
+
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+          echo "Listing SDK root contents (if present):"
+          ls -la "${ANDROID_HOME:-/tmp}" || true
+          echo "Listing platforms and build-tools (if present):"
+          ls -la "${ANDROID_HOME:-/tmp}/platforms" || true
+          ls -la "${ANDROID_HOME:-/tmp}/build-tools" || true
 
       - name: Install required Android SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Preflight Android SDK packages
         run: ./scripts/android-sdk-preflight.sh
 
       - name: Compile debug Kotlin
-        run: gradle :app:compileDebugKotlin
+        run: |
+          if [ -x ./gradlew ]; then
+            ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
+          else
+            gradle :app:compileDebugKotlin --stacktrace
+          fi
 
-      - name: Assemble debug APK
-        run: gradle :app:assembleDebug
+      - name: Assemble debug and release APKs
+        run: |
+          if [ -x ./gradlew ]; then
+            ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+          else
+            gradle :app:assembleDebug :app:assembleRelease --stacktrace
+          fi
+
+      - name: Stage APK outputs
+        run: |
+          mkdir -p dist/apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/apk/botBlade-debug.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/apk/botBlade-release-unsigned.apk
+          sha256sum dist/apk/*.apk | tee dist/apk/SHA256SUMS.txt
+
+      - name: Decode keystore and sign release APK
+        if: secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != ''
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          # Decode the base64-encoded keystore to a temp file
+          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+          
+          # Sign the release APK using jarsigner
+          jarsigner -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore /tmp/release.keystore \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEYSTORE_PASSWORD" \
+            dist/apk/botBlade-release-unsigned.apk \
+            "$KEY_ALIAS"
+          
+          # Align the signed APK
+          zipalign -v 4 dist/apk/botBlade-release-unsigned.apk dist/apk/botBlade-release-signed.apk
+          
+          # Cleanup
+          rm /tmp/release.keystore
+          
+          # Verify the signed APK
+          jarsigner -verify -verbose -certs dist/apk/botBlade-release-signed.apk
+          
+          # Update checksums to include the signed APK
+          sha256sum dist/apk/botBlade-release-signed.apk >> dist/apk/SHA256SUMS.txt
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: botBlade-apks-${{ github.sha }}
+          path: dist/apk/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish main branch release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT_SHA=${{ github.sha }}
+          COMMIT_SHA_SHORT=${COMMIT_SHA:0:7}
+          TIMESTAMP=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          RELEASE_TAG="main-${COMMIT_SHA_SHORT}"
+          
+          # Determine which release APK to use
+          if [ -f dist/apk/botBlade-release-signed.apk ]; then
+            RELEASE_APK="botBlade-release-signed.apk"
+            RELEASE_NOTE="signed release APK"
+          else
+            RELEASE_APK="botBlade-release-unsigned.apk"
+            RELEASE_NOTE="unsigned release APK; signing is still required before store distribution"
+          fi
+          
+          # Create release notes
+          {
+            echo "# botBlade Continuous Release"
+            echo ""
+            echo "Automated APK build from commit \`${COMMIT_SHA_SHORT}\` on $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "## Download"
+            echo ""
+            echo "- **[botBlade-debug.apk](../../releases/download/${RELEASE_TAG}/botBlade-debug.apk)** — debug APK for emulator, device, and local backend testing."
+            echo "- **[${RELEASE_APK}](../../releases/download/${RELEASE_TAG}/${RELEASE_APK})** — ${RELEASE_NOTE}."
+            echo "- **[SHA256SUMS.txt](../../releases/download/${RELEASE_TAG}/SHA256SUMS.txt)** — checksums for verifying APK integrity."
+            echo ""
+            echo "## Build information"
+            echo ""
+            echo "- **Commit:** [$COMMIT_SHA_SHORT](../../commit/${COMMIT_SHA})"
+            echo "- **Built:** $TIMESTAMP"
+            echo "- **Workflow:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > release-notes.md
+          
+          # Delete the old main release if it exists
+          gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+          
+          # Create new release with latest artifacts (as prerelease only, without --latest flag)
+          gh release create "$RELEASE_TAG" dist/apk/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "botBlade Main (${COMMIT_SHA_SHORT})" \
+            --notes-file release-notes.md \
+            --prerelease
+
+      - name: Publish tagged GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          # Determine which release APK to use
+          if [ -f dist/apk/botBlade-release-signed.apk ]; then
+            RELEASE_APK="botBlade-release-signed.apk"
+            RELEASE_NOTE="signed release APK ready for store distribution"
+          else
+            RELEASE_APK="botBlade-release-unsigned.apk"
+            RELEASE_NOTE="unsigned release APK; signing is still required before store distribution"
+          fi
+          
+          {
+            echo "# botBlade Release $TAG_NAME"
+            echo ""
+            echo "Automated botBlade APK release for $TAG_NAME."
+            echo ""
+            echo "## Download"
+            echo ""
+            echo "- **[botBlade-debug.apk](../../releases/download/$TAG_NAME/botBlade-debug.apk)** — debug APK for local testing."
+            echo "- **[${RELEASE_APK}](../../releases/download/$TAG_NAME/${RELEASE_APK})** — ${RELEASE_NOTE}."
+            echo "- **[SHA256SUMS.txt](../../releases/download/$TAG_NAME/SHA256SUMS.txt)** — checksums for the APK files."
+          } > release-notes.md
+
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" dist/apk/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --title "botBlade $TAG_NAME" --notes-file release-notes.md --latest
+          else
+            gh release create "$TAG_NAME" dist/apk/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "botBlade $TAG_NAME" \
+              --notes-file release-notes.md \
+              --latest
+          fi
