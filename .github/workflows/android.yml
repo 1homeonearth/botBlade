@@ -113,7 +113,7 @@ jobs:
             echo "## Download"
             echo ""
             echo "- **[botBlade-debug.apk](../../releases/download/${RELEASE_TAG}/botBlade-debug.apk)** — debug APK for emulator, device, and local backend testing."
-            echo "- **[botBlade-release-unsigned.apk](../../releases/download/${RELEASE_TAG}/botBlade-release-unsigned.apk)** — unsigned release APK; signing is still required before store distribution."
+            echo "- **[botBlade-release-unsigned.apk](../../releases/download/${RELEASE_TAG}/botBlade-release-unsigned.apk)** — unsigned release APK; signing is still required before store dist[...]"
             echo "- **[SHA256SUMS.txt](../../releases/download/${RELEASE_TAG}/SHA256SUMS.txt)** — checksums for verifying APK integrity."
             echo ""
             echo "## Build information"
@@ -126,12 +126,11 @@ jobs:
           # Delete the old main release if it exists
           gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           
-          # Create new release with latest artifacts
+          # Create new release with latest artifacts (as prerelease only, without --latest flag)
           gh release create "$RELEASE_TAG" dist/apk/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "botBlade Main (${COMMIT_SHA_SHORT})" \
             --notes-file release-notes.md \
-            --latest \
             --prerelease
 
       - name: Publish tagged GitHub release
@@ -148,7 +147,7 @@ jobs:
             echo "## Download"
             echo ""
             echo "- **[botBlade-debug.apk](../../releases/download/$TAG_NAME/botBlade-debug.apk)** — debug APK for local testing."
-            echo "- **[botBlade-release-unsigned.apk](../../releases/download/$TAG_NAME/botBlade-release-unsigned.apk)** — unsigned release APK; signing is still required before store distribution."
+            echo "- **[botBlade-release-unsigned.apk](../../releases/download/$TAG_NAME/botBlade-release-unsigned.apk)** — unsigned release APK; signing is still required before store distribut[...]"
             echo "- **[SHA256SUMS.txt](../../releases/download/$TAG_NAME/SHA256SUMS.txt)** — checksums for the APK files."
           } > release-notes.md
 
