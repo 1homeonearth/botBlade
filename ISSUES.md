@@ -338,3 +338,37 @@ Failed to download Android command-line tools.
 - **Validation:**
   - `gradle :app:compileDebugKotlin --stacktrace` failed because the flavored app requires explicit variant tasks, and `gradle :app:compileLocalDevDebugKotlin --stacktrace` then failed with missing Android SDK location in this container.
 - **Resolution notes:** Contrast is now deterministic across day/night modes instead of relying on device-default palette behavior.
+
+## 2026-05-19T06:05:00Z — Android workflow release asset/checksum contract drift and invalid trigger behavior
+
+- **Status:** Complete
+- **Context:** The Android workflow had stale release asset naming (`botBlade-*`), pre-signing checksum generation, and release/trigger behavior that did not satisfy PR/main/tag/manual contract expectations.
+- **Troubleshooting steps taken:**
+  - Rebuilt `.github/workflows/android.yml` with explicit preflight/build/release jobs, safe concurrency, PR/main/tag/workflow_dispatch triggers, deterministic asset selection arrays, checksum generation after final selection, release metadata generation, and conditional signing enforcement.
+  - Added `.github/release.yml` category config for release notes grouping.
+  - Added `docs/releases.md` with trigger matrix, asset contract, signing behavior, and recovery steps.
+  - Updated README download/release sections and latest links to stable `royal-scepter.apk` path.
+- **Commands:**
+  - `cat > .github/workflows/android.yml <<'YAML' ...`
+  - `cat > .github/release.yml <<'YAML' ...`
+  - `cat > docs/releases.md <<'MD' ...`
+  - `python - <<'PY' ...` (README updates)
+- **Resolution notes:** Contract fixes are now codified in workflow and docs; runtime validation must occur on GitHub-hosted runners with Android SDK and repository secrets.
+
+- **Repeat occurrence 2026-05-19T05:37:26Z:** Pre-session unresolved-issue resolution attempt reran SDK preflight before CI/release follow-up edits.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation persists in this container; Android assemble/test validation still requires an SDK-enabled environment or approved mirror.
+
+## 2026-05-19T05:45:35Z — PR build failure visibility gap (missing sticky failure comment)
+
+- **Status:** Complete
+- **Context:** Follow-up review required a sticky PR comment for failed APK builds (not just successful builds).
+- **Troubleshooting steps taken:**
+  - Added a dedicated `pr-comment-on-failure` job gated on `pull_request` + `needs.build.result == 'failure'`.
+  - Reused marker-based sticky comment upsert logic to avoid duplicate PR spam.
+  - Added release job summary checklist output for clearer operator visibility in Actions UI.
+- **Commands:**
+  - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/android.yml"); puts "yaml ok"'`
+  - `git diff --check`
+- **Resolution notes:** PR failures now produce a best-effort sticky comment with run link and failure guidance.
