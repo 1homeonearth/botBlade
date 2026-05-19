@@ -42,7 +42,7 @@
   - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
 - **Repeat occurrence 2026-05-18T09:51:47Z:** Android compilation verification for backend URL configuration changes hit the same missing SDK limitation.
   - Command: `gradle :app:compileDebugKotlin`
-  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
+  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/botBlade/local.properties'.`
   - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
 - **Repeat occurrence 2026-05-18T10:06:14Z:** Pre-session unresolved issue review repeated the Android SDK preflight before Android release packaging polish.
   - Command: `./scripts/android-sdk-preflight.sh`
@@ -50,7 +50,7 @@
   - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
 - **Repeat occurrence 2026-05-18T10:14:02Z:** Full Android assemble verification for release packaging changes hit the same missing SDK limitation.
   - Command: `gradle :app:assembleLocalDevDebug :app:assembleProdRelease`
-  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
+  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/botBlade/local.properties'.`
   - Status: Incomplete — environment limitation remains; Gradle configuration and manifest processing were verified, but full APK/AAB assembly must be rerun in an SDK-enabled environment.
 
 
@@ -208,7 +208,7 @@
 
 ```text
 Could not determine the dependencies of task ':app:compileDebugJavaWithJavac'.
-> SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.
+> SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/botBlade/local.properties'.
 ```
 
 **Resolution attempt:**
@@ -352,7 +352,7 @@ Failed to download Android command-line tools.
   - Rebuilt `.github/workflows/android.yml` with explicit preflight/build/release jobs, safe concurrency, PR/main/tag/workflow_dispatch triggers, deterministic asset selection arrays, checksum generation after final selection, release metadata generation, and conditional signing enforcement.
   - Added `.github/release.yml` category config for release notes grouping.
   - Added `docs/releases.md` with trigger matrix, asset contract, signing behavior, and recovery steps.
-  - Updated README download/release sections and latest links to stable `royal-scepter.apk` path.
+  - Updated README download/release sections and latest links to stable `bot-blade.apk` path.
 - **Commands:**
   - `cat > .github/workflows/android.yml <<'YAML' ...`
   - `cat > .github/release.yml <<'YAML' ...`
@@ -377,3 +377,16 @@ Failed to download Android command-line tools.
   - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/android.yml"); puts "yaml ok"'`
   - `git diff --check`
 - **Resolution notes:** PR failures now produce a best-effort sticky comment with run link and failure guidance.
+
+## 2026-05-19T06:45:00Z — Repository-wide naming migration from royalScepter to botBlade references
+
+### 2026-05-19T06:45:00Z — Text reference replacement sweep
+- Context: User-requested rename pass to replace all `royalScepter` textual references and common variants with `botBlade` equivalents across repository files.
+- Commands run:
+  - `rg -n "royalScepter|royal-scepter|royal scepter|RoyalScepter|Royal Scepter"`
+  - `python - <<'PY' ...` (targeted batch string replacements)
+  - `rg -n "royalScepter|royal-scepter|royal scepter|RoyalScepter|Royal Scepter" || true`
+- Observed output/errors: Initial scan found references in README, contributing/docs, settings UI strings, manifest theme name, and project logs; post-change scan returned no remaining matches.
+- Versions/environment: UTC shell in `/workspace/royalScepter` on 2026-05-19.
+- Status: Complete
+- Next action: Run repository build/test checks relevant to changed surfaces in a fully provisioned Android+Node environment when needed.

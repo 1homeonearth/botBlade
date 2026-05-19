@@ -1,4 +1,4 @@
-# Royal Scepter Privacy Policy and Data Safety Notes
+# BotBlade Privacy Policy and Data Safety Notes
 
 _Last updated: 2026-05-18_
 
@@ -6,7 +6,7 @@ This repository does not publish a hosted privacy policy URL. Before public dist
 
 ## Summary
 
-Royal Scepter is an Android client for managing Discord bot projects through a backend that the user or operator configures. The app is intended to communicate with a Royal Scepter backend API, display project/build/runtime status, and submit user-entered project configuration.
+BotBlade is an Android client for managing Discord bot projects through a backend that the user or operator configures. The app is intended to communicate with a BotBlade backend API, display project/build/runtime status, and submit user-entered project configuration.
 
 ## Data the Android app may process
 

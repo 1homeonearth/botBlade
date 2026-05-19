@@ -108,7 +108,7 @@ class SettingsFragment : Fragment() {
         workflowButton.setOnClickListener { createWorkflow() }
         copyWorkflowHelpButton.setOnClickListener { copyWorkflowInstructions() }
         pushGitHubButton.setOnClickListener { pushGitHub() }
-        apkDownloadsText.text = getString(R.string.apk_download_links, "princessraven/royalScepter")
+        apkDownloadsText.text = getString(R.string.apk_download_links, "princessraven/botBlade")
         loadSecrets()
         loadGitHubSection()
     }
@@ -251,7 +251,7 @@ class SettingsFragment : Fragment() {
         val instructions = buildString {
             append(getString(R.string.github_workflow_help))
             append("\n")
-            append(getString(R.string.apk_download_links, "princessraven/royalScepter").replace(Regex("<[^>]+>"), ""))
+            append(getString(R.string.apk_download_links, "princessraven/botBlade").replace(Regex("<[^>]+>"), ""))
         }
         clipboard.setPrimaryClip(ClipData.newPlainText("workflow_help", instructions))
         Toast.makeText(requireContext(), getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
