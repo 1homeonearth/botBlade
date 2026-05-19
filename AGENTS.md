@@ -17,3 +17,13 @@
 - For each issue or validation failure, append a UTC-stamped attempt entry under the most recent matching issue chain, including commands run, relevant logs/errors, versions, and current status.
 - After a fix is validated by a passing test, mark that issue chain complete and prune obsolete raw logs that are no longer useful for future debugging.
 - If work is not finished, write clear continuation steps in `LEFTOVERS.md` so the next agent can resume safely.
+
+## Required GitHub Actions secrets for Android release signing
+
+Configure these repository secrets for signed release APK output in `.github/workflows/android.yml`:
+
+- `KEYSTORE_BASE64`: Base64-encoded Android signing keystore file contents.
+- `KEYSTORE_PASSWORD`: Keystore password (also used as key password in the workflow).
+- `KEY_ALIAS`: Alias name of the signing key entry inside the keystore.
+
+If any of these secrets are missing, the signing step is skipped automatically and release uploads fall back to the unsigned APK.

@@ -167,8 +167,11 @@ jobs:
           # Delete the old main release if it exists
           gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           
+          # Upload only intended assets (prefer signed release APK when available)
+          RELEASE_ASSETS=("dist/apk/botBlade-debug.apk" "dist/apk/${RELEASE_APK}" "dist/apk/SHA256SUMS.txt")
+
           # Create new release with latest artifacts (as prerelease only, without --latest flag)
-          gh release create "$RELEASE_TAG" dist/apk/* \
+          gh release create "$RELEASE_TAG" "${RELEASE_ASSETS[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "botBlade Main (${COMMIT_SHA_SHORT})" \
             --notes-file release-notes.md \
@@ -201,11 +204,13 @@ jobs:
             echo "- **[SHA256SUMS.txt](../../releases/download/$TAG_NAME/SHA256SUMS.txt)** — checksums for the APK files."
           } > release-notes.md
 
+          RELEASE_ASSETS=("dist/apk/botBlade-debug.apk" "dist/apk/${RELEASE_APK}" "dist/apk/SHA256SUMS.txt")
+
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG_NAME" dist/apk/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG_NAME" "${RELEASE_ASSETS[@]}" --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --title "botBlade $TAG_NAME" --notes-file release-notes.md --latest
           else
-            gh release create "$TAG_NAME" dist/apk/* \
+            gh release create "$TAG_NAME" "${RELEASE_ASSETS[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --title "botBlade $TAG_NAME" \
               --notes-file release-notes.md \
