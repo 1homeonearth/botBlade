@@ -2,13 +2,13 @@
 
 [![Android APK workflow](../../actions/workflows/android.yml/badge.svg)](../../actions/workflows/android.yml)
 
-## Download Royal Scepter for Android
+## Download BotBlade for Android
 
-- **Recommended:** [`royal-scepter.apk`](https://github.com/1homeonearth/botBlade/releases/latest/download/royal-scepter.apk) from the [Latest Release](https://github.com/1homeonearth/botBlade/releases/latest).
-- Direct APK download: [https://github.com/1homeonearth/botBlade/releases/latest/download/royal-scepter.apk](https://github.com/1homeonearth/botBlade/releases/latest/download/royal-scepter.apk)
+- **Recommended:** [`bot-blade.apk`](https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk) from the [Latest Release](https://github.com/1homeonearth/botBlade/releases/latest).
+- Direct APK download: [https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk](https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk)
 - Checksums: [https://github.com/1homeonearth/botBlade/releases/latest/download/SHA256SUMS.txt](https://github.com/1homeonearth/botBlade/releases/latest/download/SHA256SUMS.txt)
 
-Regular users should download `royal-scepter.apk`. Debug APKs are for testers. Unsigned APKs are for developers/testers only.
+Regular users should download `bot-blade.apk`. Debug APKs are for testers. Unsigned APKs are for developers/testers only.
 
 ### Development builds
 - Pull requests automatically build APK artifacts through GitHub Actions.
@@ -54,7 +54,7 @@ Still experimental:
 ## Naming
 
 - **botBlade** is the repository, backend service, and developer platform name.
-- **Royal Scepter** is the Android application and APK distribution name.
+- **BotBlade** is the Android application and APK distribution name.
 - `com.princess.botblade` is the Android package namespace.
 
 ## Featured mobile IDE capabilities
@@ -119,10 +119,10 @@ The repository includes `.github/workflows/android.yml` with a preflight job, AP
 - `workflow_dispatch` supports `build-only`, `prerelease`, and `versioned-release`.
 
 Public release assets:
-- `royal-scepter.apk`
-- `royal-scepter-vVERSION-VERSIONCODE-signed.apk`
-- `royal-scepter-debug.apk`
-- `royal-scepter-vVERSION-VERSIONCODE-debug.apk`
+- `bot-blade.apk`
+- `bot-blade-vVERSION-VERSIONCODE-signed.apk`
+- `bot-blade-debug.apk`
+- `bot-blade-vVERSION-VERSIONCODE-debug.apk`
 - `SHA256SUMS.txt`, `release.json`, `INSTALL.md`
 
 See [docs/releases.md](docs/releases.md) for full release workflow and recovery steps.

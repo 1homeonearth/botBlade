@@ -14,18 +14,18 @@
 If missing, PR builds still succeed. Versioned release publishing fails before publication if signing is unavailable.
 
 ## Public release assets
-- `royal-scepter.apk` (stable signed user download)
-- `royal-scepter-vVERSION-VERSIONCODE-signed.apk`
-- `royal-scepter-debug.apk`
-- `royal-scepter-vVERSION-VERSIONCODE-debug.apk`
+- `bot-blade.apk` (stable signed user download)
+- `bot-blade-vVERSION-VERSIONCODE-signed.apk`
+- `bot-blade-debug.apk`
+- `bot-blade-vVERSION-VERSIONCODE-debug.apk`
 - `SHA256SUMS.txt`
 - `release.json`
 - `INSTALL.md`
 
 ## PR artifacts
-- `royalScepter-...-debug-apk`
-- `royalScepter-...-release-unsigned-apk`
-- `royalScepter-...-checksums`
+- `botBlade-...-debug-apk`
+- `botBlade-...-release-unsigned-apk`
+- `botBlade-...-checksums`
 
 Artifacts are available in the workflow run **Artifacts** section.
 

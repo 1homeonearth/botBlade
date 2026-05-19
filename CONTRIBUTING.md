@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for helping improve **botBlade** / **Royal Scepter**.
+Thanks for helping improve **botBlade** / **BotBlade**.
 
 ## Repository layout
 
-- `app/`: Android app (`com.princess.botblade`, display name Royal Scepter).
+- `app/`: Android app (`com.princess.botblade`, display name BotBlade).
 - `backend/`: Node/TypeScript backend (`botblade-backend`).
 - `docs/`: project documentation.
 - `docs/project/`: agent/session continuity notes and process history.

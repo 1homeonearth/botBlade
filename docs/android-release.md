@@ -49,8 +49,8 @@ Generate a local upload key only on a trusted workstation:
 keytool -genkeypair \
   -v \
   -storetype PKCS12 \
-  -keystore royal-scepter-upload.jks \
-  -alias royal-scepter-upload \
+  -keystore bot-blade-upload.jks \
+  -alias bot-blade-upload \
   -keyalg RSA \
   -keysize 4096 \
   -validity 10000
@@ -59,9 +59,9 @@ keytool -genkeypair \
 Provide signing values with Gradle properties or environment variables at build time:
 
 ```bash
-export ROYAL_SCEPTER_RELEASE_STORE_FILE=/secure/path/royal-scepter-upload.jks
+export ROYAL_SCEPTER_RELEASE_STORE_FILE=/secure/path/bot-blade-upload.jks
 export ROYAL_SCEPTER_RELEASE_STORE_PASSWORD='***'
-export ROYAL_SCEPTER_RELEASE_KEY_ALIAS=royal-scepter-upload
+export ROYAL_SCEPTER_RELEASE_KEY_ALIAS=bot-blade-upload
 export ROYAL_SCEPTER_RELEASE_KEY_PASSWORD='***'
 
 gradle :app:bundleProdRelease -PVERSION_CODE=2 -PVERSION_NAME=0.1.1
