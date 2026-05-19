@@ -4,8 +4,18 @@
         <item name="colorPrimaryVariant">@color/botblade_purple_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSecondary">@color/botblade_gold</item>
+        <item name="colorSurface">@color/botblade_surface</item>
+        <item name="colorOnSurface">@color/botblade_on_surface</item>
+        <item name="android:colorBackground">@color/botblade_surface</item>
+        <item name="android:textColorPrimary">@color/botblade_on_surface</item>
+        <item name="android:textColorSecondary">@color/botblade_on_surface</item>
+        <item name="materialCardViewStyle">@style/Widget.BotBlade.MaterialCardView</item>
         <item name="android:statusBarColor">@color/botblade_purple_dark</item>
         <item name="android:navigationBarColor">@color/botblade_surface</item>
-        <item name="android:fontFamily">sans</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="Widget.BotBlade.MaterialCardView" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/botblade_surface_variant</item>
     </style>
 </resources>

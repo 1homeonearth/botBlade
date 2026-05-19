@@ -1,43 +1,55 @@
-# botBlade Android compile handoff
+# HUMANS.md — Android SDK blocker playbook for this container
 
-Current branch includes the Android slash-command and GitHub settings polish from the latest commits. Backend tests pass, and Android resource XML parsing passes locally, but Android compilation is still blocked by this container's network/proxy restrictions around Android SDK downloads.
+## Problem summary
+`./scripts/android-sdk-preflight.sh` fails in this container because Android SDK packages are not installed and outbound HTTPS downloads for SDK artifacts are blocked by a proxy (`CONNECT tunnel failed, response 403`).
 
-## What was tried in this pass
+## What was tried (multiple approaches)
+1. **Standard bootstrap script**
+   - Command: `./scripts/android-sdk-bootstrap.sh`
+   - Result: `curl: (22) ... 403` from `dl.google.com`.
 
-1. Confirmed the repo has no checked-in `HUMANS.md` at start and no uncommitted changes.
-2. Checked for a preinstalled Android SDK and `ANDROID_HOME`; none was usable in the container.
-3. Tried to download Android command-line tools from Google directly:
-   - `curl -fL --retry 3 -o commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip`
-   - Result: HTTP 403 from the proxy.
-4. Tried `apt-get update` as an alternate path to packaged Android SDK tools.
-   - Result: Ubuntu repository access also returned HTTP 403 from the proxy.
-5. Retried Gradle with `ANDROID_HOME=/workspace/android-sdk`.
-   - Result: Gradle recognized `ANDROID_HOME`, but Android Gradle Plugin attempted to fetch SDK package manifests from `https://dl.google.com/android/repository/...`; the proxy returned HTTP 403, and Build Tools could not be installed/found.
-6. Added `buildToolsVersion = "35.0.0"` to `app/build.gradle.kts` so the project requests a build-tools revision aligned with `compileSdk = 35` / `targetSdk = 35` instead of falling back to an older default in environments that already have API 35 installed.
+2. **Direct mirror candidates / alternate Google endpoint checks**
+   - Commands:
+     - `curl -I -L https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip`
+     - `curl -I -L https://redirector.gvt1.com/edgedl/android/repository/commandlinetools-linux-13114758_latest.zip`
+     - `curl -I -L https://mirrors.cloud.tencent.com/AndroidSDK/android/repository/commandlinetools-linux-13114758_latest.zip`
+   - Result for all: `CONNECT tunnel failed, response 403` (proxy-level deny before artifact host).
 
-## Suggested next prompt if continuing in a new Codex session
+3. **Check for preinstalled SDK fallback**
+   - Command: `test -d /root/android-sdk/platforms/android-35` and `test -d /root/android-sdk/build-tools/35.0.0`
+   - Result: both missing.
 
-Copy/paste this:
+## Why this repeats
+The blocker is not in repository code. It is infrastructure/network policy for this container. Until an approved SDK artifact source is reachable through the proxy, every Android compile/assemble task will fail early.
 
-> Continue from `/workspace/botBlade` on the current branch. First inspect `git status` and `HUMANS.md`. The latest work added Android slash-command management and GitHub settings polish. Android compilation is blocked in this container because SDK downloads from `dl.google.com` and apt repositories return HTTP 403 via the proxy, even when `ANDROID_HOME=/workspace/android-sdk` is set. `app/build.gradle.kts` now pins `buildToolsVersion = "35.0.0"`. If you have an environment with Android SDK access, install `platforms;android-35`, `build-tools;35.0.0`, and `platform-tools`, set `ANDROID_HOME` to that SDK, then run `gradle :app:compileDebugKotlin`. If compilation fails with Kotlin/resource errors, fix them, rerun backend tests and Android compile, then commit and open a PR. Preserve no-raw-token/no-secret logging behavior and do not fake GitHub push success.
+## Fastest path to green
+Use **one** of these:
 
-## Commands worth rerunning in an SDK-enabled environment
+1. **Preferred:** provide an approved mirror URL that the proxy allows, then run:
+   ```bash
+   ANDROID_CMDLINE_TOOLS_URL=https://<approved-mirror>/commandlinetools-linux-13114758_latest.zip \
+   ./scripts/android-sdk-bootstrap.sh
+   ./scripts/android-sdk-preflight.sh
+   ```
 
+2. **Alternative:** mount or pre-provision an SDK directory that already contains:
+   - `platforms/android-35`
+   - `build-tools/35.0.0`
+   - `platform-tools`
+
+   Then set either:
+   - `export ANDROID_HOME=/path/to/android-sdk`, or
+   - untracked `local.properties` with `sdk.dir=/path/to/android-sdk`.
+
+3. **CI-only validation fallback:** rely on GitHub Actions Android workflow (which provisions SDK on runner) for APK build verification when local container networking is restricted.
+
+## Verification commands after fix
 ```bash
-npm test --prefix backend
-python3 - <<'PY'
-import xml.etree.ElementTree as ET
-for path in ['app/src/main/res/layout/fragment_settings.xml', 'app/src/main/res/values/strings.xml']:
-    ET.parse(path)
-    print(f'OK {path}')
-PY
-ANDROID_HOME=/path/to/android-sdk gradle :app:compileDebugKotlin
+./scripts/android-sdk-preflight.sh
+gradle :app:compileLocalDevDebugKotlin --stacktrace
+gradle :app:assembleLocalDevDebug --stacktrace
 ```
 
-## Expected Android SDK packages
-
-- `platforms;android-35`
-- `build-tools;35.0.0`
-- `platform-tools`
-
-Do not commit `local.properties` with a machine-specific `sdk.dir`.
+## Notes for LLMs / engineers
+- Do not keep retrying random mirrors unless proxy policy changed; record attempts in `ISSUES.md` under the existing Android SDK issue chain.
+- If this is unresolved at end of session, update `LEFTOVERS.md` with exact mirror/proxy requirement and stop burning cycles.

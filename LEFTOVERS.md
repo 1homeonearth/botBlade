@@ -9,7 +9,7 @@
 
 ## Remaining requested work
 2. **Android GitHub defer UX + validation**
-   - If GitHub push remains deferred in UI flows, disable/hide push button and show copyable workflow/export instructions.
+   - ✅ Implemented: push-disabled mode now shows copyable workflow/export instructions and helper text in Settings.
    - Warn for missing Discord IDs based on command registration mode.
 
 3. **Android release UX sweep**
@@ -36,3 +36,11 @@
 
 ## Environment blockers to revisit first next session
 - Android SDK validation is blocked in this container: no SDK variables/local.properties are present, and `./scripts/android-sdk-bootstrap.sh` cannot download command-line tools because `dl.google.com` returns HTTP 403. Retry with network access to Google downloads or set `ANDROID_CMDLINE_TOOLS_URL` to an approved mirror, then run `./scripts/android-sdk-preflight.sh` and `gradle :app:assembleDebug :app:assembleRelease --stacktrace`.
+
+
+## 2026-05-19 follow-up from readability + IDE expansion request
+- Implement searchable file tree with folder expansion and quick-open.
+- Add syntax highlighting + line numbers + find/replace in editor panel.
+- Add GitHub repository browser (list/select templates/repos) with one-tap import/generate for bot templates.
+- ⚠️ Partial: added in-app APK download links panel in Settings; checksum display still pending.
+- Add CI verification that README homepage links resolve to current release assets after each main/tag build.
