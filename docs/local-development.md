@@ -55,3 +55,7 @@ New features should prefer project-scoped endpoints under `/api/projects/:projec
 ## In-memory data
 
 Projects, secrets, build jobs, deployment targets, runtimes, and audit events are in memory. Restarting the backend clears them. Generated project files remain on disk under `backend/generated-projects/` until deleted manually.
+
+## npm proxy warning mitigation
+
+If npm prints `Unknown env config "http-proxy"`, your shell or CI is exporting a deprecated npm env key. Prefer standard proxy env vars (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) or npm config keys written with underscores (`npm_config_http_proxy`, `npm_config_https_proxy`) to stay compatible with newer npm versions.
