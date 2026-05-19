@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 
 process.env.NODE_ENV = "test";
 process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
@@ -13,7 +14,7 @@ type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 
 async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean } = {}) {
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
-  const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${Math.random().toString(16).slice(2)}` };
+  const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${randomUUID()}` };
   if (!options.unauthenticated) {
     if (options.sessionToken) headers.cookie = `botBladeSession=${encodeURIComponent(options.sessionToken)}`;
     else headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
@@ -194,4 +195,11 @@ test("deployment rejects missing target/build", async () => {
   const response = await request("POST", `/api/projects/${created.body.id}/deployments`, { targetId: "target_missing", buildId: "build_missing" });
   assert.equal(response.statusCode, 404);
   assert.equal(response.body.error.code, "TARGET_NOT_FOUND");
+});
+
+
+test("invalid request URL returns 400", async () => {
+  const response = await request("GET", "http://%", undefined, { unauthenticated: true });
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.error.code, "INVALID_REQUEST_URL");
 });

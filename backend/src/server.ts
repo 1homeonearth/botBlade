@@ -54,8 +54,7 @@ if (process.env.NODE_ENV !== "test") {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, requestId: string): Promise<void> {
   const method = req.method ?? "GET";
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  const path = url.pathname;
+  const path = extractPathname(req.url);
 
   if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
@@ -320,6 +319,16 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   const body = Buffer.concat(chunks).toString("utf8").trim();
   if (!body) return {};
   try { return JSON.parse(body) as unknown; } catch { throw new RequestValidationError([{ field: "body", message: "Body must be valid JSON." }]); }
+}
+
+
+function extractPathname(rawUrl: string | undefined): string {
+  const candidate = typeof rawUrl === "string" && rawUrl.length > 0 ? rawUrl : "/";
+  try {
+    return new URL(candidate, "http://localhost").pathname;
+  } catch {
+    throw { statusCode: 400, code: "INVALID_REQUEST_URL", message: "Request URL is invalid.", details: {} };
+  }
 }
 
 function writeJson(res: ServerResponse, statusCode: number, body: unknown): void {
