@@ -2,6 +2,11 @@
 
 ## 2026-05-18T07:05:04Z — Android SDK unavailable in current shell
 
+- **Repeat occurrence 2026-05-19T06:20:00Z:** Pre-session unresolved issue review reran Android SDK preflight before README/docs coherence pass.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation persists in this container; Android SDK-dependent checks remain blocked.
+
 - **Status:** Incomplete — environment limitation; repository changes include documentation and preflight automation, but this shell does not expose an Android SDK through `ANDROID_HOME`.
 - **Context:** The session requested Android SDK bootstrap guidance, a CI preflight check for `platforms/android-35` and `build-tools/35.0.0`, and build verification in an SDK-enabled environment.
 - **Observed details:** `ANDROID_HOME` was empty when checked in the current shell; using the placeholder `/path/to/android-sdk` also failed because no SDK exists at that path in this environment.
