@@ -281,3 +281,23 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 
 **Remaining warnings:**
 - npm environment still emits one `Unknown env config "http-proxy"` warning at npm startup in this container.
+
+### 2026-05-19T02:10:00Z repeat occurrence — bootstrap retry still blocked by Google download 403
+
+**Status:** Incomplete
+
+**Context:** Per repository workflow requirements, retried unresolved Android SDK bootstrap blocker before starting new requested changes.
+
+**Resolution attempt:**
+- Ran `./scripts/android-sdk-bootstrap.sh` from repository root.
+- Download failed again with HTTP 403 from `https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip`.
+
+**Key logs:**
+
+```text
+curl: (22) The requested URL returned error: 403
+Failed to download Android command-line tools.
+```
+
+**Outcome:**
+- Issue remains incomplete in this environment without an approved mirror URL for Android command-line tools.
