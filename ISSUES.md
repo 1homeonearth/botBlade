@@ -28,7 +28,7 @@
 
 ## 2026-05-18T22:50:00Z — Android validation environment and JVM unit-test server failures during botBlade rename
 
-**Status:** Complete
+**Status:** Incomplete (repeat Android SDK availability issue observed 2026-05-18T23:37:00Z)
 
 **Context:** While validating the rename and APK release workflow, the first Android Gradle validation attempt could not locate an Android SDK because this container did not have `ANDROID_HOME`, `ANDROID_SDK_ROOT`, or `local.properties` configured. After bootstrapping the SDK, `:app:compileDebugUnitTestKotlin` failed because the unit test imported `com.sun.net.httpserver`, which was unavailable to the Kotlin unit-test compile classpath. After replacing that test helper, the path-encoding test still failed because JDK `HttpURLConnection` rejects `PATCH` in JVM unit tests.
 
@@ -52,3 +52,35 @@
 - `gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --warning-mode all` completed successfully; remaining deprecation warnings originate from Android Gradle Plugin/Gradle internals rather than repository build scripts.
 
 **Remaining warnings:** Android Gradle Plugin 8.7.3 emits Gradle 8.14.4 deprecation warnings for generated/internal `is-` boolean properties and one null attribute lookup during `lintVitalAnalyzeRelease`.
+
+### 2026-05-18T23:37:00Z repeat occurrence — SDK missing in current validation environment
+
+**Status:** Incomplete
+
+**Context:** While validating GitHub Actions release-link changes, `gradle :app:assembleDebug :app:assembleRelease --stacktrace` failed before task execution because the current container had no `ANDROID_HOME`, `ANDROID_SDK_ROOT`, or `local.properties` SDK pointer. This repeats the earlier Android validation environment class of issue.
+
+**Key logs:**
+
+```text
+Could not determine the dependencies of task ':app:compileDebugJavaWithJavac'.
+> SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.
+```
+
+**Resolution attempt:**
+- Ran `./scripts/android-sdk-bootstrap.sh` to reinstall Android command-line tools and write `local.properties`.
+- The bootstrap failed because `curl` received HTTP 403 from `https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip`.
+
+**Bootstrap log:**
+
+```text
+curl: (22) The requested URL returned error: 403
+Failed to download Android command-line tools.
+This environment may require an approved mirror.
+```
+
+**Relevant versions observed:**
+- Gradle: 8.14.4
+- Android Gradle Plugin: 8.7.3
+- Kotlin Android plugin: 2.0.21
+
+**Next steps:** Retry `./scripts/android-sdk-bootstrap.sh` in an environment that can access `dl.google.com`, or set `ANDROID_CMDLINE_TOOLS_URL` to an approved mirror for `commandlinetools-linux-13114758_latest.zip`, then rerun `./scripts/android-sdk-preflight.sh` and `gradle :app:assembleDebug :app:assembleRelease --stacktrace`.
