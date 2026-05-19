@@ -23,3 +23,18 @@ Central place for local backend configuration and future account/environment set
 ## Secrets UI
 
 Secrets UI is reachable through the project/deployment/settings flows where implemented. It should create, rotate, and delete secret metadata without displaying stored secret values. Secret entry fields should be cleared after successful save/rotate.
+
+
+## Release screenshots
+
+Capture screenshots from a `prodRelease`-equivalent build or a `prodDebug` build pointed at a sanitized staging backend. Use representative but fake projects, commands, deployment targets, GitHub repositories, and secret references.
+
+Recommended screenshot set for store review:
+
+1. Dashboard showing sanitized bot/runtime status and active project context.
+2. Projects screen with fake project names and validation status.
+3. Editor screen showing non-sensitive generated template code only.
+4. Deployments screen showing placeholder build/runtime logs with no tokens or private hostnames.
+5. Settings screen showing an HTTPS production/staging backend URL with no credentials, query string, or fragment.
+
+Before publishing screenshots, verify that no Discord token, GitHub token, private repository, private backend hostname, user email, or real audit record is visible. Keep raw screenshots out of source control unless they are sanitized marketing assets.

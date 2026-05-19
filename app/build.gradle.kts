@@ -1,7 +1,23 @@
+import org.gradle.api.Project
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+fun Project.releaseValue(name: String): String? =
+    providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull
+
+val releaseStoreFile = releaseValue("ROYAL_SCEPTER_RELEASE_STORE_FILE")
+val releaseStorePassword = releaseValue("ROYAL_SCEPTER_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseValue("ROYAL_SCEPTER_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseValue("ROYAL_SCEPTER_RELEASE_KEY_PASSWORD")
+val hasReleaseSigningConfig = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.princess.royalscepter"
@@ -12,14 +28,54 @@ android {
         applicationId = "com.princess.royalscepter"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
-        buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:8000\"")
+
+        // Release policy: bump VERSION_CODE for every Play upload; use SemVer for VERSION_NAME.
+        // Override without editing source: -PVERSION_CODE=2 -PVERSION_NAME=0.1.1.
+        versionCode = providers.gradleProperty("VERSION_CODE").orNull?.toInt() ?: 1
+        versionName = providers.gradleProperty("VERSION_NAME").orNull ?: "0.1.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigningConfig) {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("localDev") {
+            dimension = "environment"
+            applicationIdSuffix = ".localdev"
+            versionNameSuffix = "-local-dev"
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                "\"${providers.gradleProperty("PROD_API_BASE_URL").orNull ?: "https://api.royalscepter.app"}\"",
+            )
+        }
     }
 
     buildTypes {
         debug {
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            isDebuggable = true
+        }
+        release {
+            isDebuggable = false
+            isMinifyEnabled = false
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

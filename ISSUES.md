@@ -39,6 +39,14 @@
   - Command: `gradle :app:compileDebugKotlin`
   - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
   - Status: Incomplete — environment limitation remains; Kotlin/Android compilation must be rerun in an SDK-enabled environment.
+- **Repeat occurrence 2026-05-18T10:06:14Z:** Pre-session unresolved issue review repeated the Android SDK preflight before Android release packaging polish.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; no SDK root or approved Android SDK artifact mirror is available in this shell.
+- **Repeat occurrence 2026-05-18T10:14:02Z:** Full Android assemble verification for release packaging changes hit the same missing SDK limitation.
+  - Command: `gradle :app:assembleLocalDevDebug :app:assembleProdRelease`
+  - Result: `SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at '/workspace/royalScepter/local.properties'.`
+  - Status: Incomplete — environment limitation remains; Gradle configuration and manifest processing were verified, but full APK/AAB assembly must be rerun in an SDK-enabled environment.
 
 ## 2026-05-18T07:43:01Z — Public npm registry returns 403 for generated bot dependency resolution
 
@@ -74,3 +82,36 @@
   - Replaced `import.meta.url` migration resolution with a `process.cwd()`-based lookup that works from repo root and `backend/` cwd.
   - Reran `npm --prefix backend run build` and `npm --prefix backend test` successfully.
 - **Resolution notes:** Complete; no dependency installation was needed.
+
+## 2026-05-18T10:12:40Z — Debug manifest overrides conflicted with release baseline manifest
+
+- **Status:** Complete — added `tools:replace` for debug-only application attributes.
+- **Context:** Android release packaging polish changed the main manifest to disable backup and cleartext traffic while the debug manifest intentionally enables them for local development.
+- **Observed details:** Manifest processing failed because `allowBackup`, `fullBackupContent`, `networkSecurityConfig`, and `usesCleartextTraffic` were defined in both source sets with different values.
+- **Relevant logs:**
+  - `Attribute application@allowBackup value=(true) ... is also present ... value=(false).`
+  - `Suggestion: add 'tools:replace="android:allowBackup"' to <application> element...`
+- **Troubleshooting steps taken:** Added `xmlns:tools` and `tools:replace="android:allowBackup,android:fullBackupContent,android:networkSecurityConfig,android:usesCleartextTraffic"` to the debug manifest.
+- **Resolution notes:** Complete; rerun manifest processing to verify the debug overlay and release baseline merge correctly.
+- **Repeat occurrence 2026-05-19T04:25:08Z:** Pre-session unresolved issue review repeated the Android SDK preflight before follow-up release packaging fixes.
+  - Command: `./scripts/android-sdk-preflight.sh`
+  - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
+  - Status: Incomplete — environment limitation remains; SDK-backed assemble verification must run in an SDK-enabled environment.
+
+## 2026-05-19T04:28:00Z — Binary launcher icon assets made PR review difficult
+
+- **Status:** Complete — replaced launcher binary PNGs with text-based XML drawables in mipmap density folders.
+- **Context:** Follow-up requested making previously committed binary icon files non-binary while preserving Android launcher behavior.
+- **Troubleshooting steps taken:** Replaced `mipmap-*` PNGs with `ic_launcher.xml`/`ic_launcher_round.xml` files, updated verification script to validate XML icon assets, and kept adaptive icon resources unchanged.
+- **Resolution notes:** Complete; repository launcher assets are now text files for easier PR review and diff handling.
+
+## 2026-05-19T04:32:00Z — Android dependency repositories returned 403 during Gradle manifest processing
+
+- **Status:** Incomplete — environment limitation; network proxy/repository access blocks Android dependency resolution.
+- **Context:** Follow-up validation after replacing binary launcher icons with XML assets attempted to rerun manifest processing tasks.
+- **Observed details:** Gradle failed while resolving AndroidX/Material dependencies from both Google Maven and Maven Central.
+- **Relevant logs:**
+  - `Could not GET 'https://dl.google.com/dl/android/maven2/...'. Received status code 403 from server: Forbidden`
+  - `Could not GET 'https://repo.maven.apache.org/maven2/...'. Received status code 403 from server: Forbidden`
+- **Troubleshooting steps taken:** Confirmed icon/manifest verification script still passes locally; retained this as an environment network constraint.
+- **Resolution notes:** Re-run Gradle checks in an environment with approved access/mirror for Google Maven and Maven Central.
