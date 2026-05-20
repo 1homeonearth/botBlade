@@ -1,4 +1,4 @@
-name: Royal Scepter Android APKs
+name: BotBlade Android APKs
 
 on:
   pull_request:
@@ -331,12 +331,12 @@ jobs:
           (cd dist/release && sha256sum -c SHA256SUMS.txt)
 
           cat > dist/release/INSTALL.md <<'EOF'
-          # Install Royal Scepter on Android
+          # Install BotBlade on Android
 
           1. Download **bot-blade.apk** from the latest release.
           2. Open the APK on your Android phone.
           3. If asked, allow installs from your browser or file manager.
-          4. Continue and install Royal Scepter.
+          4. Continue and install BotBlade.
           5. For updates, download the newest **bot-blade.apk** from the latest release.
 
           Optional verification: download `SHA256SUMS.txt` and run `sha256sum -c SHA256SUMS.txt`.
@@ -350,10 +350,10 @@ jobs:
           p=Path('dist/release')
           sha={line.split()[1]:line.split()[0] for line in (p/'SHA256SUMS.txt').read_text().splitlines()}
           obj={
-            "app_name":"Royal Scepter",
+            "app_name":"BotBlade",
             "repository":"${{ github.repository }}",
             "release_tag":"${{ needs.preflight.outputs.release_tag }}",
-            "release_title":f"Royal Scepter Android v${{ needs.build.outputs.app_version_name }}",
+            "release_title":f"BotBlade Android v${{ needs.build.outputs.app_version_name }}",
             "version_name":"${{ needs.build.outputs.app_version_name }}",
             "version_code":"${{ needs.build.outputs.app_version_code }}",
             "git_commit_sha":"${{ github.sha }}",
@@ -411,7 +411,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.ensure_tag.outputs.tag }}"
-          TITLE="Royal Scepter Android v${{ needs.build.outputs.app_version_name }}"
+          TITLE="BotBlade Android v${{ needs.build.outputs.app_version_name }}"
           NOTES_FILE=dist/release/notes.md
           cat > "$NOTES_FILE" <<EOF
           | File | Who it is for |
