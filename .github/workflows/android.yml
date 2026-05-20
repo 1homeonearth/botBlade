@@ -40,11 +40,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [ -f ./gradlew ] || { echo "::error::Missing ./gradlew at repository root."; exit 1; }
+          if [ ! -x ./gradlew ]; then
+            echo "::warning::Missing executable ./gradlew; workflow will fall back to system gradle."
+          fi
           [ -f app/build.gradle.kts ] || { echo "::error::Missing app/build.gradle.kts."; exit 1; }
           [ -f .github/workflows/android.yml ] || { echo "::error::Missing workflow file .github/workflows/android.yml."; exit 1; }
           [ -d app/src/main ] || { echo "::error::Missing Android source directory app/src/main."; exit 1; }
-          chmod +x ./gradlew
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
           if [ -f dist/apk/SHA256SUMS.txt ]; then
             echo "::error::dist/apk/SHA256SUMS.txt exists before final asset selection. Remove checked-in generated artifacts.";
             exit 1;
@@ -155,7 +157,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+          if [ -x ./gradlew ]; then
+            ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+          else
+            gradle :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+          fi
       - name: Stage APKs
         shell: bash
         run: |
