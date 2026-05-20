@@ -317,44 +317,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/apk
-          mapfile -d '' -t debug_candidates < <(find app/build/outputs/apk/prod/debug -type f -name '*.apk' -print0 | sort -z)
-          mapfile -d '' -t release_unsigned_candidates < <(find app/build/outputs/apk/prod/release -type f -name '*unsigned*.apk' -print0 | sort -z)
+          DEBUG_APK="app/build/outputs/apk/prod/debug/app-prod-debug.apk"
+          RELEASE_UNSIGNED_APK="app/build/outputs/apk/prod/release/app-prod-release-unsigned.apk"
 
-          debug_selected=()
-          for candidate in "${debug_candidates[@]}"; do
-            base_name="$(basename "$candidate")"
-            if [[ "$base_name" == *"-androidTest-"* ]]; then
-              continue
-            fi
-            debug_selected+=("$candidate")
-          done
-
-          release_unsigned_selected=()
-          for candidate in "${release_unsigned_candidates[@]}"; do
-            base_name="$(basename "$candidate")"
-            if [[ "$base_name" == *"-androidTest-"* ]]; then
-              continue
-            fi
-            release_unsigned_selected+=("$candidate")
-          done
-
-          if [[ "${#debug_selected[@]}" -ne 1 || "${#release_unsigned_selected[@]}" -ne 1 ]]; then
+          if [[ ! -f "$DEBUG_APK" || ! -f "$RELEASE_UNSIGNED_APK" ]]; then
             echo "::group::APK staging diagnostics"
-            echo "Discovered debug APK candidates (${#debug_candidates[@]}):"
-            printf '  - %s\n' "${debug_candidates[@]:-<none>}"
-            echo "Selected debug APK candidates (${#debug_selected[@]}):"
-            printf '  - %s\n' "${debug_selected[@]:-<none>}"
-            echo "Discovered release unsigned APK candidates (${#release_unsigned_candidates[@]}):"
-            printf '  - %s\n' "${release_unsigned_candidates[@]:-<none>}"
-            echo "Selected release unsigned APK candidates (${#release_unsigned_selected[@]}):"
-            printf '  - %s\n' "${release_unsigned_selected[@]:-<none>}"
+            [[ -f "$DEBUG_APK" ]] || echo "Missing debug APK: $DEBUG_APK"
+            [[ -f "$RELEASE_UNSIGNED_APK" ]] || echo "Missing unsigned release APK: $RELEASE_UNSIGNED_APK"
             echo "::endgroup::"
-            echo "::error::Expected exactly one debug APK and one unsigned release APK. Check variant/flavor outputs."
+            echo "::error::Expected prod debug and prod unsigned release APK outputs were not found."
             exit 1
           fi
 
-          cp "${debug_selected[0]}" "dist/apk/${{ steps.meta.outputs.debug_file }}"
-          cp "${release_unsigned_selected[0]}" "dist/apk/${{ steps.meta.outputs.release_unsigned_file }}"
+          cp "$DEBUG_APK" "dist/apk/${{ steps.meta.outputs.debug_file }}"
+          cp "$RELEASE_UNSIGNED_APK" "dist/apk/${{ steps.meta.outputs.release_unsigned_file }}"
       - name: Sign release APK when secrets are available
         id: sign
         if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != ''
