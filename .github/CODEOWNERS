@@ -1,0 +1,3 @@
+# Workflow and CI configuration requires human review
+/.github/workflows/ @1homeonearth
+/.github/CODEOWNERS @1homeonearth

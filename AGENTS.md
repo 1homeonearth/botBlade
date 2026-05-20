@@ -27,3 +27,14 @@ After editing, run the smallest useful check available.
 
 ## Android release signing secrets
 For required GitHub Actions signing secrets and setup notes, see `docs/ci/android-signing.md`.
+
+
+## CI health gate
+- Before opening any PR, check the current status of `.github/workflows/android.yml`
+  on the target branch. If it is failing, do not open new PRs for unrelated work.
+  The only PR permitted when the workflow is red is one that directly fixes the
+  failing workflow.
+- Do not merge any PR to main while the android.yml workflow is in a failure state
+  on main, regardless of whether the PR itself touches the workflow file.
+- After merging any PR that modifies .github/workflows/android.yml, verify the
+  next workflow run succeeds before opening or merging further PRs.
