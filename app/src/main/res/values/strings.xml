@@ -52,6 +52,10 @@
     <string name="test_backend_connection">Test Connection</string>
     <string name="share_startup_diagnostics">Share redacted startup diagnostics</string>
     <string name="startup_diagnostics_missing">No startup crash artifact found yet.</string>
+    <string name="safe_mode_diagnostics_banner">Safe mode enabled after repeated early startup crashes. Non-essential integrations and auto-attach features are disabled.</string>
+    <string name="clear_runtime_cache">Clear runtime cache</string>
+    <string name="reset_integration_state">Reset integration state</string>
+    <string name="export_safe_mode_logs">Export safe-mode logs</string>
     <string name="backend_url_saved">Saved backend URL: %1$s</string>
     <string name="backend_url_testing">Testing %1$s…</string>
     <string name="backend_url_test_success">Connected to %1$s. Health: %2$s.</string>

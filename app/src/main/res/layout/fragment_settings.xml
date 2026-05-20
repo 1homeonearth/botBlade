@@ -84,6 +84,24 @@
             android:layout_height="wrap_content"
             android:text="@string/share_startup_diagnostics"
             android:visibility="gone" />
+        <Button
+            android:id="@+id/clear_runtime_cache_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/clear_runtime_cache"
+            android:visibility="gone" />
+        <Button
+            android:id="@+id/reset_integration_state_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/reset_integration_state"
+            android:visibility="gone" />
+        <Button
+            android:id="@+id/export_safe_mode_logs_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/export_safe_mode_logs"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="match_parent"

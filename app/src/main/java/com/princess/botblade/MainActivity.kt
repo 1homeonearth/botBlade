@@ -24,6 +24,7 @@ import com.princess.botblade.ui.logs.LogsFragment
 import com.princess.botblade.ui.onboarding.OnboardingFragment
 import com.princess.botblade.ui.projects.ProjectsFragment
 import com.princess.botblade.ui.settings.SettingsFragment
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -56,6 +57,9 @@ class MainActivity : AppCompatActivity() {
             else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
         window.decorView.post { StartupDiagnostics.mark("first_render") }
+        lifecycleScope.launch(Dispatchers.IO) { StartupGuard(application).markStartupComplete() }
+        val safeModeBanner = findViewById<android.widget.TextView>(R.id.safe_mode_banner)
+        safeModeBanner.visibility = if (StartupGuard(application).isSafeModeEnabledBlocking()) android.view.View.VISIBLE else android.view.View.GONE
     }
     fun finishOnboarding() {
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)

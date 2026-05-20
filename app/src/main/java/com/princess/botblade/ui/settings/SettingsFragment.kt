@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import com.princess.botblade.BuildConfig
 import com.princess.botblade.R
 import com.princess.botblade.StartupDiagnostics
+import com.princess.botblade.StartupGuard
 import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.data.api.ApiResult
 import com.princess.botblade.data.api.BotBladeApiClient
@@ -87,6 +88,9 @@ class SettingsFragment : Fragment() {
         backendUrlInput = view.findViewById(R.id.backend_url_input)
         testConnectionButton = view.findViewById(R.id.test_backend_connection_button)
         val shareDiagnosticsButton = view.findViewById<Button>(R.id.share_startup_diagnostics_button)
+        val clearRuntimeCacheButton = view.findViewById<Button>(R.id.clear_runtime_cache_button)
+        val resetIntegrationStateButton = view.findViewById<Button>(R.id.reset_integration_state_button)
+        val exportSafeModeLogsButton = view.findViewById<Button>(R.id.export_safe_mode_logs_button)
         list = view.findViewById(R.id.secrets_list_container)
         nameInput = view.findViewById(R.id.secret_name_input)
         typeInput = view.findViewById(R.id.secret_type_input)
@@ -111,8 +115,19 @@ class SettingsFragment : Fragment() {
         view.findViewById<Button>(R.id.save_backend_url_button).setOnClickListener { saveBackendUrl() }
         testConnectionButton.setOnClickListener { testBackendConnection() }
         if (BuildConfig.DEBUG) {
+            val startupGuard = StartupGuard(requireActivity().application)
             shareDiagnosticsButton.visibility = View.VISIBLE
             shareDiagnosticsButton.setOnClickListener { shareStartupDiagnostics() }
+            clearRuntimeCacheButton.visibility = View.VISIBLE
+            clearRuntimeCacheButton.setOnClickListener {
+                lifecycleScope.launch { startupGuard.clearRuntimeCache(); Toast.makeText(requireContext(), "Runtime cache cleared.", Toast.LENGTH_SHORT).show() }
+            }
+            resetIntegrationStateButton.visibility = View.VISIBLE
+            resetIntegrationStateButton.setOnClickListener {
+                lifecycleScope.launch { startupGuard.resetIntegrationState(); Toast.makeText(requireContext(), "Integration state reset.", Toast.LENGTH_SHORT).show() }
+            }
+            exportSafeModeLogsButton.visibility = View.VISIBLE
+            exportSafeModeLogsButton.setOnClickListener { shareSafeModeLogs(startupGuard) }
         }
         view.findViewById<Button>(R.id.create_secret_button).setOnClickListener { createSecret() }
         view.findViewById<Button>(R.id.connect_github_button).setOnClickListener { connectGitHub() }
@@ -125,6 +140,16 @@ class SettingsFragment : Fragment() {
         setupAutoStart(view)
         loadSecrets()
         loadGitHubSection()
+    }
+
+    private fun shareSafeModeLogs(startupGuard: StartupGuard) {
+        val exportFile = startupGuard.exportLogs()
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "botBlade safe-mode logs")
+            putExtra(Intent.EXTRA_TEXT, exportFile.readText())
+        }
+        startActivity(Intent.createChooser(intent, getString(R.string.export_safe_mode_logs)))
     }
 
     private fun saveBackendUrl(): Boolean {

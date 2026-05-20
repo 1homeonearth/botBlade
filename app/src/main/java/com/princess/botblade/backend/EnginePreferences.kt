@@ -11,11 +11,19 @@ private val Context.engineDataStore by preferencesDataStore(name = "engine_prefs
 
 object EnginePreferences {
     val AUTO_START_ON_BOOT = booleanPreferencesKey("auto_start_on_boot")
+    val TERMINAL_AUTO_ATTACH = booleanPreferencesKey("terminal_auto_attach")
 
     fun autoStartOnBoot(context: Context): Flow<Boolean> =
         context.applicationContext.engineDataStore.data.map { it[AUTO_START_ON_BOOT] ?: false }
 
     suspend fun setAutoStartOnBoot(context: Context, enabled: Boolean) {
         context.applicationContext.engineDataStore.edit { it[AUTO_START_ON_BOOT] = enabled }
+    }
+
+    fun terminalAutoAttach(context: Context): Flow<Boolean> =
+        context.applicationContext.engineDataStore.data.map { it[TERMINAL_AUTO_ATTACH] ?: true }
+
+    suspend fun setTerminalAutoAttach(context: Context, enabled: Boolean) {
+        context.applicationContext.engineDataStore.edit { it[TERMINAL_AUTO_ATTACH] = enabled }
     }
 }
