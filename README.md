@@ -11,9 +11,11 @@ Merges to `main` update the rolling prerelease channel, while version tags match
 
 ## Download BotBlade for Android
 
-- **Recommended:** [`bot-blade.apk`](https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk) from the [Latest Release](https://github.com/1homeonearth/botBlade/releases/latest).
-- Direct APK download: [https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk](https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk)
-- Checksums: [https://github.com/1homeonearth/botBlade/releases/latest/download/SHA256SUMS.txt](https://github.com/1homeonearth/botBlade/releases/latest/download/SHA256SUMS.txt)
+- **Recommended:** [`bot-blade.apk`](../../releases/latest/download/bot-blade.apk) from the [Latest Release](../../releases/latest).
+- Direct APK download: [../../releases/latest/download/bot-blade.apk](../../releases/latest/download/bot-blade.apk)
+- Checksums: [../../releases/latest/download/SHA256SUMS.txt](../../releases/latest/download/SHA256SUMS.txt)
+
+Canonical explicit repository URL example (for external sharing/docs): `https://github.com/1homeonearth/botBlade/releases/latest`.
 
 Regular users should download `bot-blade.apk`. Debug APKs are for testers. Unsigned APKs are for developers/testers only.
 
