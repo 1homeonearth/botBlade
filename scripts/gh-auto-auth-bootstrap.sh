@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v gh >/dev/null 2>&1; then
+  printf '%s\n' \
+    "Error: GitHub CLI is required but not installed (missing command: gh)." \
+    "Install package 'gh' first, then rerun: ./scripts/gh-auto-auth-bootstrap.sh" \
+    "Ubuntu/Debian: sudo apt update && sudo apt install -y gh" >&2
+  exit 1
+fi
+
 profile_file="${GH_PROFILE_FILE:-$HOME/.bashrc}"
 marker_start="# >>> botBlade gh auto-auth >>>"
 marker_end="# <<< botBlade gh auto-auth <<<"
@@ -18,9 +26,13 @@ BLOCK
 )
 bridge_block=$(cat <<BLOCK
 $bridge_start
-if [ -f "\$HOME/.bashrc" ]; then
-    source "\$HOME/.bashrc"
-fi
+case \$- in
+  *i*)
+    if [ -f "\$HOME/.bashrc" ]; then
+      source "\$HOME/.bashrc"
+    fi
+    ;;
+esac
 $bridge_end
 BLOCK
 )

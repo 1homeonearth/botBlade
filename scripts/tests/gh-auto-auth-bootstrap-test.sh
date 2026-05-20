@@ -28,11 +28,26 @@ assert_count() {
 tmp_home="$(mktemp -d)"
 trap 'rm -rf "$tmp_home"' EXIT
 
+set +e
+missing_gh_output=$(HOME="$tmp_home" PATH="/definitely-missing" /bin/bash "$script" 2>&1)
+missing_gh_status=$?
+set -e
+if [ "$missing_gh_status" -eq 0 ]; then
+  echo "Expected bootstrap to fail when gh is missing" >&2
+  exit 1
+fi
+if [[ "$missing_gh_output" != *"missing command: gh"* ]]; then
+  echo "Expected missing gh error message, got: $missing_gh_output" >&2
+  exit 1
+fi
+
 HOME="$tmp_home" "$script" >/dev/null
 assert_contains "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>"
 assert_count "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>" 1
 assert_contains "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>"
 assert_count "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>" 1
+assert_contains "$tmp_home/.bash_profile" "case \$- in"
+assert_contains "$tmp_home/.bash_profile" "*i*)"
 
 HOME="$tmp_home" "$script" >/dev/null
 assert_count "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>" 1
@@ -42,5 +57,19 @@ override_file="$tmp_home/custom_profile"
 HOME="$tmp_home" GH_PROFILE_FILE="$override_file" "$script" >/dev/null
 assert_contains "$override_file" "# >>> botBlade gh auto-auth >>>"
 assert_count "$override_file" "# >>> botBlade gh auto-auth >>>" 1
+
+cat > "$tmp_home/.bash_profile" <<'PROFILE'
+# existing content
+# >>> gh-auto-auth bashrc bridge >>>
+if [ -f "$HOME/.bashrc" ]; then
+    source "$HOME/.bashrc"
+fi
+# <<< gh-auto-auth bashrc bridge <<<
+PROFILE
+HOME="$tmp_home" "$script" >/dev/null
+assert_count "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>" 1
+assert_contains "$tmp_home/.bash_profile" "case \$- in"
+assert_contains "$tmp_home/.bash_profile" "*i*)"
+
 
 echo "gh-auto-auth-bootstrap tests passed"
