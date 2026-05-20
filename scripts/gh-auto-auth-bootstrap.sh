@@ -26,6 +26,7 @@ BLOCK
 )
 bridge_block=$(cat <<BLOCK
 $bridge_start
+# Only source ~/.bashrc for interactive shells.
 case \$- in
   *i*)
     if [ -f "\$HOME/.bashrc" ]; then
