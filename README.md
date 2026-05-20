@@ -2,6 +2,13 @@
 
 [![Android APK workflow](../../actions/workflows/android.yml/badge.svg)](../../actions/workflows/android.yml)
 
+## Release navigation
+
+[![Latest Release](https://img.shields.io/badge/Latest%20Release-view-blue)](../../releases/latest)
+[![Download APK](https://img.shields.io/badge/Download%20APK-bot--blade.apk-success)](../../releases/latest/download/bot-blade.apk)
+
+Merges to `main` update the rolling prerelease channel, while version tags matching `v*` publish immutable versioned releases.
+
 ## Download BotBlade for Android
 
 - **Recommended:** [`bot-blade.apk`](https://github.com/1homeonearth/botBlade/releases/latest/download/bot-blade.apk) from the [Latest Release](https://github.com/1homeonearth/botBlade/releases/latest).
