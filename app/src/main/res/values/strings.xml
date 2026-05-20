@@ -152,4 +152,7 @@ Repository: %3$s</string>
     <string name="apk_download_links"><![CDATA[Download latest debug APK: <a href="https://github.com/%1$s/releases/latest/download/botBlade-debug.apk">botBlade-debug.apk</a>
 Download latest unsigned release APK: <a href="https://github.com/%1$s/releases/latest/download/botBlade-release-unsigned.apk">botBlade-release-unsigned.apk</a>]]></string>
 
+    <string name="safe_mode_diagnostics_banner">Safe mode enabled after repeated early crashes. Runtime safeguards are active.</string>
+    <string name="safe_mode_export_logs_action">Export logs</string>
+
 </resources>

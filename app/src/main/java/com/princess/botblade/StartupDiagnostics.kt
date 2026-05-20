@@ -15,9 +15,12 @@ import java.util.concurrent.atomic.AtomicReference
 object StartupDiagnostics {
     private const val ARTIFACT_FILE = "startup_crash_artifact.json"
     private val latestMilestone = AtomicReference("process_start")
+    private val startupGuardRef = AtomicReference<StartupGuard?>(null)
 
     fun install(application: Application, appVersion: String, buildType: String, gitSha: String?) {
         mark("application_on_create_start")
+        startupGuardRef.set(StartupGuard(application))
+        startupGuardRef.get()?.beginStartup()
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) { mark("first_activity_launch") }
             override fun onActivityStarted(activity: Activity) = Unit
@@ -29,12 +32,19 @@ object StartupDiagnostics {
         })
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            runCatching { writeArtifact(application, thread, throwable, appVersion, buildType, gitSha) }
+            runCatching {
+                writeArtifact(application, thread, throwable, appVersion, buildType, gitSha)
+                startupGuardRef.get()?.recordEarlyCrash(latestMilestone.get())
+            }
             previous?.uncaughtException(thread, throwable) ?: throw throwable
         }
     }
 
     fun mark(milestone: String) { latestMilestone.set("${milestone}@${Instant.now()}") }
+
+    fun isSafeModeEnabled(application: Application): Boolean = StartupGuard(application).isSafeModeEnabled()
+
+    fun markStartupComplete(application: Application) = StartupGuard(application).recordStartupSuccess()
 
     fun readLatest(application: Application): String? {
         val file = File(application.filesDir, ARTIFACT_FILE)
@@ -66,3 +76,4 @@ object StartupDiagnostics {
         return writer.toString()
     }
 }
+

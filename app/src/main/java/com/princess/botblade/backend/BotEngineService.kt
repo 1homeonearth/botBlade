@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import com.princess.botblade.BuildConfig
 import com.princess.botblade.MainActivity
 import com.princess.botblade.R
+import com.princess.botblade.StartupGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -71,6 +72,13 @@ class BotEngineService : Service() {
     }
 
     private fun startNode() {
+        val safeModeEnabled = StartupGuard(application).isSafeModeEnabled()
+        if (safeModeEnabled) {
+            appendLog("Safe-mode active: non-essential integrations disabled; risky module load paths skipped; terminal auto-attach disabled.")
+            isRunning = false
+            notifyState(false)
+            return
+        }
         val entry = prepareBackendEntry()
         entry // keep asset preparation side effects
         // TODO(on-device-runtime): LiquidCore 0.6.2 does not exist on JitPack.

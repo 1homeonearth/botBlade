@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.snackbar.Snackbar
 import com.princess.botblade.backend.BotEngineBindingState
 import com.princess.botblade.backend.BotEngineService
 import com.princess.botblade.data.api.ApiConfig
@@ -55,7 +56,13 @@ class MainActivity : AppCompatActivity() {
             if (!done) { bottomNavigation.visibility = android.view.View.GONE; showFragment(OnboardingFragment()) }
             else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
-        window.decorView.post { StartupDiagnostics.mark("first_render") }
+        window.decorView.post {
+            StartupDiagnostics.mark("first_render")
+            StartupDiagnostics.markStartupComplete(application)
+        }
+        if (StartupDiagnostics.isSafeModeEnabled(application)) {
+            showSafeModeBanner()
+        }
     }
     fun finishOnboarding() {
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
@@ -75,6 +82,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openLogsScreen() { showFragment(LogsFragment()) }
+
+    private fun showSafeModeBanner() {
+        Snackbar.make(findViewById(R.id.fragment_container), getString(R.string.safe_mode_diagnostics_banner), Snackbar.LENGTH_INDEFINITE)
+            .setAction(R.string.safe_mode_export_logs_action) {
+                val file = StartupGuard(application).exportLogs()
+                android.widget.Toast.makeText(this, "Exported logs: ${file.name}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
 
     private fun showFragment(fragment: Fragment) {
         val tx = supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment)
