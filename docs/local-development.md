@@ -60,6 +60,16 @@ New features should prefer project-scoped endpoints under `/api/projects/:projec
 
 Projects, secrets, build jobs, deployment targets, runtimes, and audit events are in memory. Restarting the backend clears them. Generated project files remain on disk under `backend/generated-projects/` until deleted manually.
 
+## Android manifest check helper
+
+Use `scripts/run-manifest-check.sh` to run Android manifest-processing tasks with Gradle wrapper safety checks.
+
+- **Default mode (self-healing):** `./scripts/run-manifest-check.sh`
+  - If `./gradlew` or `gradle/wrapper/gradle-wrapper.jar` is missing, the script regenerates wrapper files via system `gradle` and then continues.
+- **Check-only mode:** `./scripts/run-manifest-check.sh --check-only` (or `CHECK_ONLY=1 ./scripts/run-manifest-check.sh`)
+  - Wrapper regeneration is disabled.
+  - If wrapper files are missing, the script exits with remediation guidance instead of changing files.
+
 ## npm proxy warning mitigation
 
 If npm prints `Unknown env config "http-proxy"`, your shell or CI is exporting a deprecated npm env key. Prefer standard proxy env vars (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) or npm config keys written with underscores (`npm_config_http_proxy`, `npm_config_https_proxy`) to stay compatible with newer npm versions.
