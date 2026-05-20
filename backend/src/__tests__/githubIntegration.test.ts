@@ -44,3 +44,31 @@ test("push updates lastPushedAt only on success and records audit", async () => 
   assert.equal(events[0].action, "github.push");
   assert.equal((events[0].metadata as Record<string, unknown>).status, "success");
 });
+
+test("push failure redacts token-like content from audit metadata and API details", async () => {
+  const events: Array<Record<string, unknown>> = [];
+  const leakedToken = "ghp_superSecretToken123456";
+  const leakedPat = "github_pat_verySecretToken987";
+  const svc = new GitHubIntegrationService(() => true, () => "token", (input) => { events.push(input as unknown as Record<string, unknown>); }, {
+    pushProject: async () => { throw new Error(`fatal: Authentication failed for https://x-access-token:${leakedToken}@github.com/octo/repo.git bearer ${leakedPat}`); },
+  });
+  svc.connect({ tokenSecretRef: "secret_1" });
+  const p = project();
+  let err: any;
+  try {
+    await svc.push(p, "req_fail");
+  } catch (error: any) {
+    err = error;
+  }
+  assert.equal(err.code, "GITHUB_PUSH_FAILED");
+  assert.equal(err.details.reason, "git_push_failed");
+  assert.equal(JSON.stringify(err).includes(leakedToken), false);
+  assert.equal(JSON.stringify(err).includes(leakedPat), false);
+  assert.equal(events.length, 1);
+  const metadata = events[0].metadata as Record<string, unknown>;
+  assert.equal(metadata.status, "failure");
+  const message = String(metadata.message);
+  assert.equal(message.includes(leakedToken), false);
+  assert.equal(message.includes(leakedPat), false);
+  assert.equal(message.includes("[REDACTED_TOKEN]"), true);
+});
