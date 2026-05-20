@@ -1,0 +1,108 @@
+version: 1
+last_updated: "2026-05-20"
+entries:
+  - id: termux_app
+    name: termux/termux-app
+    classification: external_app_integration
+    status: reference_only
+    license: GPL-3.0-only
+    notes:
+      - Whole app is GPLv3-only.
+      - Do not vendor the full application into botBlade.
+
+  - id: termux_terminal_view
+    name: termux terminal-view
+    classification: candidate_dependency
+    status: review_required
+    license: unknown
+    notes:
+      - License and provenance review required before adoption.
+
+  - id: termux_terminal_emulator
+    name: termux terminal-emulator
+    classification: candidate_dependency
+    status: review_required
+    license: unknown
+    notes:
+      - License and provenance review required before adoption.
+
+  - id: jackpal_android_terminal_emulator
+    name: jackpal/Android-Terminal-Emulator
+    classification: reference_only
+    status: archived_reference
+    license: Apache-2.0
+    notes:
+      - Archived upstream; treat as historical reference, not active dependency.
+
+  - id: openpgp_api
+    name: open-keychain/openpgp-api
+    classification: candidate_dependency
+    status: review_required
+    license: Apache-2.0
+    notes:
+      - Provider compatibility library candidate.
+
+  - id: open_keychain_app
+    name: open-keychain/open-keychain
+    classification: external_app_integration
+    status: reference_only
+    license: GPL-3.0
+    notes:
+      - External app integration only.
+      - Do not vendor the full application into botBlade.
+
+  - id: cargo_ndk
+    name: cargo-ndk
+    classification: development_dependency_candidate
+    status: review_required
+    license: unknown
+    notes:
+      - Evaluate for Android Rust build workflows.
+
+  - id: android_keystore
+    name: Android Keystore
+    classification: platform_feature
+    status: candidate
+    license: platform
+    notes:
+      - Candidate for secure key material operations.
+
+  - id: android_saf
+    name: Android Storage Access Framework
+    classification: platform_feature
+    status: candidate
+    license: platform
+    notes:
+      - Candidate for controlled file import/export access.
+
+  - id: github_integration
+    name: GitHub
+    classification: commercial_integration_candidate
+    status: review_required
+    license: service_terms
+    notes:
+      - Candidate for repo and workflow integration.
+
+  - id: password_manager_integrations
+    name: 1Password / Bitwarden / Proton Pass
+    classification: commercial_integration_candidate
+    status: review_required
+    license: service_terms
+    notes:
+      - Integrate via Android Autofill or explicit handoff only.
+
+  - id: cloud_storage_integrations
+    name: Google Drive / Dropbox / OneDrive
+    classification: commercial_integration_candidate
+    status: review_required
+    license: service_terms
+    notes:
+      - Integrate via SAF, share, or export flows.
+
+  - id: messaging_integrations
+    name: Slack / Discord / Telegram
+    classification: commercial_integration_candidate
+    status: review_required
+    license: service_terms
+    notes:
+      - Integrate via intents, deep links, or share flows.
