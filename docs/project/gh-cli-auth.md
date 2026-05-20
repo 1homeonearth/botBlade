@@ -8,6 +8,8 @@ Use this repo's helper scripts to configure `gh` automatic login for each new sh
 ./scripts/gh-auto-auth-bootstrap.sh
 ```
 
+The bootstrap requires GitHub CLI (`gh`) to already be installed; it exits with install hints when `gh` is missing.
+
 That command writes a small managed block to `~/.bashrc` (or `GH_PROFILE_FILE` when set) which runs `scripts/gh-auto-auth.sh` on shell startup.
 
 For login shell compatibility, the bootstrap also writes a managed bridge block in `~/.bash_profile` to source `~/.bashrc`.
