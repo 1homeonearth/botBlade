@@ -234,9 +234,9 @@ jobs:
             exit 1
           fi
 
-          mapfile -d '' -t all_apks < <(find "$APK_ROOT" -type f -name '*.apk' -print0 | sort -z)
-          mapfile -d '' -t debug_candidates < <(find "$APK_ROOT" -type f -name '*debug*.apk' -print0 | sort -z)
-          mapfile -d '' -t release_unsigned_candidates < <(find "$APK_ROOT" -type f -name '*release*unsigned*.apk' -print0 | sort -z)
+          mapfile -d '' -t all_apks < <(find "$APK_ROOT/prod" -type f -name '*.apk' -print0 | sort -z)
+          mapfile -d '' -t debug_candidates < <(find "$APK_ROOT/prod" -type f -name '*debug*.apk' -print0 | sort -z)
+          mapfile -d '' -t release_unsigned_candidates < <(find "$APK_ROOT/prod" -type f -name '*release*unsigned*.apk' -print0 | sort -z)
 
           debug_selected=()
           for candidate in "${debug_candidates[@]}"; do
@@ -317,8 +317,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/apk
-          mapfile -d '' -t debug_candidates < <(find app/build/outputs/apk -type f -name '*debug*.apk' -print0 | sort -z)
-          mapfile -d '' -t release_unsigned_candidates < <(find app/build/outputs/apk -type f -name '*release*unsigned*.apk' -print0 | sort -z)
+          mapfile -d '' -t debug_candidates < <(find app/build/outputs/apk/prod/debug -type f -name '*.apk' -print0 | sort -z)
+          mapfile -d '' -t release_unsigned_candidates < <(find app/build/outputs/apk/prod/release -type f -name '*unsigned*.apk' -print0 | sort -z)
 
           debug_selected=()
           for candidate in "${debug_candidates[@]}"; do
