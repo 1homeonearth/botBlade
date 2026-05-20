@@ -17,11 +17,17 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
+data class DashboardControlState(val running: Boolean, val canStart: Boolean, val canStop: Boolean, val canRestart: Boolean)
+
 class DashboardViewModel(private val repository: DashboardRepository = DashboardRepository()) : ViewModel() {
     private val client = OkHttpClient()
     private var ws: WebSocket? = null
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
+    private val _status = MutableStateFlow<RuntimeStatusResponse?>(null)
+    val status = _status.asStateFlow()
+    private val _controls = MutableStateFlow(DashboardControlState(false, true, false, false))
+    val controls: StateFlow<DashboardControlState> = _controls.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -29,33 +35,36 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
                 if (running != null) {
                     val status = if (running) "running" else "stopped"
                     _status.value = RuntimeStatusResponse("bound", status, "Status from bound BotEngineService")
+                    _controls.value = if (running) DashboardControlState(true, false, true, true) else DashboardControlState(false, true, false, false)
                 }
             }
         }
     }
 
-    private val _status = MutableStateFlow<RuntimeStatusResponse?>(null)
-    val status = _status.asStateFlow()
-
     fun loadStatus(projectId: String?) = viewModelScope.launch {
         if (BotEngineBindingState.serviceRunning.value == null) {
             when (val result = repository.getBotStatus(projectId)) {
-                is ApiResult.Success -> _status.value = result.data
+                is ApiResult.Success -> {
+                    _status.value = result.data
+                    val running = result.data.status.equals("running", ignoreCase = true)
+                    _controls.value = if (running) DashboardControlState(true, false, true, true) else DashboardControlState(false, true, false, false)
+                }
                 else -> {}
             }
         }
     }
 
+    fun start() { _logs.value = (_logs.value + "Start requested").takeLast(200) }
+    fun stop() { _logs.value = (_logs.value + "Stop requested").takeLast(200) }
+    fun restart() { _logs.value = (_logs.value + "Restart requested").takeLast(200) }
+
     fun connectLogs() {
         if (ws != null) return
         ws = client.newWebSocket(Request.Builder().url("ws://127.0.0.1:7432/logs").build(), object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
-                val next = (_logs.value + text).takeLast(200)
-                _logs.value = next
+                _logs.value = (_logs.value + text).takeLast(200)
             }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                ws = null
-            }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { ws = null }
         })
     }
 

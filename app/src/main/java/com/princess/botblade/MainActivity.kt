@@ -7,7 +7,10 @@ import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
 import androidx.appcompat.app.AppCompatActivity
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.backend.BotEngineBindingState
 import com.princess.botblade.backend.BotEngineService
@@ -15,25 +18,22 @@ import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorFragment
+import com.princess.botblade.ui.onboarding.OnboardingFragment
 import com.princess.botblade.ui.projects.ProjectsFragment
 import com.princess.botblade.ui.settings.SettingsFragment
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+private val Context.dataStore by preferencesDataStore("onboarding")
 
 class MainActivity : AppCompatActivity() {
     private var bound = false
     private var binder: BotEngineService.LocalBinder? = null
     private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            binder = service as? BotEngineService.LocalBinder
-            bound = true
-            BotEngineBindingState.serviceRunning.value = binder?.isRunning()
-        }
-        override fun onServiceDisconnected(name: ComponentName?) {
-            bound = false
-            binder = null
-            BotEngineBindingState.serviceRunning.value = null
-        }
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) { binder = service as? BotEngineService.LocalBinder; bound = true; BotEngineBindingState.serviceRunning.value = binder?.isRunning() }
+        override fun onServiceDisconnected(name: ComponentName?) { bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }
     }
-    override fun onCreate(savedInstanceState: Bundle?) { /* existing */
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ApiConfig.initialize(this)
         setContentView(R.layout.activity_main)
@@ -46,25 +46,14 @@ class MainActivity : AppCompatActivity() {
             R.id.navigation_settings -> { showFragment(SettingsFragment()); true }
             else -> false
         } }
-        if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
-    }
-
-    override fun onResume() {
-        super.onResume()
-        bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE)
-    }
-
-    override fun onPause() {
-        if (bound) {
-            unbindService(connection)
-            bound = false
-            binder = null
-            BotEngineBindingState.serviceRunning.value = null
+        lifecycleScope.launch {
+            val done = dataStore.data.first()[booleanPreferencesKey("onboarding_complete")] == true
+            if (!done) { bottomNavigation.visibility = android.view.View.GONE; showFragment(OnboardingFragment()) }
+            else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
-        super.onPause()
     }
-
-    private fun showFragment(fragment: Fragment) {
-        supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit()
-    }
+    fun finishOnboarding() { findViewById<BottomNavigationView>(R.id.bottom_navigation).visibility = android.view.View.VISIBLE; showFragment(DashboardFragment()) }
+    override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
+    override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }
+    private fun showFragment(fragment: Fragment) { supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit() }
 }
