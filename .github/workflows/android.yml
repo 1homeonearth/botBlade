@@ -373,13 +373,38 @@ jobs:
             dist/release/bot-blade.apk
             dist/release/SHA256SUMS.txt
             dist/release/release.json
-      - name: Publish release
+      - id: ensure_tag
+        name: Ensure release tag ref exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           TAG="${{ needs.preflight.outputs.release_tag }}"
+          TAG_REF_STATUS="not-required"
+
+          if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
+            TAG="latest"
+            git tag -f "$TAG" "$GITHUB_SHA"
+            if git push --force origin "refs/tags/$TAG"; then
+              TAG_REF_STATUS="updated-via-git-push"
+            else
+              gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$TAG" -f sha="$GITHUB_SHA" >/dev/null 2>&1 \
+                || gh api -X POST "repos/${{ github.repository }}/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" >/dev/null
+              TAG_REF_STATUS="upserted-via-gh-api"
+            fi
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag_ref_status=$TAG_REF_STATUS" >> "$GITHUB_OUTPUT"
+          echo "- Tag ref guard: $TAG_REF_STATUS ($TAG)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ensure_tag.outputs.tag }}"
           TITLE="Royal Scepter Android v${{ needs.build.outputs.app_version_name }}"
           NOTES_FILE=dist/release/notes.md
           cat > "$NOTES_FILE" <<EOF

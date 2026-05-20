@@ -477,3 +477,14 @@ Failed to download Android command-line tools.
 - Versions/environment: UTC container on 2026-05-20; GitHub CLI unavailable locally.
 - Status: Incomplete
 - Next action: Trigger `android.yml` on this branch from GitHub UI (or shell with `gh` installed), rerun once, and confirm marker comment is edited in place.
+
+### 2026-05-20T02:03:04Z — Prerelease tag-ref guard for rolling `latest`
+- Context: Updated Android release workflow so `main` prerelease publishing no longer assumes `refs/tags/latest` already exists before `gh release create/edit`.
+- Commands run:
+  - `python - <<'PY' ...` (patched `.github/workflows/android.yml` release job with tag upsert step)
+  - `rg -n "Ensure release tag ref exists|TAG_REF_STATUS|steps.ensure_tag.outputs.tag" .github/workflows/android.yml`
+  - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/android.yml"); puts "yaml ok"'`
+- Observed output/errors: YAML validation passed (`yaml ok`). Added guard step that force-updates `latest` tag to `$GITHUB_SHA` via `git tag -f` + `git push --force` with `gh api` upsert fallback, emits summary line, and reuses resolved tag in publish step.
+- Versions/environment: UTC container on 2026-05-20; local shell has no GitHub-hosted runner execution context for end-to-end Actions validation.
+- Status: Incomplete
+- Next action: Run `android.yml` from a merge commit on `main` in a test repository and confirm prerelease updates existing/created `latest` release without missing-tag failure.
