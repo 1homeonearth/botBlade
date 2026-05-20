@@ -18,12 +18,13 @@ interface AuthCredential {
 }
 
 const GLOBAL_PROJECT = "*";
+const MIN_TOKEN_LENGTH = 8;
 
 export function authenticateRequest(req: IncomingMessage): AuthenticatedActor {
   const bearerToken = readBearerToken(req);
   const sessionToken = readSessionToken(req);
   const credentials = configuredCredentials();
-  const match = credentials.find((credential) => credential.token === bearerToken || credential.token === sessionToken);
+  const match = credentials.find((credential) => safeTokenEquals(credential.token, bearerToken) || safeTokenEquals(credential.token, sessionToken));
   if (!match) {
     throw { statusCode: 401, code: "AUTHENTICATION_REQUIRED", message: "A valid bearer token or session credential is required.", details: { schemes: ["Bearer", "botBladeSession"] } };
   }
@@ -55,6 +56,11 @@ export function assertGlobalAccess(actor: AuthenticatedActor, resource: string):
   throw { statusCode: 403, code: "GLOBAL_ACCESS_DENIED", message: `The authenticated actor is not authorized to access ${resource}.`, details: { resource } };
 }
 
+export function assertExecutionAccess(actor: AuthenticatedActor, resource: string): void {
+  if (actor.roles.includes("admin") || actor.roles.includes("execute")) return;
+  throw { statusCode: 403, code: "EXECUTION_ACCESS_DENIED", message: `The authenticated actor is not authorized to execute ${resource}.`, details: { resource } };
+}
+
 function readBearerToken(req: IncomingMessage): string | undefined {
   const header = req.headers.authorization;
   if (typeof header !== "string") return undefined;
@@ -76,7 +82,9 @@ function readSessionToken(req: IncomingMessage): string | undefined {
 
 function configuredCredentials(): AuthCredential[] {
   const credentials = [...parseJsonCredentials(process.env.BOTBLADE_AUTH_TOKENS, "bearer"), ...parseJsonCredentials(process.env.BOTBLADE_SESSION_TOKENS, "session")];
+  ensureUniqueTokenIds(credentials);
   if (credentials.length > 0) return credentials;
+  if (process.env.BOTBLADE_LOCAL_DEV !== "true") return [];
   const legacyTokens = splitTokens(process.env.BOTBLADE_API_TOKENS ?? process.env.BOTBLADE_API_TOKEN);
   return legacyTokens.map((token, index) => ({ token, actorId: index === 0 ? "local_admin" : `local_user_${index + 1}`, tokenId: `env_token_${index + 1}`, roles: ["admin"], projectIds: [GLOBAL_PROJECT], authMethod: "bearer" }));
 }
@@ -93,11 +101,11 @@ function parseJsonCredentials(value: string | undefined, authMethod: "bearer" | 
 }
 
 function normalizeCredential(value: unknown, index: number, authMethod: "bearer" | "session"): AuthCredential[] {
-  if (typeof value === "string" && value.trim()) return [{ token: value.trim(), actorId: `${authMethod}_user_${index + 1}`, tokenId: `${authMethod}_token_${index + 1}`, roles: ["admin"], projectIds: [GLOBAL_PROJECT], authMethod }];
+  if (typeof value === "string" && value.trim().length >= MIN_TOKEN_LENGTH) return [{ token: value.trim(), actorId: `${authMethod}_user_${index + 1}`, tokenId: `${authMethod}_token_${index + 1}`, roles: ["admin"], projectIds: [GLOBAL_PROJECT], authMethod }];
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const record = value as Record<string, unknown>;
   const token = typeof record.token === "string" ? record.token.trim() : "";
-  if (!token) return [];
+  if (!token || token.length < MIN_TOKEN_LENGTH) return [];
   return [{
     token,
     actorId: typeof record.actorId === "string" && record.actorId.trim() ? record.actorId.trim() : typeof record.userId === "string" && record.userId.trim() ? record.userId.trim() : `${authMethod}_user_${index + 1}`,
@@ -113,5 +121,23 @@ function stringArray(value: unknown): string[] {
 }
 
 function splitTokens(value: string | undefined): string[] {
-  return value?.split(",").map((token) => token.trim()).filter(Boolean) ?? [];
+  return value?.split(",").map((token) => token.trim()).filter((token) => token.length >= MIN_TOKEN_LENGTH) ?? [];
+}
+
+function safeTokenEquals(expected: string, provided?: string): boolean {
+  if (!provided) return false;
+  const a = expected;
+  const b = provided;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function ensureUniqueTokenIds(credentials: AuthCredential[]): void {
+  const ids = new Set<string>();
+  for (const credential of credentials) {
+    if (ids.has(credential.tokenId)) throw new Error(`Duplicate auth tokenId detected: ${credential.tokenId}`);
+    ids.add(credential.tokenId);
+  }
 }

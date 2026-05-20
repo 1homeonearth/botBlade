@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import crypto from "node:crypto";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
 import { AuditService } from "./services/auditService.js";
-import { assertGlobalAccess, assertProjectAccess, authenticateRequest, canAccessProject, hasGlobalProjectAccess } from "./services/authService.js";
+import { assertExecutionAccess, assertGlobalAccess, assertProjectAccess, authenticateRequest, canAccessProject, hasGlobalProjectAccess } from "./services/authService.js";
 import { BuildService } from "./services/buildService.js";
 import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./services/commandDefinitions.js";
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
@@ -173,7 +173,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && filePath === undefined) return writeJson(res, 200, { files: await fileService.list(projectId) });
     if (method === "GET" && filePath !== undefined) return writeJson(res, 200, await fileService.read(projectId, filePath));
-    if (method === "PUT" && filePath !== undefined) return writeJson(res, 200, await fileService.write(projectId, filePath, parseFileWriteInput(await readJson(req)).content));
+    if (method === "PUT" && filePath !== undefined) { assertExecutionAccess(actor, "project file writes"); return writeJson(res, 200, await fileService.write(projectId, filePath, parseFileWriteInput(await readJson(req)).content)); }
   }
 
   const buildMatch = path.match(/^\/api\/projects\/([^/]+)\/builds(?:\/([^/]+)(?:\/(logs))?)?$/);
@@ -183,6 +183,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && !buildId) {
+      assertExecutionAccess(actor, "builds");
       const body = await readJson(req);
       const audit = auditService.record({ action: "build.start", actorId: actor.id, projectId, resourceType: "build", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
       const job = await buildService.create(project, body, audit.id, requestId, actor.id);
@@ -201,9 +202,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "GET" && action === "status") return writeJson(res, 200, runtimeService.getStatus(projectId));
-    if (method === "POST" && action === "start") { const status = await runtimeService.start(project); const audit = auditService.record({ action: "runtime.start", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "POST" && action === "stop") { const status = await runtimeService.stop(projectId); const audit = auditService.record({ action: "runtime.stop", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "POST" && action === "restart") { const status = await runtimeService.restart(project); const audit = auditService.record({ action: "runtime.restart", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "start") { assertExecutionAccess(actor, "runtime start"); const status = await runtimeService.start(project); const audit = auditService.record({ action: "runtime.start", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "stop") { assertExecutionAccess(actor, "runtime stop"); const status = await runtimeService.stop(projectId); const audit = auditService.record({ action: "runtime.stop", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
+    if (method === "POST" && action === "restart") { assertExecutionAccess(actor, "runtime restart"); const status = await runtimeService.restart(project); const audit = auditService.record({ action: "runtime.restart", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
     if (method === "GET" && action === "logs") return writeJson(res, 200, { logs: runtimeService.getLogs(projectId) });
   }
 
@@ -214,6 +215,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
     if (method === "POST" && !deploymentId) {
+      assertExecutionAccess(actor, "deployments");
       const body = await readJson(req);
       const audit = auditService.record({ action: "deployment.start", actorId: actor.id, projectId, resourceType: "deployment", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
       const job = await deploymentStore.create(project, body, audit.id, requestId, actor.id);
@@ -224,7 +226,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (method === "GET" && deploymentId && !action) return writeJson(res, 200, deploymentStore.get(projectId, deploymentId) ?? notFoundDeployment(deploymentId));
     if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "logs"));
     if (method === "GET" && deploymentId && action === "status") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "status"));
-    if (method === "POST" && deploymentId && (action === "start" || action === "stop" || action === "restart" || action === "rollback")) return writeJson(res, 200, await deploymentStore.action(project, deploymentId, action));
+    if (method === "POST" && deploymentId && (action === "start" || action === "stop" || action === "restart" || action === "rollback")) { assertExecutionAccess(actor, "deployment actions"); return writeJson(res, 200, await deploymentStore.action(project, deploymentId, action)); }
   }
 
   const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);
@@ -303,6 +305,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       return writeJson(res, 200, validateProject(project, (secretId) => secretStore.has(secretId)));
     }
     if (method === "POST" && (action === "generate" || action === "regenerate")) {
+      assertExecutionAccess(actor, "project generation");
       const project = projectStore.get(projectId);
       if (!project) throw notFoundProject(projectId);
       const audit = auditService.record({ action: "generate.start", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: { force: action === "regenerate" }, requestId });
@@ -314,8 +317,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
+  const maxBytes = 1024 * 1024;
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  let size = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > maxBytes) throw new RequestValidationError([{ field: "body", message: "Request body exceeds 1MB limit." }]);
+    chunks.push(buffer);
+  }
   const body = Buffer.concat(chunks).toString("utf8").trim();
   if (!body) return {};
   try { return JSON.parse(body) as unknown; } catch { throw new RequestValidationError([{ field: "body", message: "Body must be valid JSON." }]); }

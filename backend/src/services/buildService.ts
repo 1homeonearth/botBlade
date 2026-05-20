@@ -31,6 +31,7 @@ export interface BuildJob {
 }
 
 export class BuildService {
+  private static readonly MAX_LOG_BYTES = 256 * 1024;
   private readonly jobs = new Map<string, BuildJob[]>();
   private readonly logs = new Map<string, string>();
 
@@ -80,7 +81,8 @@ export class BuildService {
 
   private async run(project: BotProject, job: BuildJob, requestId: string, actorId?: string): Promise<void> {
     const append = (line: string) => {
-      this.logs.set(job.buildId, `${this.logs.get(job.buildId) ?? ""}${redactSecrets(sanitizeUrlsInText(line))}\n`);
+      const next = `${this.logs.get(job.buildId) ?? ""}${redactSecrets(sanitizeUrlsInText(line))}\n`;
+      this.logs.set(job.buildId, next.length > BuildService.MAX_LOG_BYTES ? `[truncated]\n${next.slice(-BuildService.MAX_LOG_BYTES)}` : next);
       this.persist(job);
     };
     try {
@@ -153,7 +155,7 @@ export function runCommand(command: string, args: string[], cwd: string, append:
       append(line);
     };
     capture(`$ ${command} ${args.join(" ")}`);
-    const child = spawn(command, args, { cwd, shell: false, env: { ...process.env } });
+    const child = spawn(command, args, { cwd, shell: false, env: allowedEnv() });
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
       reject(new CommandExecutionError(`${command} timed out.`, output));
@@ -166,6 +168,13 @@ export function runCommand(command: string, args: string[], cwd: string, append:
       if (code === 0) resolve(); else reject(new CommandExecutionError(`${command} exited with code ${code}.`, output));
     });
   });
+}
+
+function allowedEnv(): Record<string, string> {
+  const keys = ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "NPM_CONFIG_REGISTRY", "npm_config_registry", "CI"];
+  const env: Record<string, string> = {};
+  for (const key of keys) if (process.env[key]) env[key] = process.env[key] as string;
+  return env;
 }
 
 async function appendNpmInstallDiagnostics(cwd: string, error: unknown, append: LogAppender): Promise<void> {
