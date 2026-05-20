@@ -1,58 +1,79 @@
 package com.princess.botblade.ui.dashboard
 
 import android.os.Bundle
-import android.view.LayoutInflater
+import android.os.SystemClock
 import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.TextView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import com.princess.botblade.R
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.theme.BotBladeTheme
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.ComposeView
 
 class DashboardFragment : Fragment() {
     private val viewModel: DashboardViewModel by viewModels()
     private var activeProjectId: String? = null
     private lateinit var activeProjectStore: ActiveProjectStore
-    private lateinit var activeProjectText: TextView
-    private lateinit var statusText: TextView
-    private lateinit var messageText: TextView
-    private lateinit var terminalText: TextView
-    private lateinit var refreshButton: Button
+    private val started = SystemClock.elapsedRealtime()
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
-        inflater.inflate(R.layout.fragment_dashboard, container, false)
+    override fun onCreateView(inflater: android.view.LayoutInflater, container: android.view.ViewGroup?, savedInstanceState: Bundle?): View {
+        activeProjectStore = ActiveProjectStore(requireContext())
+        return ComposeView(requireContext()).apply {
+            setContent {
+                BotBladeTheme { DashboardScreen(viewModel, started) }
+            }
+        }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        activeProjectStore = ActiveProjectStore(requireContext())
-        activeProjectText = view.findViewById(R.id.active_project_text)
-        statusText = view.findViewById(R.id.bot_status_text)
-        messageText = view.findViewById(R.id.dashboard_message_text)
-        terminalText = view.findViewById(R.id.runtime_terminal_text)
-        refreshButton = view.findViewById(R.id.refresh_status_button)
-        refreshButton.setOnClickListener { viewModel.loadStatus(activeProjectId) }
         updateActiveProject()
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.status.collect { it?.let { s -> statusText.text = getString(R.string.bot_status_value, s.status); messageText.text = s.message ?: "" } }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.logs.collect { terminalText.text = it.joinToString("\n") }
-        }
-        viewModel.connectLogs()
-        viewModel.loadStatus(activeProjectId)
+        viewLifecycleOwner.lifecycleScope.launch { viewModel.connectLogs(); viewModel.loadStatus(activeProjectId) }
     }
 
     override fun onResume() { super.onResume(); updateActiveProject(); viewModel.connectLogs(); viewModel.loadStatus(activeProjectId) }
     override fun onPause() { viewModel.disconnectLogs(); super.onPause() }
+    private fun updateActiveProject() { activeProjectId = activeProjectStore.getActiveProjectId() }
+}
 
-    private fun updateActiveProject() {
-        activeProjectId = activeProjectStore.getActiveProjectId()
-        val n = activeProjectStore.getActiveProjectName()
-        activeProjectText.text = if (activeProjectId == null) getString(R.string.active_project_none) else getString(R.string.active_project_value, n ?: activeProjectId)
+@Composable
+private fun DashboardScreen(vm: DashboardViewModel, started: Long) {
+    val status by vm.status.collectAsState()
+    val logs by vm.logs.collectAsState()
+    val controls by vm.controls.collectAsState()
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.padding(end = 12.dp).height(14.dp).fillMaxWidth(0.03f).background(if (controls.running) Color(0xFF2ECC71) else Color(0xFFE74C3C)))
+            Column { Text("BotBlade Bot"); Text("Uptime: ${(SystemClock.elapsedRealtime() - started) / 1000}s · ${status?.status ?: "unknown"}") }
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().background(Color.Black).padding(8.dp)) {
+            items(logs) { line -> Text(line, color = Color(0xFF00FF9C)) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = vm::start, enabled = controls.canStart) { Text("Start") }
+            Button(onClick = vm::stop, enabled = controls.canStop) { Text("Stop") }
+            Button(onClick = vm::restart, enabled = controls.canRestart) { Text("Restart") }
+        }
     }
 }
