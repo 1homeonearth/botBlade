@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "tsc -p tsconfig.json && node --test dist/__tests__/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test dist/__tests__/*.test.js",
+    "preflight:node": "node ./scripts/preflight-node-version.mjs"
   }
 }

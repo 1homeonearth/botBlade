@@ -2,11 +2,15 @@
 
 ## Backend on port 8000
 
+Node.js 22+ is required for backend commands.
+
+
 Start the backend:
 
 ```bash
 cd backend
 npm install
+npm run preflight:node
 npm run build
 PORT=8000 npm start
 ```
