@@ -59,4 +59,23 @@ if (( ${#missing[@]} > 0 )); then
   fail "missing required SDK directory/directories: ${missing[*]}"
 fi
 
+check_repo_access
+
 echo "Android SDK preflight passed for $ANDROID_HOME"
+
+
+check_repo_access() {
+  local url="https://dl.google.com/dl/android/maven2/"
+  if command -v curl >/dev/null 2>&1; then
+    local code
+    code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "$url" || true)
+    case "$code" in
+      200|301|302|403)
+        ;;
+      000)
+        fail "cannot reach $url (network/DNS/proxy failure). Verify HTTP_PROXY/HTTPS_PROXY/GRADLE_OPTS/CA configuration." ;;
+      *)
+        fail "unexpected HTTP status $code from $url. Verify network/proxy/repository access before building APKs." ;;
+    esac
+  fi
+}

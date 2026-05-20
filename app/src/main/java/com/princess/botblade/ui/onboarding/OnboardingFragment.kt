@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import java.util.concurrent.atomic.AtomicBoolean
 import com.princess.botblade.MainActivity
 import com.princess.botblade.ui.theme.BotBladeTheme
 import kotlinx.coroutines.launch
@@ -47,6 +49,7 @@ import kotlinx.coroutines.launch
 private val Context.dataStore by preferencesDataStore("onboarding")
 
 class OnboardingFragment : Fragment() {
+    private val finishTriggered = AtomicBoolean(false)
     override fun onCreateView(
         inflater: android.view.LayoutInflater,
         container: android.view.ViewGroup?,
@@ -56,10 +59,15 @@ class OnboardingFragment : Fragment() {
     }
 
     private fun finishOnboardingFlow() {
-        val appContext = context?.applicationContext ?: return
-        viewLifecycleOwner.lifecycleScope.launch {
+        if (!isAdded || !finishTriggered.compareAndSet(false, true)) return
+        val host = activity as? MainActivity ?: return
+        val appContext = requireContext().applicationContext
+
+        // Switch UI immediately to avoid finish-tap races when fragment state changes during teardown.
+        host.finishOnboarding()
+
+        lifecycleScope.launch {
             appContext.dataStore.edit { prefs -> prefs[booleanPreferencesKey("onboarding_complete")] = true }
-            (activity as? MainActivity)?.finishOnboarding()
         }
     }
 }
@@ -73,7 +81,7 @@ private fun OnboardingPager(onFinish: () -> Unit) {
         OnboardingPage(Icons.Default.Build, "Manage projects", "Edit project files with clear structure and repeatable workflow tools."),
         OnboardingPage(Icons.Default.RocketLaunch, "Deploy faster", "Ship updates confidently with guided checks and quick actions."),
     )
-    var index by remember { mutableStateOf(0) }
+    var index by rememberSaveable { mutableStateOf(0) }
     val page = pages[index]
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
