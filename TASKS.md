@@ -13,7 +13,7 @@ Purpose: single deterministic execution plan for future agents so they can conti
 - Read and clear `LEFTOVERS.md` if present before new work.
 - If PR creation is planned, apply CI health gate process from `docs/project/gh-cli-auth.md` when auth is unavailable.
 
-## [P1] Crash Triage Task Group [BLOCKS]
+## [P1] Crash Triage Task Group [CONDITIONAL BLOCKS for crash-related work]
 - Collect latest reproducible crash reports and affected surfaces.
 - Classify each crash by: security impact, data-loss risk, reproducibility, and owner area.
 - Map each crash to one of the security-manual domains for required controls:
@@ -113,8 +113,9 @@ Future agents must obtain these inputs before implementation if not already know
 
 ## Quick Start Sequence (Deterministic)
 1. Execute **P0**.
-2. Complete **P1 → P4** in order (hard blockers).
-3. Run **P5, P6, P7** (parallel allowed where ownership is disjoint).
-4. Execute **P8** before merge/release.
-5. Maintain **P9** continuously for unfinished work.
-6. Re-check **P10** whenever a blocker appears due to missing inputs.
+2. If the task includes crash investigation or crash fixes, complete **P1 → P4** in order (hard blockers).
+3. If the task is non-crash work, skip **P1** and start with **P2 → P4** in order.
+4. Run **P5, P6, P7** (parallel allowed where ownership is disjoint).
+5. Execute **P8** before merge/release.
+6. Maintain **P9** continuously for unfinished work.
+7. Re-check **P10** whenever a blocker appears due to missing inputs.
