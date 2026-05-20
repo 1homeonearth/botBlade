@@ -1,60 +1,126 @@
-# 04 — Native Modules and Upstream Governance
+# 04 — Modules, Upstream Borrowing, and Community Trust
 
-## Native module system plan
+## Purpose
 
-botBlade will support controlled native modules/plugins across these classes:
-- Language modules
-- Platform modules
-- Deployment modules
-- Terminal modules
-- Secure integration modules
+Enable faster product evolution through modules and upstream integrations while preserving verifiable trust boundaries.
 
-Each module type must declare:
-- capabilities requested
-- runtime surface touched
-- data classes accessed
-- required policy gates
-- rollback/uninstall behavior
+## Core principle
 
-## Module lifecycle controls
+No module or upstream component is trusted by default.
+Every addition must declare capabilities, permissions, provenance, license status, update policy, tests, and rollback path.
 
-For install, enable, update, and removal:
-- validate manifests with Rust core
-- validate checksums/signatures where supported
-- evaluate policy compatibility
-- run sandbox capability diff review
-- run regression tests for impacted gates
+## Module categories
 
-Deny activation if module metadata is incomplete or provenance is untrusted.
+1. Language modules (Node, Python, Rust, Go, Java/Kotlin, PHP, Ruby, Docker, Compose, generic process, GitHub Actions)
+2. Platform modules (Discord, Telegram, Slack, GitHub, Matrix, Reddit, Mastodon, Bluesky, Twitch, IRC, webhooks, workers)
+3. Build modules (native language build, Dockerfile, Compose, Dev Container, Procfile, Buildpacks, manual command plan)
+4. Deployment modules (local process/docker, VPS/SSH, Actions runner, Railway/Render/Fly/Heroku-class hosts, manual export)
+5. Android integration modules (terminal, OpenPGP provider, Autofill/password-manager, SAF, browser/custom tabs, share sheet, cloud storage)
 
-## Upstream governance policy
+## Module manifest model
 
-Trusted code may be borrowed only when all are satisfied:
-1. License reviewed and compatible for intended use.
-2. Provenance verified (source origin and ownership).
-3. Version/commit pinned.
-4. Security and behavior tests added or updated.
-5. Attribution recorded.
-6. Rollback plan documented.
+Path:
+- `.botblade/modules/<module-id>/module.yml` (or JSON equivalent)
 
-No full vendoring of upstream app code without explicit governance approval.
+Required fields:
+- id, name, version, description, moduleType
+- entrypoint, supportedBotBladeVersion
+- license, sourceRepo, pinnedCommit
+- checksum, signature
+- capabilities
+- requiredPermissions, optionalPermissions
+- secretsAccess, fileAccess, networkAccess, externalIntents
+- commandsExposed, routesExposed
+- settingsSchema
+- testsRequired
+- updatePolicy, rollbackPolicy
+- maintainer, trustLevel, humanReviewed
 
-## `upstreams.yml` as source of truth
+## Permissions and trust levels
 
-`docs/design/botblade-security-manual/upstreams.yml` tracks:
-- upstream identity and classification
-- integration mode (reference/dependency/external app/platform feature)
-- licensing notes and restrictions
-- review status and required follow-ups
+Example permissions:
+- `read_repository`, `write_repository`
+- `read_manifest`, `write_manifest`
+- `read_logs`, `write_logs`
+- `read_secret_metadata`, `request_secret_value_at_runtime`
+- `start_process`, `stop_process`, `open_terminal`
+- `create_build`, `create_deployment`, `external_intent`
+- `network_access`, `filesystem_workspace_write`
+- `filesystem_host_access` (blocked by default)
+- `docker_socket_access` (blocked by default)
 
-Any upstream-related change must update `upstreams.yml` and tests.
+Trust levels:
+- `builtin`
+- `official`
+- `trusted_upstream`
+- `community_reviewed`
+- `local_unreviewed`
+- `blocked`
 
-## Rust crate governance
+## Module security constraints
 
-Security-critical validation should prefer Rust crates with:
-- actively maintained releases
-- clear licensing
-- reproducible dependency graph
-- pinned versions and update cadence
+- scan modules before enablement
+- deny secret-value access unless explicitly granted at runtime
+- deny writes outside workspace
+- deny terminal launch without policy approval
+- deny external intents without preview/confirmation
+- deny host filesystem and docker socket access by default
+- deny self-update without explicit policy path
 
-Crate additions affecting security decisions require policy and regression tests.
+## Native embedded feature candidates
+
+- Rust security core
+- terminal UI component (only after license review)
+- static language detection scanners
+- manifest editor with Rust validation path
+- archive importer with Rust-backed checks
+- OpenPGP provider bridge (external provider boundary)
+- SAF/FileProvider bundle manager with checksum/provenance
+
+## Trusted upstream governance
+
+Use `docs/design/botblade-security-manual/upstreams.yml` as source of truth.
+
+Each entry should track:
+- id/name/source repo + URL
+- license
+- usage type (dependency, vendored module, reference-only, external app integration, platform feature, commercial candidate)
+- pinned version/commit
+- imported/local paths
+- local modifications
+- advisory sources
+- required tests
+- rollback plan
+- owner and notes
+
+## License boundaries
+
+- Do not vendor GPL application code into botBlade without explicit legal/product approval.
+- Prefer reference-only or external-app integration for GPL apps.
+- Record all actual code imports with provenance and attribution.
+
+## Upstream update workflow
+
+1. review upstream release/changelog
+2. review license status/changes
+3. review security advisories
+4. update pinned version/commit in controlled branch
+5. run required tests + app checks
+6. review local modifications + rollback notes
+7. merge only after green checks
+
+## Community trust expectations
+
+- keep manual public and current
+- maintain upstream list
+- preserve implemented-vs-planned clarity
+- provide exportable redacted safety/import diagnostics
+- keep audit logs and provenance metadata reviewable
+
+## Tests
+
+- module manifest schema validation
+- capability/permission enforcement tests
+- trust-level gate behavior tests
+- upstream metadata presence/consistency tests
+- GPL vendoring boundary checks

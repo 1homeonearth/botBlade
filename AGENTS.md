@@ -23,7 +23,7 @@ After editing, run the smallest useful check available.
 - Android SDK preflight: `./scripts/android-sdk-preflight.sh`
 - Android debug assemble: `gradle :app:assembleDebug`
 - Android unit tests (flavor-specific): `gradle :app:testLocalDevDebugUnitTest`
-- Backend build: `npm run build`
+- Backend build: `npm run build` (repo root proxies to `backend`; backend package root is `backend/`)
 
 ## Android release signing secrets
 For required GitHub Actions signing secrets and setup notes, see `docs/ci/android-signing.md`.
@@ -55,21 +55,46 @@ For required GitHub Actions signing secrets and setup notes, see `docs/ci/androi
 
 ## botBlade security design manual
 - Before modifying any of the following areas, read `docs/design/botblade-security-manual/README.md` and relevant linked sections:
-  - repo import
+  - repository import
   - archive extraction
   - manifests
-  - build plans
+  - build plans / command plans
   - runtime profiles
   - terminal sessions
   - external app integrations
   - secrets
   - sandboxing
-  - upstream dependencies
+  - upstream dependency borrowing
   - Rust crates
   - deployment security
   - native modules/plugins
+- Treat the manual as a required design contract for covered work; implementation and docs changes in those areas must conform to it unless intentionally superseded in a documented design update.
 - Keep the manual updated whenever behavior in those areas changes.
-- Add tests for security gates, archive handling, terminal handling, path resolution, secret redaction, external intents, and upstream dependency changes when applicable.
+- Add tests for security gates, archive handling, terminal handling, repo-import handling, path resolution, secret redaction, external intents, and upstream dependency changes when applicable.
 - Do not vendor upstream code without an `upstreams.yml` entry, license review, attribution, and tests.
-- Prefer Rust for security-critical validation.
+- Prefer Rust for hostile-input parsing, path normalization, archive validation, manifest validation, command-plan validation, checksum/signature helpers, and policy evaluation.
 - Preserve existing Discord behavior while universal workload support evolves.
+- **Stern reliability gate:** if Android builds fail with dependency-download errors (for example `Could not GET ... dl.google.com ... 403 Forbidden`), stop feature work and first resolve repository/network/proxy configuration (`HTTP_PROXY`/`HTTPS_PROXY`/`GRADLE_OPTS`) so `gradle :app:assembleDebug` can resolve dependencies again. Do not mark APK compile failures as non-blocking.
+
+- **Hard CI/APK triage checklist (required before feature work resumes when APK compile breaks):** run `./scripts/check-android-ci-health.sh main` (or record **not verifiable (token unavailable)**), run `./scripts/android-sdk-preflight.sh`, and run `gradle :app:assembleDebug --stacktrace`. Capture the first failing task and root cause in PR notes.
+- **Do not misclassify build command failures:** if `npm run build` fails at repo root due to missing script/package wiring, fix workspace scripts immediately (root build must delegate to backend build).
+
+
+## Codex runtime network constraints
+
+The Codex Cloud agent phase cannot reach Android Maven repositories:
+- Proxied path → dl.google.com returns HTTP 403 Forbidden
+- Unproxied path → UnknownHostException (no DNS in sandbox)
+
+This affects all `./gradlew` and `gradle` commands that need dependency resolution,
+the CI health check script (also needs GH_TOKEN, unavailable at runtime),
+and any preflight script that makes network calls.
+
+Rules for all agents:
+- Never run ./gradlew or gradle to verify code changes.
+- Never treat a Gradle sandbox failure as evidence of a code bug.
+- Use `actionlint .github/workflows/android.yml` for workflow file verification.
+- Use static file inspection (read, grep) for Kotlin error verification.
+- All Gradle build verification happens exclusively in GitHub Actions CI.
+- The ⚠️ "token unavailable" warning from check-android-ci-health.sh is expected and harmless. Do not attempt to fix it from within a task.
+- Dependencies are pre-fetched during setup via ./gradlew resolveAllDependencies. If the cache is stale, reset the Codex environment to trigger a fresh setup.
