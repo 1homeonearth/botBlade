@@ -4,7 +4,7 @@ object SecretRedactor {
     private const val REDACTION = "[REDACTED]"
     private val sensitiveKeyPattern = Regex("(?i)(token|secret|password|api[_-]?key|authorization|auth)")
     private val tokenLikePattern = Regex("[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{10,}")
-    private val assignmentPattern = Regex("(?i)(token|secret|password|api[_-]?key|authorization|auth)\\s*[:=]\\s*([^\\s,;]+)")
+    private val assignmentPattern = Regex("(?i)(token|secret|password|api[_-]?key|authorization|auth)\\s*[:=]\\s*([^\\r\\n,;]+)")
 
     fun redact(value: String?): String {
         if (value.isNullOrBlank()) return ""

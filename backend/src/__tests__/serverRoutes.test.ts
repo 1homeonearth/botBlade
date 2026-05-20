@@ -49,6 +49,13 @@ test("startup diagnostics route returns unconfigured when no path is set", async
   assert.equal(response.body.artifact, null);
 });
 
+test("startup diagnostics route rejects unauthenticated requests", async () => {
+  delete process.env.BOTBLADE_STARTUP_CRASH_ARTIFACT;
+  const response = await request("GET", "/api/diagnostics/startup-crash", undefined, { unauthenticated: true });
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.error.code, "AUTHENTICATION_REQUIRED");
+});
+
 
 
 test("protected routes reject unauthenticated requests", async () => {
