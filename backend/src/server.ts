@@ -31,7 +31,8 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
   return summary && value !== undefined ? { id: summary.id, name: summary.name, value } : undefined;
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
-const port = Number(process.env.PORT ?? 8000);
+const host = "127.0.0.1";
+const port = 7432;
 
 function createPersistence(): SqlitePersistence | undefined {
   if (process.env.NODE_ENV === "test" && !process.env.BOTBLADE_DATABASE_URL && !process.env.DATABASE_URL) return undefined;
@@ -59,7 +60,7 @@ export function createRequestListener() {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  createServer(createRequestListener()).listen(port, () => console.info(JSON.stringify({ level: "info", message: "botBlade backend listening", port })));
+  (createServer(createRequestListener()) as any).listen(port, host, () => console.info(JSON.stringify({ level: "info", message: "botBlade backend listening", host, port })));
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, requestId: string): Promise<void> {

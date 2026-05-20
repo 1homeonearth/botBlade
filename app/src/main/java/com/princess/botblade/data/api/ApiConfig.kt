@@ -1,34 +1,22 @@
 package com.princess.botblade.data.api
 
 import android.content.Context
-import android.content.SharedPreferences
-import com.princess.botblade.BuildConfig
 import java.net.URI
 
 object ApiConfig {
-    private const val PREFERENCES_NAME = "botblade_api_config"
-    private const val BACKEND_URL_KEY = "backend_url"
-
-    val DEFAULT_BASE_URL: String = normalizeUrl(BuildConfig.API_BASE_URL)
+    val DEFAULT_BASE_URL: String = normalizeUrl(BackendConfig.baseUrl)
     const val DEFAULT_BEARER_TOKEN = ""
     const val DEFAULT_SESSION_TOKEN = ""
 
-    private var preferences: SharedPreferences? = null
-
     val baseUrl: String
-        get() = preferences
-            ?.getString(BACKEND_URL_KEY, null)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_BASE_URL
+        get() = normalizeUrl(BackendConfig.baseUrl)
 
     fun initialize(context: Context) {
-        preferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        context.applicationContext
     }
 
     fun saveBaseUrl(url: String): String {
-        val normalizedUrl = normalizeUrl(url)
-        preferences?.edit()?.putString(BACKEND_URL_KEY, normalizedUrl)?.apply()
-        return normalizedUrl
+        return normalizeUrl(baseUrl)
     }
 
     fun validateBaseUrl(url: String): String? = runCatching {
