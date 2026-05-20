@@ -46,6 +46,8 @@ assert_contains "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>"
 assert_count "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>" 1
 assert_contains "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>"
 assert_count "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>" 1
+assert_contains "$tmp_home/.bash_profile" "case \$- in"
+assert_contains "$tmp_home/.bash_profile" "*i*)"
 
 HOME="$tmp_home" "$script" >/dev/null
 assert_count "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>" 1
@@ -55,5 +57,19 @@ override_file="$tmp_home/custom_profile"
 HOME="$tmp_home" GH_PROFILE_FILE="$override_file" "$script" >/dev/null
 assert_contains "$override_file" "# >>> botBlade gh auto-auth >>>"
 assert_count "$override_file" "# >>> botBlade gh auto-auth >>>" 1
+
+cat > "$tmp_home/.bash_profile" <<'PROFILE'
+# existing content
+# >>> gh-auto-auth bashrc bridge >>>
+if [ -f "$HOME/.bashrc" ]; then
+    source "$HOME/.bashrc"
+fi
+# <<< gh-auto-auth bashrc bridge <<<
+PROFILE
+HOME="$tmp_home" "$script" >/dev/null
+assert_count "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>" 1
+assert_contains "$tmp_home/.bash_profile" "case \$- in"
+assert_contains "$tmp_home/.bash_profile" "*i*)"
+
 
 echo "gh-auto-auth-bootstrap tests passed"

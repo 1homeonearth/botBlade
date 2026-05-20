@@ -26,9 +26,13 @@ BLOCK
 )
 bridge_block=$(cat <<BLOCK
 $bridge_start
-if [ -f "\$HOME/.bashrc" ]; then
-    source "\$HOME/.bashrc"
-fi
+case \$- in
+  *i*)
+    if [ -f "\$HOME/.bashrc" ]; then
+      source "\$HOME/.bashrc"
+    fi
+    ;;
+esac
 $bridge_end
 BLOCK
 )
