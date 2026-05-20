@@ -50,6 +50,8 @@
     <string name="backend_url_hint">Backend URL (for example http://10.0.2.2:8000)</string>
     <string name="save_backend_url">Save Backend URL</string>
     <string name="test_backend_connection">Test Connection</string>
+    <string name="share_startup_diagnostics">Share redacted startup diagnostics</string>
+    <string name="startup_diagnostics_missing">No startup crash artifact found yet.</string>
     <string name="backend_url_saved">Saved backend URL: %1$s</string>
     <string name="backend_url_testing">Testing %1$s…</string>
     <string name="backend_url_test_success">Connected to %1$s. Health: %2$s.</string>

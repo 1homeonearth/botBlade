@@ -42,6 +42,13 @@ test("health route returns ok", async () => {
   assert.equal(response.body.ok, true);
 });
 
+test("startup diagnostics route returns unconfigured when no path is set", async () => {
+  delete process.env.BOTBLADE_STARTUP_CRASH_ARTIFACT;
+  const response = await request("GET", "/api/diagnostics/startup-crash");
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.artifact, null);
+});
+
 
 
 test("protected routes reject unauthenticated requests", async () => {

@@ -74,6 +74,17 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
 
   if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
+  if (method === "GET" && path === "/api/diagnostics/startup-crash") {
+    const artifactPath = process.env.BOTBLADE_STARTUP_CRASH_ARTIFACT;
+    if (!artifactPath) return writeJson(res, 200, { artifact: null, source: "unconfigured" });
+    const fs = await import("node:fs/promises");
+    try {
+      const artifact = await fs.readFile(artifactPath, "utf8");
+      return writeJson(res, 200, { artifact, source: "file" });
+    } catch {
+      return writeJson(res, 200, { artifact: null, source: "missing" });
+    }
+  }
 
   const actor = authenticateRequest(req);
 
