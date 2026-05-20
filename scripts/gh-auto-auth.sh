@@ -73,15 +73,23 @@ Token lookup order:
   3) GH_Token (legacy/mixed-case runtime environment variable)
   4) ~/.config/gh/token (first line)
 
-If your secret is configured in the Codex UI, make sure it is injected as GH_TOKEN or store the token in ~/.config/gh/token.
+If your secret is configured in the Codex UI, make sure it is injected as GH_TOKEN during setup.
 MSG
 
   exit 0
 fi
 
-printf '%s' "$token" | gh auth login --hostname github.com --with-token >/dev/null
+# Unset token environment variables only for the gh login/setup commands so gh stores
+# credentials instead of merely using the temporary setup-phase environment token.
+printf '%s' "$token" | env -u GH_TOKEN -u GITHUB_TOKEN -u GH_Token \
+  gh auth login --hostname github.com --with-token >/dev/null
 
-gh auth setup-git >/dev/null
+env -u GH_TOKEN -u GITHUB_TOKEN -u GH_Token \
+  gh auth setup-git >/dev/null
 
-debug_log "gh auth login and setup-git completed"
-echo "gh CLI login configured for github.com" >&2
+if gh auth status --hostname github.com >/dev/null 2>&1; then
+  debug_log "gh auth login and setup-git completed"
+  echo "gh CLI login configured for github.com" >&2
+else
+  echo "gh CLI login command completed, but github.com auth status still failed" >&2
+fi
