@@ -184,6 +184,9 @@ jobs:
       - name: Extract app metadata
         id: meta
         shell: bash
+        env:
+          IS_TAG_RELEASE: ${{ needs.preflight.outputs.is_tag_release }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
         run: |
           set -euo pipefail
           if [ -x ./gradlew ]; then
@@ -200,17 +203,19 @@ jobs:
             printf '%s\n' "$METADATA_OUTPUT"
             exit 1
           fi
-          if [[ "${{ needs.preflight.outputs.is_tag_release }}" == "true" ]]; then
-            if [[ "${{ needs.preflight.outputs.release_tag }}" != "v${VERSION_NAME}" ]]; then
-              echo "::error::Tag ${{ needs.preflight.outputs.release_tag }} conflicts with versionName $VERSION_NAME"; exit 1
+          if [[ "$IS_TAG_RELEASE" == "true" ]]; then
+            if [[ "$RELEASE_TAG" != "v${VERSION_NAME}" ]]; then
+              echo "::error::Tag $RELEASE_TAG conflicts with versionName $VERSION_NAME"; exit 1
             fi
           fi
-          echo "app_version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "app_version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "debug_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-debug.apk" >> "$GITHUB_OUTPUT"
-          echo "release_unsigned_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-unsigned.apk" >> "$GITHUB_OUTPUT"
-          echo "release_signed_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-signed.apk" >> "$GITHUB_OUTPUT"
+          {
+            echo "app_version_name=$VERSION_NAME"
+            echo "app_version_code=$VERSION_CODE"
+            echo "short_sha=$SHORT_SHA"
+            echo "debug_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-debug.apk"
+            echo "release_unsigned_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-unsigned.apk"
+            echo "release_signed_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-signed.apk"
+          } >> "$GITHUB_OUTPUT"
       - name: Build debug and release APKs
         shell: bash
         run: |
@@ -258,7 +263,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          (cd dist/apk && sha256sum *.apk > SHA256SUMS.txt)
+          (cd dist/apk && sha256sum -- ./*.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
@@ -328,20 +333,28 @@ jobs:
           path: dist/incoming
       - name: Select final assets and generate metadata
         shell: bash
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
+          APP_VERSION_NAME: ${{ needs.build.outputs.app_version_name }}
+          APP_VERSION_CODE: ${{ needs.build.outputs.app_version_code }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
+          GITHUB_REF_VALUE: ${{ github.ref }}
+          GITHUB_WORKFLOW_VALUE: ${{ github.workflow }}
+          GITHUB_RUN_ID_VALUE: ${{ github.run_id }}
+          SIGNING_STATUS: ${{ needs.build.outputs.signing_status }}
+          RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
         run: |
           set -euo pipefail
           mkdir -p dist/release
           cp dist/incoming/*/*.apk dist/release/
-          APP_VERSION_NAME="${{ needs.build.outputs.app_version_name }}"
-          APP_VERSION_CODE="${{ needs.build.outputs.app_version_code }}"
-          SHORT_SHA="${{ needs.build.outputs.short_sha }}"
-          SIGNING_STATUS="${{ needs.build.outputs.signing_status }}"
 
           DEBUG_VERSIONED="bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-debug.apk"
           cp "dist/release/${{ needs.build.outputs.debug_file }}" "dist/release/${DEBUG_VERSIONED}"
           cp "dist/release/${{ needs.build.outputs.debug_file }}" dist/release/bot-blade-debug.apk
 
-          if [[ "$SIGNING_STATUS" != "signed" && "${{ needs.preflight.outputs.release_kind }}" == "versioned" ]]; then
+          if [[ "$SIGNING_STATUS" != "signed" && "$RELEASE_KIND" == "versioned" ]]; then
             echo "::error::Versioned release requires signing secrets."; exit 1
           fi
 
@@ -371,29 +384,32 @@ jobs:
           Debug APKs are for testers and developers.
           EOF
 
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          python - <<PY
+          BUILD_TIMESTAMP_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export BUILD_TIMESTAMP_UTC
+          python - <<'PY'
           import json
+          import os
           from pathlib import Path
-          p=Path('dist/release')
-          sha={line.split()[1]:line.split()[0] for line in (p/'SHA256SUMS.txt').read_text().splitlines()}
-          obj={
-            "app_name":"BotBlade",
-            "repository":"${{ github.repository }}",
-            "release_tag":"${{ needs.preflight.outputs.release_tag }}",
-            "release_title":f"BotBlade Android v${{ needs.build.outputs.app_version_name }}",
-            "version_name":"${{ needs.build.outputs.app_version_name }}",
-            "version_code":"${{ needs.build.outputs.app_version_code }}",
-            "git_commit_sha":"${{ github.sha }}",
-            "ref":"${{ github.ref }}",
-            "workflow":"${{ github.workflow }}",
-            "workflow_run_id":"${{ github.run_id }}",
-            "workflow_run_url":RUN_URL,
-            "build_timestamp_utc":"$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "signing_status":"${{ needs.build.outputs.signing_status }}",
-            "apk_sha256":sha
+
+          p = Path("dist/release")
+          sha = {line.split()[1]: line.split()[0] for line in (p / "SHA256SUMS.txt").read_text().splitlines()}
+          obj = {
+              "app_name": "BotBlade",
+              "repository": os.environ["REPOSITORY"],
+              "release_tag": os.environ["RELEASE_TAG"],
+              "release_title": f"BotBlade Android v{os.environ['APP_VERSION_NAME']}",
+              "version_name": os.environ["APP_VERSION_NAME"],
+              "version_code": os.environ["APP_VERSION_CODE"],
+              "git_commit_sha": os.environ["GITHUB_SHA_VALUE"],
+              "ref": os.environ["GITHUB_REF_VALUE"],
+              "workflow": os.environ["GITHUB_WORKFLOW_VALUE"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID_VALUE"],
+              "workflow_run_url": os.environ["RUN_URL"],
+              "build_timestamp_utc": os.environ["BUILD_TIMESTAMP_UTC"],
+              "signing_status": os.environ["SIGNING_STATUS"],
+              "apk_sha256": sha,
           }
-          (p/'release.json').write_text(json.dumps(obj, indent=2)+"\\n")
+          (p / "release.json").write_text(json.dumps(obj, indent=2) + "\n")
           PY
 
           RELEASE_ASSETS=("SHA256SUMS.txt" "release.json" "INSTALL.md")
@@ -423,18 +439,31 @@ jobs:
             if git push --force origin "refs/tags/$TAG"; then
               TAG_REF_STATUS="updated-via-git-push"
             else
-              gh api -X PATCH "repos/${{ github.repository }}/git/refs/tags/$TAG" -f sha="$GITHUB_SHA" >/dev/null 2>&1 \
-                || gh api -X POST "repos/${{ github.repository }}/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" >/dev/null
+              API_URL="${{ github.api_url }}/repos/${{ github.repository }}"
+              curl -fsS -X PATCH \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "$API_URL/git/refs/tags/$TAG" \
+                -d "{\"sha\":\"$GITHUB_SHA\",\"force\":true}" >/dev/null 2>&1 \
+                || curl -fsS -X POST \
+                  -H "Authorization: Bearer $GH_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  "$API_URL/git/refs" \
+                  -d "{\"ref\":\"refs/tags/$TAG\",\"sha\":\"$GITHUB_SHA\"}" >/dev/null
               TAG_REF_STATUS="upserted-via-gh-api"
             fi
           fi
 
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "tag_ref_status=$TAG_REF_STATUS" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$TAG"
+            echo "tag_ref_status=$TAG_REF_STATUS"
+          } >> "$GITHUB_OUTPUT"
           echo "- Tag ref guard: $TAG_REF_STATUS ($TAG)" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -453,18 +482,92 @@ jobs:
           | INSTALL.md | Android install instructions. |
           EOF
 
-          if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
-            RELEASE_FLAG="--prerelease"
-          else
-            RELEASE_FLAG="--latest"
-          fi
+          NOTES="$(cat "$NOTES_FILE")"
+          API_REPO_URL="${GITHUB_API_URL}/repos/${REPOSITORY}"
+          RELEASE_JSON_PATH="dist/release/release-response.json"
+          COMMON_HEADERS=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          JSON_HEADERS=("${COMMON_HEADERS[@]}" -H "Content-Type: application/json")
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            while read -r asset; do gh release upload "$TAG" "dist/release/$asset" --clobber; done < dist/release/release-assets.txt
-            gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE" "$RELEASE_FLAG"
+          if curl -fsS "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/tags/$TAG" > "$RELEASE_JSON_PATH"; then
+            RELEASE_ID="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path("dist/release/release-response.json").read_text())["id"])
+          PY
+            )"
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path("dist/release/release-assets.txt")
+          rid = os.environ["RELEASE_ID"]
+          base = os.environ["API_REPO_URL"]
+          lines = [line.strip() for line in p.read_text().splitlines() if line.strip()]
+          with Path("dist/release/delete-asset-urls.txt").open("w") as out:
+              for name in lines:
+                  out.write(f"{base}/releases/{rid}/assets?name={name}\n")
+          PY
+            while read -r delete_url; do
+              curl -fsS -X DELETE "${COMMON_HEADERS[@]}" "$delete_url" >/dev/null || true
+            done < dist/release/delete-asset-urls.txt
+            while read -r asset; do
+              curl -fsS -X POST "${COMMON_HEADERS[@]}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@dist/release/$asset" \
+                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$asset" >/dev/null
+            done < dist/release/release-assets.txt
+            if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
+              PRERELEASE_VALUE=true
+              MAKE_LATEST=legacy
+            else
+              PRERELEASE_VALUE=false
+              MAKE_LATEST=true
+            fi
+            python - <<'PY' > dist/release/update-release.json
+          import json, os
+          print(json.dumps({
+              "tag_name": os.environ["TAG"],
+              "name": os.environ["TITLE"],
+              "body": os.environ["NOTES"],
+              "prerelease": os.environ["PRERELEASE_VALUE"] == "true",
+              "make_latest": os.environ["MAKE_LATEST"],
+          }))
+          PY
+            curl -fsS -X PATCH "${JSON_HEADERS[@]}" \
+              "$API_REPO_URL/releases/$RELEASE_ID" \
+              --data-binary @dist/release/update-release.json >/dev/null
           else
-            ASSETS=(); while read -r asset; do ASSETS+=("dist/release/$asset"); done < dist/release/release-assets.txt
-            gh release create "$TAG" "${ASSETS[@]}" --title "$TITLE" --notes-file "$NOTES_FILE" "$RELEASE_FLAG"
+            if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
+              PRERELEASE_VALUE=true
+              MAKE_LATEST=legacy
+            else
+              PRERELEASE_VALUE=false
+              MAKE_LATEST=true
+            fi
+            python - <<'PY' > dist/release/create-release.json
+          import json, os
+          print(json.dumps({
+              "tag_name": os.environ["TAG"],
+              "name": os.environ["TITLE"],
+              "body": os.environ["NOTES"],
+              "prerelease": os.environ["PRERELEASE_VALUE"] == "true",
+              "make_latest": os.environ["MAKE_LATEST"],
+          }))
+          PY
+            curl -fsS -X POST "${JSON_HEADERS[@]}" \
+              "$API_REPO_URL/releases" \
+              --data-binary @dist/release/create-release.json > "$RELEASE_JSON_PATH"
+            RELEASE_ID="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path("dist/release/release-response.json").read_text())["id"])
+          PY
+            )"
+            while read -r asset; do
+              curl -fsS -X POST "${COMMON_HEADERS[@]}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@dist/release/$asset" \
+                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$asset" >/dev/null
+            done < dist/release/release-assets.txt
           fi
       - name: Release checklist summary
         shell: bash
