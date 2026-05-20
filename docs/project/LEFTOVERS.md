@@ -23,3 +23,8 @@
   1. Open PR and confirm it is accepted without binary artifacts.
   2. Run workflow on PR and main push; store URLs and outcomes in `docs/project/ISSUES.md`.
   3. If hosted runners lack system gradle, re-add text-only instructions or wrapper support strategy based on runner capabilities.
+
+
+## Additional follow-up (2026-05-20)
+- Validate sticky PR artifact comment behavior by rerunning the same PR workflow and confirming the existing marker comment is edited in place (not duplicated).
+- Suggested command (from a GitHub-authenticated shell): `gh workflow run android.yml --ref <branch>` then rerun once and inspect PR comments.
