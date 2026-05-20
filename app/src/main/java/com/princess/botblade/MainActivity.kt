@@ -18,6 +18,7 @@ import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorFragment
+import com.princess.botblade.ui.logs.LogsFragment
 import com.princess.botblade.ui.onboarding.OnboardingFragment
 import com.princess.botblade.ui.projects.ProjectsFragment
 import com.princess.botblade.ui.settings.SettingsFragment
@@ -55,5 +56,12 @@ class MainActivity : AppCompatActivity() {
     fun finishOnboarding() { findViewById<BottomNavigationView>(R.id.bottom_navigation).visibility = android.view.View.VISIBLE; showFragment(DashboardFragment()) }
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
     override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }
+    fun showEditorForProject(projectName: String) {
+        showFragment(CodeEditorFragment())
+        findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
+    }
+
+    fun openLogsScreen() { showFragment(LogsFragment()) }
+
     private fun showFragment(fragment: Fragment) { supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit() }
 }
