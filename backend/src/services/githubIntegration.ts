@@ -89,8 +89,9 @@ export class GitHubIntegrationService {
       this.auditRecord?.({ action: "github.push", resourceType: "project", resourceId: project.id, projectId: project.id, requestId, metadata: { status: "success", owner: project.github.owner, repo: project.github.repo, branch: pushed.branch } });
       return { ...pushed, pushedAt };
     } catch (error) {
-      this.auditRecord?.({ action: "github.push", resourceType: "project", resourceId: project.id, projectId: project.id, requestId, metadata: { status: "failure", message: error instanceof Error ? error.message : "unknown" } });
-      throw { statusCode: 502, code: "GITHUB_PUSH_FAILED", message: "GitHub push failed.", details: { reason: error instanceof Error ? error.message : "unknown" } };
+      const safeSummary = sanitizeErrorSummary(error);
+      this.auditRecord?.({ action: "github.push", resourceType: "project", resourceId: project.id, projectId: project.id, requestId, metadata: { status: "failure", message: safeSummary } });
+      throw { statusCode: 502, code: "GITHUB_PUSH_FAILED", message: "GitHub push failed.", details: { reason: "git_push_failed" } };
     }
   }
 
@@ -98,6 +99,18 @@ export class GitHubIntegrationService {
     if (!project.github?.owner || !project.github?.repo) throw { statusCode: 400, code: "GITHUB_REPO_NOT_LINKED", message: "Link owner/repo before creating workflow content.", details: {} };
     return { path: ".github/workflows/botblade-build.yml", content: workflowContent(project.github?.defaultBranch || "main") };
   }
+}
+
+
+function sanitizeErrorSummary(input: unknown): string {
+  if (!(input instanceof Error) || typeof input.message !== "string") return "operation_failed";
+  const condensed = input.message.replace(/\s+/g, " ").trim();
+  if (!condensed) return "operation_failed";
+  const redacted = condensed
+    .replace(/https?:\/\/[^\s@]+@/gi, "https://[REDACTED]@")
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|x-access-token:[^\s@]+|Bearer\s+[A-Za-z0-9._-]+|token[=:]\s*[^\s,;]+)/gi, "[REDACTED_TOKEN]");
+  const summary = redacted.slice(0, 200);
+  return summary || "operation_failed";
 }
 
 function workflowContent(branch: string): string { return `name: botBlade Build\n\non:\n  push:\n    branches: [${branch}]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n      - run: npm ci\n      - run: npm run build\n`; }
