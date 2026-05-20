@@ -1,6 +1,11 @@
 # Android releases and APK artifacts
 
 ## Trigger behavior
+
+## Naming convention
+- **botBlade** refers to the repository/workflow artifact namespace.
+- **BotBlade** refers to the Android app name shown to users and in release titles.
+
 - `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`): builds debug + unsigned release APKs and uploads workflow artifacts.
 - `push` to `main`: builds APKs and publishes a prerelease channel (`latest`) with release assets.
 - `push` tags matching `v*`: builds APKs and publishes a normal versioned GitHub Release.
