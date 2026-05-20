@@ -148,11 +148,12 @@ Local process mode is for development. Local Docker is for stronger local/runtim
 
 ## Backend setup
 
-The backend lives in `backend/` and requires Node 22 or newer.
+The backend lives in `backend/` and requires Node 22 or newer. Run `npm run preflight:node` to verify your local runtime before builds/tests.
 
 ```bash
 cd backend
 npm install
+npm run preflight:node
 npm run build
 npm start
 ```
