@@ -52,3 +52,24 @@ For required GitHub Actions signing secrets and setup notes, see `docs/ci/androi
 - In Codex/offline environments, avoid `./gradlew` checks that require wrapper downloads.
 - Prefer smallest offline-capable checks first (for example: `gradle` if available locally, targeted `npm`/script checks, and static file validation).
 - Do not change GitHub workflow validation behavior just to satisfy local Codex constraints.
+
+## botBlade security design manual
+- Before modifying any of the following areas, read `docs/design/botblade-security-manual/README.md` and relevant linked sections:
+  - repo import
+  - archive extraction
+  - manifests
+  - build plans
+  - runtime profiles
+  - terminal sessions
+  - external app integrations
+  - secrets
+  - sandboxing
+  - upstream dependencies
+  - Rust crates
+  - deployment security
+  - native modules/plugins
+- Keep the manual updated whenever behavior in those areas changes.
+- Add tests for security gates, archive handling, terminal handling, path resolution, secret redaction, external intents, and upstream dependency changes when applicable.
+- Do not vendor upstream code without an `upstreams.yml` entry, license review, attribution, and tests.
+- Prefer Rust for security-critical validation.
+- Preserve existing Discord behavior while universal workload support evolves.
