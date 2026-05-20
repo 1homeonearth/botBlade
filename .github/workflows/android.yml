@@ -2,7 +2,7 @@ name: BotBlade Android APKs
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
   push:
     branches: [main]
     tags:
@@ -79,6 +79,10 @@ jobs:
           IS_TAG_RELEASE=false
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            SHOULD_RELEASE=true
+            RELEASE_KIND=prerelease
+            RELEASE_TAG="latest"
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" && "${{ github.event.action }}" == "closed" && "${{ github.event.pull_request.merged }}" == "true" && "${{ github.event.pull_request.base.ref }}" == "main" ]]; then
             SHOULD_RELEASE=true
             RELEASE_KIND=prerelease
             RELEASE_TAG="latest"
