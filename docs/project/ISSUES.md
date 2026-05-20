@@ -452,3 +452,28 @@ Failed to download Android command-line tools.
 - Versions/environment: UTC shell in `/workspace/royalScepter` on 2026-05-19.
 - Status: Complete
 - Next action: Validate workflow YAML parses and confirm no stale `royal-scepter` release-link references remain.
+
+
+### 2026-05-20T01:50:11Z — Sticky PR comment update verification + workflow trigger attempt
+- Context: Verified `.github/workflows/android.yml` sticky PR artifact comment update payload and attempted to trigger a PR workflow run to confirm in-place comment updates.
+- Commands run:
+  - `rg -n "Sticky PR artifact comment|updateComment\(" .github/workflows/android.yml`
+  - `gh workflow run android.yml`
+- Observed output/errors:
+  - `updateComment` payload already contains unique keys once (`owner`, `repo`, `comment_id`, `body`).
+  - `gh: command not found` prevented triggering a workflow run from this environment.
+- Versions/environment: UTC container on 2026-05-20; GitHub CLI unavailable locally.
+- Status: Incomplete
+- Next action: Trigger the `android.yml` PR run from GitHub UI (or a shell with `gh` installed) and confirm sticky comment is updated in place on reruns.
+
+### 2026-05-20T01:53:41Z — Sticky PR artifact comment payload refactor + trigger retry
+- Context: Applied a direct workflow code refactor in the sticky PR artifact comment step so comment API payload keys are sourced from a single `{ owner, repo }` destructure and retried workflow triggering from this shell.
+- Commands run:
+  - `rg -n "const \{ owner, repo \}|updateComment\(|Sticky PR artifact comment" .github/workflows/android.yml`
+  - `gh workflow run android.yml --ref work`
+- Observed output/errors:
+  - Workflow step now destructures `owner` and `repo` once and uses them for `listComments`, `updateComment`, and `createComment`.
+  - Trigger retry still blocked in this environment: `gh: command not found`.
+- Versions/environment: UTC container on 2026-05-20; GitHub CLI unavailable locally.
+- Status: Incomplete
+- Next action: Trigger `android.yml` on this branch from GitHub UI (or shell with `gh` installed), rerun once, and confirm marker comment is edited in place.
