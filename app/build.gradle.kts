@@ -30,10 +30,12 @@ android {
         minSdk = 26
         targetSdk = 35
 
-        // Release policy: bump VERSION_CODE for every Play upload; use SemVer for VERSION_NAME.
-        // Override without editing source: -PVERSION_CODE=2 -PVERSION_NAME=0.1.1.
-        versionCode = providers.gradleProperty("VERSION_CODE").orNull?.toInt() ?: 1
-        versionName = providers.gradleProperty("VERSION_NAME").orNull ?: "0.1.0"
+        // Versioning policy: BotBlade starts at 0.001 and increments by thousandths (0.002, 0.003, ...).
+        // Override without editing source: -PVERSION_SEQ=12 (-> 0.012) or -PVERSION_NAME=0.250.
+        val resolvedVersionSeq = providers.gradleProperty("VERSION_SEQ").orNull?.toInt() ?: 1
+        require(resolvedVersionSeq > 0) { "VERSION_SEQ must be > 0 (was $resolvedVersionSeq)." }
+        versionCode = providers.gradleProperty("VERSION_CODE").orNull?.toInt() ?: resolvedVersionSeq
+        versionName = providers.gradleProperty("VERSION_NAME").orNull ?: "0.${"%03d".format(resolvedVersionSeq)}"
     }
 
     signingConfigs {
