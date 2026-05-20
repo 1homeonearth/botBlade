@@ -124,7 +124,6 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.github.LiquidPlayer:LiquidCore:0.6.2")
 }
 
 tasks.register("printResolvedVersionMetadata") {

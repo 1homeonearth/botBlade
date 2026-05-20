@@ -21,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.liquidplayer.nodejs.NodeJS
 import java.io.File
 import java.util.ArrayDeque
 
@@ -73,8 +72,15 @@ class BotEngineService : Service() {
 
     private fun startNode() {
         val entry = prepareBackendEntry()
-        NodeJS.start(entry.absolutePath)
-        isRunning = true
+        entry // keep asset preparation side effects
+        // TODO(on-device-runtime): Replace with working Node.js runtime library.
+        // LiquidCore 0.6.2 does not exist on JitPack. Evaluate:
+        // - J2V8 (eclipsesource/j2v8) - V8 bindings, no full Node.js
+        // - Capacitor/Ionic approach - WebView-based JS execution
+        // - Chaquopy - Python alternative if bot logic is rewritten
+        // - Self-hosted Node.js binary bundled as an asset (advanced)
+        android.util.Log.w("BotEngineService", "Node.js runtime not yet available — LiquidCore removed pending replacement")
+        isRunning = false
         notifyState(true)
         startProcessMonitor()
     }
@@ -82,7 +88,13 @@ class BotEngineService : Service() {
     private fun stopNode() {
         monitorJob?.cancel()
         monitorJob = null
-        if (isRunning) NodeJS.stop()
+        // TODO(on-device-runtime): Replace with working Node.js runtime library.
+        // LiquidCore 0.6.2 does not exist on JitPack. Evaluate:
+        // - J2V8 (eclipsesource/j2v8) - V8 bindings, no full Node.js
+        // - Capacitor/Ionic approach - WebView-based JS execution
+        // - Chaquopy - Python alternative if bot logic is rewritten
+        // - Self-hosted Node.js binary bundled as an asset (advanced)
+        android.util.Log.w("BotEngineService", "Node.js runtime not yet available — LiquidCore removed pending replacement")
         isRunning = false
         notifyState(false)
     }
@@ -92,10 +104,17 @@ class BotEngineService : Service() {
         monitorJob = serviceScope.launch {
             while (true) {
                 delay(1000)
-                val running = NodeJS.isActive()
+                // TODO(on-device-runtime): Replace with working Node.js runtime library.
+                // LiquidCore 0.6.2 does not exist on JitPack. Evaluate:
+                // - J2V8 (eclipsesource/j2v8) - V8 bindings, no full Node.js
+                // - Capacitor/Ionic approach - WebView-based JS execution
+                // - Chaquopy - Python alternative if bot logic is rewritten
+                // - Self-hosted Node.js binary bundled as an asset (advanced)
+                val running = false
+                android.util.Log.w("BotEngineService", "Node.js runtime not yet available — LiquidCore removed pending replacement")
                 if (!running && isRunning) {
                     isRunning = false
-                    val reason = "LiquidCore process exited unexpectedly."
+                    val reason = "On-device Node.js runtime unavailable; service in stub mode."
                     appendLog(reason)
                     if (!userInitiatedStop && shouldRestartAfterCrash()) {
                         delay(5000)
