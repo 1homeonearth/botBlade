@@ -31,13 +31,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      - name: Setup actionlint
-        uses: reviewdog/action-actionlint@7eeec1dd160c2301eb28e1568721837d084558ad # v1.57.0
-        with:
-          actionlint_flags: -version
       - name: Lint android workflow
-        shell: bash
-        run: actionlint .github/workflows/android.yml
+        uses: reviewdog/action-actionlint@0d952c597ef8459f634d7145b0b044a9699e5e43 # v1.71.0
+        with:
+          actionlint_flags: .github/workflows/android.yml
+          fail_level: error
 
   preflight:
     runs-on: ubuntu-latest
@@ -314,12 +312,38 @@ jobs:
       - id: signing
         shell: bash
         run: |
-          echo "has-signing=${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' }}" >> "$GITHUB_OUTPUT"
+          HAS_SIGNING="${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' }}"
+          echo "has-signing=$HAS_SIGNING" >> "$GITHUB_OUTPUT"
+          echo "### Signing preflight" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$HAS_SIGNING" == "true" ]]; then
+            echo "- Signing secrets configured: yes" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Signing secrets configured: no" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
+  release-skipped-summary:
+    runs-on: ubuntu-latest
+    needs: [preflight, build, check-signing]
+    if: needs.preflight.outputs.should_release == 'true' && needs.check-signing.outputs.has-signing != 'true'
+    steps:
+      - name: Explain release skip
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Release skipped
+          - Reason: signing secrets are not fully configured.
+          - Required secrets:
+            - KEYSTORE_BASE64
+            - KEYSTORE_PASSWORD
+            - KEY_ALIAS
+          - Build artifacts were still produced by the build job.
+          - Configure signing secrets to enable automatic latest prerelease publishing from main.
+          EOF
 
   release:
     runs-on: ubuntu-latest
     needs: [lint-workflow, preflight, build, check-signing]
+    # Release publishing requires signing secrets because public release APKs must be signed.
     if: needs.preflight.outputs.should_release == 'true' && needs.check-signing.outputs.has-signing == 'true'
     permissions:
       contents: write
@@ -526,10 +550,10 @@ jobs:
               }
             done < dist/release/delete-assets.tsv
             while read -r asset; do
-              ASSET_NAME="$asset" encoded_name="$(python - <<'PY'
-          import os
+              encoded_name="$(python - "$asset" <<'PY'
+          import sys
           from urllib.parse import quote
-          print(quote(os.environ["ASSET_NAME"], safe=""))
+          print(quote(sys.argv[1], safe=""))
           PY
               )"
               curl -fsS -X POST "${COMMON_HEADERS[@]}" \
@@ -591,10 +615,10 @@ jobs:
             )"
             export RELEASE_ID
             while read -r asset; do
-              ASSET_NAME="$asset" encoded_name="$(python - <<'PY'
-          import os
+              encoded_name="$(python - "$asset" <<'PY'
+          import sys
           from urllib.parse import quote
-          print(quote(os.environ["ASSET_NAME"], safe=""))
+          print(quote(sys.argv[1], safe=""))
           PY
               )"
               curl -fsS -X POST "${COMMON_HEADERS[@]}" \
