@@ -55,7 +55,11 @@ class MainActivity : AppCompatActivity() {
             else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
     }
-    fun finishOnboarding() { findViewById<BottomNavigationView>(R.id.bottom_navigation).visibility = android.view.View.VISIBLE; showFragment(DashboardFragment()) }
+    fun finishOnboarding() {
+        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        bottomNavigation.visibility = android.view.View.VISIBLE
+        bottomNavigation.selectedItemId = R.id.navigation_dashboard
+    }
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
     override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }
     fun showEditorForProject(projectName: String) {
@@ -67,5 +71,8 @@ class MainActivity : AppCompatActivity() {
 
     fun openLogsScreen() { showFragment(LogsFragment()) }
 
-    private fun showFragment(fragment: Fragment) { supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit() }
+    private fun showFragment(fragment: Fragment) {
+        val tx = supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment)
+        if (supportFragmentManager.isStateSaved) tx.commitAllowingStateLoss() else tx.commit()
+    }
 }

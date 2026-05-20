@@ -186,12 +186,13 @@ jobs:
         env:
           IS_TAG_RELEASE: ${{ needs.preflight.outputs.is_tag_release }}
           RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
+          VERSION_SEQ: ${{ github.run_number }}
         run: |
           set -euo pipefail
           if [ -x ./gradlew ]; then
-            METADATA_OUTPUT="$(./gradlew -q :app:printResolvedVersionMetadata --no-daemon)"
+            METADATA_OUTPUT="$(./gradlew -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" --no-daemon)"
           else
-            METADATA_OUTPUT="$(gradle -q :app:printResolvedVersionMetadata --no-daemon)"
+            METADATA_OUTPUT="$(gradle -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" --no-daemon)"
           fi
           VERSION_NAME="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_NAME=//p' | tail -n1)"
           VERSION_CODE="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
@@ -217,12 +218,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Build debug and release APKs
         shell: bash
+        env:
+          VERSION_SEQ: ${{ github.run_number }}
         run: |
           set -euo pipefail
           if [ -x ./gradlew ]; then
-            ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+            ./gradlew :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
           else
-            gradle :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+            gradle :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
           fi
       - name: Validate APK outputs
         shell: bash
