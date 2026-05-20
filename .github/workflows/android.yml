@@ -428,28 +428,10 @@ jobs:
           - Downloads: Use this run's **Artifacts** section. Debug APK is for testers; unsigned release APK is test-only.
           EOF
 
-  check-signing:
-    runs-on: ubuntu-latest
-    needs: [lint-workflow]
-    outputs:
-      has-signing: ${{ steps.signing.outputs.has-signing }}
-    steps:
-      - id: signing
-        shell: bash
-        run: |
-          HAS_SIGNING="${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' }}"
-          echo "has-signing=$HAS_SIGNING" >> "$GITHUB_OUTPUT"
-          echo "### Signing preflight" >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$HAS_SIGNING" == "true" ]]; then
-            echo "- Signing secrets configured: yes" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- Signing secrets configured: no" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
   release-skipped-summary:
     runs-on: ubuntu-latest
-    needs: [preflight, build, check-signing]
-    if: needs.preflight.outputs.should_release == 'true' && needs.check-signing.outputs.has-signing != 'true'
+    needs: [preflight, build]
+    if: needs.preflight.outputs.should_release == 'true'
     steps:
       - name: Explain release skip
         shell: bash
@@ -467,14 +449,23 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [lint-workflow, preflight, build, check-signing]
-    # Release publishing requires signing secrets because public release APKs must be signed.
-    if: needs.preflight.outputs.should_release == 'true' && needs.check-signing.outputs.has-signing == 'true'
+    needs: [lint-workflow, preflight, build]
+    if: needs.preflight.outputs.should_release == 'true'
     permissions:
       contents: write
       id-token: write
       attestations: write
     steps:
+      - name: Fail if signing secrets are missing
+        run: |
+          missing=()
+          [[ -z "${{ secrets.KEYSTORE_BASE64 }}" ]] && missing+=("KEYSTORE_BASE64")
+          [[ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]] && missing+=("KEYSTORE_PASSWORD")
+          [[ -z "${{ secrets.KEY_ALIAS }}" ]] && missing+=("KEY_ALIAS")
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing signing secrets: ${missing[*]}"
+            exit 1
+          fi
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Download APK artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
