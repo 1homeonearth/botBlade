@@ -99,7 +99,7 @@ export function parseFileWriteInput(value: unknown): { content: string } {
   const maxBytes = 512 * 1024;
   const object = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   if (typeof object.content !== "string") throw new RequestValidationError([{ field: "content", message: "File content must be a string." }]);
-  if (object.content.length * 4 > maxBytes) throw new RequestValidationError([{ field: "content", message: "File content exceeds 512KB limit." }]);
+  if (Buffer.byteLength(object.content, "utf8") > maxBytes) throw new RequestValidationError([{ field: "content", message: "File content exceeds 512KB limit." }]);
   return { content: object.content };
 }
 
