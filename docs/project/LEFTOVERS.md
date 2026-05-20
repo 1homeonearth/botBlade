@@ -28,3 +28,11 @@
 ## Additional follow-up (2026-05-20)
 - Validate sticky PR artifact comment behavior by rerunning the same PR workflow and confirming the existing marker comment is edited in place (not duplicated).
 - Suggested command (from a GitHub-authenticated shell): `gh workflow run android.yml --ref <branch>` then rerun once and inspect PR comments.
+
+## Additional follow-up (2026-05-20 — prerelease tag-ref guard)
+- Validate rolling prerelease flow on `main` now that workflow force-upserts `refs/tags/latest` before release publish.
+- Suggested verification in GitHub-hosted/test repo:
+  1. Merge branch with updated `.github/workflows/android.yml` into `main`.
+  2. Confirm release job logs show `Ensure release tag ref exists` and summary line `Tag ref guard: ... (latest)`.
+  3. Confirm run reaches `gh release edit/create` successfully and updates prerelease instead of failing on missing tag.
+  4. Re-run another `main` push and confirm the same `latest` prerelease is updated (rolling channel behavior).
