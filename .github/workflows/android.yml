@@ -273,7 +273,7 @@ jobs:
                 owner,
                 repo,
                 comment_id: existing.id,
-                body
+                body,
               });
             } else {
               await github.rest.issues.createComment({
