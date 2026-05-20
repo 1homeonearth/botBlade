@@ -3,37 +3,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,0h108v108h-108z" />
-
-    <!-- Sword silhouette -->
-    <path
-        android:fillColor="#F7E27A"
-        android:pathData="M54,10L62,28L58,60L50,60L46,28Z" />
-    <path
-        android:fillColor="#D4AF37"
-        android:pathData="M44,60h20v7h-20z" />
-    <path
-        android:fillColor="#D4AF37"
-        android:pathData="M51,67h6v8h-6z" />
-
-    <!-- Robot head and torso silhouette -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M34,33h40v14h-40z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M37,47h34a4,4 0,0 1,4 4v24a4,4 0,0 1,-4 4h-34a4,4 0,0 1,-4 -4v-24a4,4 0,0 1,4 -4z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M49,27h10v8h-10z" />
-
-    <!-- Eyes cutout for recognizable robot face -->
-    <path
-        android:fillColor="#4527A0"
-        android:pathData="M42,38h9v5h-9z" />
-    <path
-        android:fillColor="#4527A0"
-        android:pathData="M57,38h9v5h-9z" />
+    <path android:fillColor="#DDF4FF" android:strokeColor="#C5EFFF" android:strokeWidth="0.8"
+        android:pathData="M54,12L63,26L59,78L49,78L45,26Z"/>
+    <path android:fillColor="#264784" android:pathData="M54,20L58,30L56,76L52,76L50,30Z"/>
+    <path android:fillColor="#243560" android:strokeColor="#39E6FF" android:strokeWidth="1.2"
+        android:pathData="M24,58h60a5,5 0,0 1,5 5v2a5,5 0,0 1,-5 5h-60a5,5 0,0 1,-5 -5v-2a5,5 0,0 1,5 -5z"/>
+    <path android:fillColor="#223A74" android:strokeColor="#39E6FF" android:strokeWidth="1.2"
+        android:pathData="M50,70h8v16h-8z"/>
+    <path android:fillColor="#223A74" android:strokeColor="#39E6FF" android:strokeWidth="1.2"
+        android:pathData="M54,96m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0"/>
+    <path android:fillColor="#36E9FF" android:pathData="M54,96m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
 </vector>

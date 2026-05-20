@@ -58,7 +58,10 @@ class MainActivity : AppCompatActivity() {
     fun finishOnboarding() {
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         bottomNavigation.visibility = android.view.View.VISIBLE
-        bottomNavigation.selectedItemId = R.id.navigation_dashboard
+        showFragment(DashboardFragment())
+        if (bottomNavigation.selectedItemId != R.id.navigation_dashboard) {
+            bottomNavigation.selectedItemId = R.id.navigation_dashboard
+        }
     }
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
     override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }

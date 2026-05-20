@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="BotBlade app icon">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#111f66"/>
+      <stop offset="1" stop-color="#08113f"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#dff7ff"/>
+      <stop offset="1" stop-color="#7ca4d6"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="976" height="976" rx="180" fill="url(#bg)" stroke="#2f4fa8" stroke-width="12"/>
+  <path d="M512 120 L612 270 L564 740 L460 740 L412 270 Z" fill="url(#blade)" stroke="#c9f5ff" stroke-width="8"/>
+  <path d="M512 220 L552 300 L538 730 L486 730 L472 300 Z" fill="#214687" opacity="0.85"/>
+  <rect x="252" y="560" width="520" height="96" rx="44" fill="#24345f" stroke="#39e6ff" stroke-width="10"/>
+  <rect x="474" y="656" width="76" height="182" fill="#20376f" stroke="#39e6ff" stroke-width="8"/>
+  <circle cx="512" cy="900" r="84" fill="#213a74" stroke="#39e6ff" stroke-width="10"/>
+  <circle cx="512" cy="900" r="34" fill="#36e9ff"/>
+  <rect x="388" y="430" width="84" height="50" rx="18" fill="#79f4ff" fill-opacity="0.32" stroke="#79f4ff" stroke-width="7"/>
+  <rect x="552" y="430" width="84" height="50" rx="18" fill="#79f4ff" fill-opacity="0.32" stroke="#79f4ff" stroke-width="7"/>
+</svg>

@@ -41,3 +41,14 @@ For required GitHub Actions signing secrets and setup notes, see `docs/ci/androi
 - If workflow status cannot be queried because runtime auth is missing, mark the gate as
   **not verifiable (token unavailable)** and follow `docs/project/gh-cli-auth.md`
   (Token-less CI verification fallback playbook). Do **not** classify this as CI failing.
+
+
+## Release-facing docs maintenance
+- On each release (or at minimum every 5 releases), review and refresh user-facing release docs: `README.md`, `INSTALL.md`, and `docs/releases.md`.
+- Remove stale/manual release links in README and rely on the repository main page + latest-release automation paths.
+- Keep release notes concise: end-user changes, developer changes, known limitations.
+
+## Codex local check policy
+- In Codex/offline environments, avoid `./gradlew` checks that require wrapper downloads.
+- Prefer smallest offline-capable checks first (for example: `gradle` if available locally, targeted `npm`/script checks, and static file validation).
+- Do not change GitHub workflow validation behavior just to satisfy local Codex constraints.
