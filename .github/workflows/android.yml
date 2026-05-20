@@ -134,15 +134,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION_NAME=$(awk -F'"' '/versionName =/{print $2; exit}' app/build.gradle.kts)
-          VERSION_CODE=$(awk '/versionCode =/{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/){print $i; exit}}' app/build.gradle.kts)
+          if [ -x ./gradlew ]; then
+            METADATA_OUTPUT="$(./gradlew -q :app:printResolvedVersionMetadata --no-daemon)"
+          else
+            METADATA_OUTPUT="$(gradle -q :app:printResolvedVersionMetadata --no-daemon)"
+          fi
+          VERSION_NAME="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_NAME=//p' | tail -n1)"
+          VERSION_CODE="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
           SHORT_SHA="${GITHUB_SHA::7}"
           if [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then
-            echo "::warning::Formal version metadata unavailable; artifact naming will fall back to short SHA only."
-            VERSION_NAME="unknown"
-            VERSION_CODE="0"
+            echo "::error::Failed to extract VERSION_NAME/VERSION_CODE from Gradle output."
+            echo "::error::Raw metadata output:"
+            printf '%s\n' "$METADATA_OUTPUT"
+            exit 1
           fi
-          if [[ "${{ needs.preflight.outputs.is_tag_release }}" == "true" && "$VERSION_NAME" != "unknown" ]]; then
+          if [[ "${{ needs.preflight.outputs.is_tag_release }}" == "true" ]]; then
             if [[ "${{ needs.preflight.outputs.release_tag }}" != "v${VERSION_NAME}" ]]; then
               echo "::error::Tag ${{ needs.preflight.outputs.release_tag }} conflicts with versionName $VERSION_NAME"; exit 1
             fi

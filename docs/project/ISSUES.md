@@ -488,3 +488,21 @@ Failed to download Android command-line tools.
 - Versions/environment: UTC container on 2026-05-20; local shell has no GitHub-hosted runner execution context for end-to-end Actions validation.
 - Status: Incomplete
 - Next action: Run `android.yml` from a merge commit on `main` in a test repository and confirm prerelease updates existing/created `latest` release without missing-tag failure.
+
+### 2026-05-20T02:14:02Z — Gradle-driven Android metadata extraction in workflow
+- Context:
+  - Replaced awk parsing of `app/build.gradle.kts` in `.github/workflows/android.yml` with a Gradle task that emits resolved `VERSION_NAME` and `VERSION_CODE` values.
+- Commands run:
+  - `sed -n '1,260p' app/build.gradle.kts`
+  - `sed -n '1,260p' .github/workflows/android.yml`
+  - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/android.yml"); puts "yaml ok"'`
+  - `git diff -- app/build.gradle.kts .github/workflows/android.yml`
+- Observed output/errors:
+  - Added `printResolvedVersionMetadata` task that prints deterministic `VERSION_NAME=...` and `VERSION_CODE=...` lines from resolved Gradle model values.
+  - Workflow metadata step now runs Gradle task (`./gradlew` or `gradle` fallback), parses deterministic output, and exits with `::error::` + `exit 1` when metadata is missing.
+  - Tag validation remains strict (`release_tag` must equal `v${VERSION_NAME}` for tag releases).
+- Versions/environment:
+  - UTC container on 2026-05-20; YAML validated locally via Ruby parser.
+- Status: Complete
+- Next action:
+  - Verify on GitHub-hosted runner that metadata extraction step logs expected values and proceeds through debug/release assemble in real CI.

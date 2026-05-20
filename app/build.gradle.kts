@@ -103,3 +103,18 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
+
+tasks.register("printResolvedVersionMetadata") {
+    group = "help"
+    description = "Print resolved VERSION_NAME and VERSION_CODE for CI metadata extraction."
+    doLast {
+        val resolvedVersionName = android.defaultConfig.versionName
+            ?: throw GradleException("Resolved versionName is null.")
+        val resolvedVersionCode = android.defaultConfig.versionCode
+        if (resolvedVersionCode <= 0) {
+            throw GradleException("Resolved versionCode must be > 0 (was $resolvedVersionCode).")
+        }
+        println("VERSION_NAME=$resolvedVersionName")
+        println("VERSION_CODE=$resolvedVersionCode")
+    }
+}
