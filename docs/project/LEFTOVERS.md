@@ -1,11 +1,9 @@
 # LEFTOVERS
 
-- Blocker: `GH_TOKEN`/`GITHUB_TOKEN`/`GH_Token` are not present in this session environment, so `gh auth login --with-token` cannot run.
+- Blocker: No GitHub auth token is currently injected in this container, so CI workflow status cannot be queried.
 - Relevant files:
-  - `scripts/gh-auto-auth.sh`
-  - `docs/project/gh-cli-auth.md`
-  - `docs/project/LEFTOVERS.md`
+  - `.github/workflows/android.yml`
+  - `scripts/check-android-ci-health.sh`
 - Exact next action:
-  1. Launch Codex with one of these env vars set to a PAT: `GH_TOKEN` (preferred), `GITHUB_TOKEN`, or `GH_Token`.
-  2. Run `./scripts/gh-auto-auth.sh && gh auth status --hostname github.com`.
-  3. Run `./scripts/gh-auto-auth-bootstrap.sh` once to persist auto-login on new shells.
+  1. Inject `GH_TOKEN` or `GITHUB_TOKEN` into runtime env (or write token to `~/.config/gh/token`).
+  2. Run `./scripts/check-android-ci-health.sh main` and record the run URL/outcome.
