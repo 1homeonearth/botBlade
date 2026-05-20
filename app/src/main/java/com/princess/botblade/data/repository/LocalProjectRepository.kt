@@ -5,6 +5,13 @@ import org.json.JSONObject
 import java.io.File
 
 class LocalProjectRepository(private val context: Context) {
+    data class LocalProjectSummary(
+        val id: String,
+        val name: String,
+        val lastModified: Long,
+        val status: String,
+    )
+
     fun createProject(projectName: String, templateAssetDir: String): File {
         val projectRoot = File(context.filesDir, "projects/$projectName")
         projectRoot.mkdirs()
@@ -30,4 +37,33 @@ class LocalProjectRepository(private val context: Context) {
             copyAssetDirectory(childAssetPath, File(destination, child))
         }
     }
+
+    fun listProjects(): List<LocalProjectSummary> {
+        val projectsRoot = File(context.filesDir, "projects")
+        if (!projectsRoot.exists()) return emptyList()
+        return projectsRoot.listFiles()
+            .orEmpty()
+            .filter { it.isDirectory }
+            .sortedByDescending { it.lastModified() }
+            .map { directory ->
+                LocalProjectSummary(
+                    id = directory.name,
+                    name = directory.name,
+                    lastModified = directory.lastModified(),
+                    status = "Ready",
+                )
+            }
+    }
+
+    fun findProjectByName(projectName: String): LocalProjectSummary? =
+        listProjects().firstOrNull { it.name == projectName }
+
+    fun renameProject(projectId: String, newName: String): Boolean {
+        val current = File(context.filesDir, "projects/$projectId")
+        val renamed = File(context.filesDir, "projects/$newName")
+        return current.exists() && !renamed.exists() && current.renameTo(renamed)
+    }
+
+    fun deleteProject(projectId: String): Boolean =
+        File(context.filesDir, "projects/$projectId").deleteRecursively()
 }
