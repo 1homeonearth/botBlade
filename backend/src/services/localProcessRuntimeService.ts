@@ -22,6 +22,7 @@ interface RuntimeRecord {
 
 export class LocalProcessRuntimeService {
   private readonly runtimes = new Map<string, RuntimeRecord>();
+  private static readonly MAX_LOG_BYTES = 256 * 1024;
 
   constructor(private readonly files: ProjectFileService, private readonly getSecretValue: (secretId: string) => string | undefined) {}
 
@@ -43,7 +44,7 @@ export class LocalProcessRuntimeService {
     const cwd = this.files.workspace(project.id);
     record.status = { ...record.status, status: "starting", running: false, message: "Bot runtime is starting." };
     this.append(record, "Starting generated bot runtime.");
-    const child = spawn("npm", ["start"], { cwd, shell: false, env: { ...process.env, DISCORD_TOKEN: token } });
+    const child = spawn("npm", ["start"], { cwd, shell: false, env: { ...allowedEnv(), DISCORD_TOKEN: token } });
     record.child = child;
     record.status = { projectId: project.id, status: "running", running: true, pid: child.pid ?? null, startedAt: new Date().toISOString(), lastExitCode: null, message: "Bot runtime is running." };
     child.stdout.on("data", (chunk) => this.append(record, String(chunk).trimEnd()));
@@ -88,8 +89,16 @@ export class LocalProcessRuntimeService {
   }
 
   private append(record: RuntimeRecord, line: string): void {
-    record.logs += `${redactSecrets(line)}\n`;
+    const next = `${record.logs}${redactSecrets(line)}\n`;
+    record.logs = next.length > LocalProcessRuntimeService.MAX_LOG_BYTES ? `[truncated]\n${next.slice(-LocalProcessRuntimeService.MAX_LOG_BYTES)}` : next;
   }
+}
+
+function allowedEnv(): Record<string, string> {
+  const keys = ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "CI"];
+  const env: Record<string, string> = {};
+  for (const key of keys) if (process.env[key]) env[key] = process.env[key] as string;
+  return env;
 }
 
 function structuredError(code: string, message: string): never {

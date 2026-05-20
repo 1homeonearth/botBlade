@@ -27,14 +27,17 @@ concurrency:
 jobs:
   lint-workflow:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      - name: Install actionlint
-        shell: bash
-        run: bash <(curl -Ls https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+      - name: Setup actionlint
+        uses: reviewdog/action-actionlint@eae4ecd8c66737642cb1445fa059c2506208bcd2 # v1.57.0
+        with:
+          actionlint_flags: -version
       - name: Lint android workflow
         shell: bash
-        run: ./actionlint .github/workflows/android.yml
+        run: actionlint .github/workflows/android.yml
 
   preflight:
     runs-on: ubuntu-latest
@@ -66,6 +69,9 @@ jobs:
       - id: mode
         name: Resolve release mode
         shell: bash
+        env:
+          INPUT_RELEASE_MODE: ${{ github.event.inputs.release_mode }}
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
           SHOULD_RELEASE=false
@@ -83,8 +89,8 @@ jobs:
             RELEASE_TAG="${GITHUB_REF_NAME}"
             IS_TAG_RELEASE=true
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            MODE="${{ github.event.inputs.release_mode }}"
-            INPUT_TAG="${{ github.event.inputs.release_tag }}"
+            MODE="${INPUT_RELEASE_MODE:-}"
+            INPUT_TAG="${INPUT_RELEASE_TAG:-}"
             case "$MODE" in
               build-only) ;;
               prerelease)
@@ -93,8 +99,8 @@ jobs:
                 RELEASE_TAG="latest"
                 ;;
               versioned-release)
-                if [[ -z "$INPUT_TAG" || ! "$INPUT_TAG" =~ ^v ]]; then
-                  echo "::error::workflow_dispatch versioned-release requires release_tag starting with v";
+                if [[ ! "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+                  echo "::error::workflow_dispatch versioned-release requires release_tag like v1.2.3 or v1.2.3-rc.1";
                   exit 1
                 fi
                 SHOULD_RELEASE=true
@@ -107,10 +113,46 @@ jobs:
             esac
           fi
 
-          echo "should_release=$SHOULD_RELEASE" >> "$GITHUB_OUTPUT"
-          echo "release_kind=$RELEASE_KIND" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-          echo "is_tag_release=$IS_TAG_RELEASE" >> "$GITHUB_OUTPUT"
+          {
+            echo "should_release<<EOF"
+            echo "$SHOULD_RELEASE"
+            echo "EOF"
+            echo "release_kind<<EOF"
+            echo "$RELEASE_KIND"
+            echo "EOF"
+            echo "release_tag<<EOF"
+            echo "$RELEASE_TAG"
+            echo "EOF"
+            echo "is_tag_release<<EOF"
+            echo "$IS_TAG_RELEASE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  pr-comment-on-success:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'pull_request' && needs.build.result == 'success'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Sticky PR artifact comment (best effort)
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        continue-on-error: true
+        with:
+          script: |
+            const marker = '<!-- bot-blade-apk-build-comment -->';
+            const body = `${marker}
+            ✅ **APK build succeeded**
+            - \`botBlade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-${{ needs.build.outputs.short_sha }}-debug-apk\`
+            - \`botBlade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-${{ needs.build.outputs.short_sha }}-release-unsigned-apk\`
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Download the debug APK from this workflow run’s **Artifacts** section.`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number, body });
 
   build:
     runs-on: ubuntu-latest
@@ -118,7 +160,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      pull-requests: write
     outputs:
       app_version_name: ${{ steps.meta.outputs.app_version_name }}
       app_version_code: ${{ steps.meta.outputs.app_version_code }}
@@ -258,42 +299,6 @@ jobs:
             - botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
           - Downloads: Use this run's **Artifacts** section. Debug APK is for testers; unsigned release APK is test-only.
           EOF
-      - name: Sticky PR artifact comment (best effort)
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        continue-on-error: true
-        with:
-          script: |
-            const marker = '<!-- bot-blade-apk-build-comment -->';
-            const body = `${marker}
-            ✅ **APK build succeeded**
-            - \`botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk\`
-            - \`botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk\`
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            Download the debug APK from this workflow run’s **Artifacts** section.`;
-            const issue_number = context.payload.pull_request.number;
-            const { owner, repo } = context.repo;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number
-            });
-            const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body
-              });
-            }
 
   check-signing:
     runs-on: ubuntu-latest
