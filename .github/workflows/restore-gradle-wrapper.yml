@@ -1,0 +1,60 @@
+name: Restore Gradle Wrapper JAR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore-wrapper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: true
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+        with:
+          gradle-version: "8.14.4"
+
+      - name: Restore Gradle wrapper files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gradle wrapper --gradle-version 8.14.4 --distribution-type bin
+
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          test -x gradlew
+
+          ./gradlew --version
+          ./gradlew :app:processDebugMainManifest :app:processReleaseMainManifest --no-daemon
+
+      - name: Commit restored wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties gradlew gradlew.bat
+
+          if git diff --cached --quiet; then
+            echo "No Gradle wrapper changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Restore Gradle wrapper binary"
+          git push
