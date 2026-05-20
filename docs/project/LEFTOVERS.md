@@ -1,8 +1,25 @@
 # LEFTOVERS
 
 ## Remaining work requiring GitHub-hosted execution
-1. Trigger the Android workflow on GitHub for `pull_request`, `push` to `main`, and a `v*` tag and record run URLs as evidence.
-2. Verify live release assets and checksums in a real run (`bot-blade.apk`, versioned aliases, `SHA256SUMS.txt`, `release.json`, `INSTALL.md`).
-3. Verify live attestation behavior in signed runs.
-4. Complete the separate Android UI polish pass and attach screenshots in README.
-5. Optional: add emulator smoke test if stable on runners.
+1. Trigger Android workflow for `pull_request` and `push` to `main`; capture run URLs.
+2. Verify wrapper fallback behavior:
+   - with `./gradlew` present+executable path
+   - with wrapper missing/non-executable path (uses `gradle`)
+3. Verify `assembleDebug` and `assembleRelease` complete in both required runs.
+4. Verify release artifacts/checksums (`bot-blade.apk`, aliases, `SHA256SUMS.txt`, `release.json`, `INSTALL.md`).
+5. Verify attestation outputs in signed runs.
+6. Complete Android UI polish screenshot pass in README.
+
+## Session notes (2026-05-20)
+- Completed:
+  - Removed binary `gradle/wrapper/gradle-wrapper.jar` to satisfy binary-restricted PR channels.
+  - Updated `.github/workflows/android.yml` preflight to warn (not fail) when `./gradlew` is absent.
+  - Updated build step to use wrapper when available, else fallback to system `gradle`.
+- Commands run:
+  - `rm -f gradle/wrapper/gradle-wrapper.jar`
+- Current blockers:
+  - Cannot run GitHub Actions from this container (`gh` CLI unavailable and no GitHub UI access from here).
+- Exact continuation:
+  1. Open PR and confirm it is accepted without binary artifacts.
+  2. Run workflow on PR and main push; store URLs and outcomes in `docs/project/ISSUES.md`.
+  3. If hosted runners lack system gradle, re-add text-only instructions or wrapper support strategy based on runner capabilities.

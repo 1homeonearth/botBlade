@@ -2,6 +2,46 @@
 
 ## 2026-05-18T07:05:04Z — Android SDK unavailable in current shell
 
+### 2026-05-20T02:30:00Z — PR blocked by binary wrapper JAR policy; switched CI to wrapper-or-gradle fallback
+- Context: User reported PR creation blocked because binary files are not supported by their PR channel.
+- Commands run:
+  - `rm -f gradle/wrapper/gradle-wrapper.jar`
+  - edited `.github/workflows/android.yml` preflight/build steps to avoid hard-failing when `./gradlew` is missing and to fallback to `gradle` for assemble tasks.
+- Observed output/errors: No local YAML/runtime errors observed during edit; full workflow execution still requires GitHub-hosted runners.
+- Versions/environment: UTC container on 2026-05-20; no `gh` CLI available locally.
+- Status: Incomplete
+- Next action: Push branch and verify PR/main runs succeed with fallback path when wrapper JAR is absent.
+
+### 2026-05-20T02:05:00Z — LEFTOVERS completion retry blocked by Gradle distribution proxy
+- Context: Attempted to finish remaining LEFTOVERS verification by running wrapper-based Android assemble tasks from this session.
+- Commands run:
+  - `./gradlew :app:assembleDebug :app:assembleRelease --stacktrace`
+- Observed output/errors: wrapper bootstrap failed before tasks with `Unable to tunnel through proxy. Proxy returns "HTTP/1.1 403 Forbidden"` when downloading `https://services.gradle.org/distributions/gradle-8.14.4-bin.zip`.
+- Versions/environment: Java 21, wrapper distribution `gradle-8.14.4-bin.zip`, UTC container 2026-05-20, outbound proxy-restricted network.
+- Status: Incomplete
+- Next action: execute remaining GitHub-hosted workflow checks in a network-allowed runner, then attach run URLs/artifact verification evidence.
+
+### 2026-05-20T01:40:00Z — Wrapper hardening retry after failed tests
+- Context: Follow-up request indicated tests failed after wrapper restoration; removed relaxed wrapper URL validation to align with secure defaults.
+- Commands run:
+  - `./gradlew --version`
+- Observed output/errors: `./gradlew --version` still cannot complete in this container because Gradle distribution download to `services.gradle.org` is blocked by proxy `HTTP/1.1 403 Forbidden`; this is independent from wrapper property hardening.
+- Versions/environment: Java 21, Gradle wrapper 8.14.4, UTC container on 2026-05-20 with outbound proxy restriction.
+- Status: Incomplete
+- Next action: Run `./gradlew --version` and Android assemble tasks on a network-allowed runner to confirm wrapper bootstrap and CI pass.
+
+### 2026-05-20T00:00:00Z — Gradle wrapper restoration verification in proxy-limited shell
+- Context: Restored repository Gradle wrapper files and ran the requested `./gradlew` verification after wrapper generation.
+- Commands run:
+  - `gradle wrapper --gradle-version 8.10.2`
+  - `gradle wrapper --gradle-version 8.14.4`
+  - `gradle wrapper --gradle-version 8.14.4 --no-validate-url`
+  - `./gradlew --version`
+- Observed output/errors: wrapper generation succeeded only with `--no-validate-url`; `./gradlew --version` failed downloading `https://services.gradle.org/distributions/gradle-8.14.4-bin.zip` with `Unable to tunnel through proxy ... 403 Forbidden`.
+- Versions/environment: Gradle launcher 8.14.4, Java 21, UTC container on 2026-05-20 with outbound proxy restrictions.
+- Status: Incomplete
+- Next action: In a network-allowed environment, run `./gradlew --version` (or any Gradle task) to allow wrapper distribution download and confirm wrapper-based Android build commands.
+
 - **Repeat occurrence 2026-05-19T06:20:00Z:** Pre-session unresolved issue review reran Android SDK preflight before README/docs coherence pass.
   - Command: `./scripts/android-sdk-preflight.sh`
   - Result: `Android SDK preflight failed: ANDROID_HOME is not set and no sdk.dir was found in local.properties.`
