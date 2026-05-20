@@ -72,4 +72,21 @@ assert_contains "$tmp_home/.bash_profile" "case \$- in"
 assert_contains "$tmp_home/.bash_profile" "*i*)"
 
 
+
+cat > "$tmp_home/.bash_profile" <<'PROFILE'
+# user preface
+# >>> gh-auto-auth bashrc bridge >>>
+if [ -f "$HOME/.bashrc" ]; then
+  source "$HOME/.bashrc"
+fi
+# <<< gh-auto-auth bashrc bridge <<<
+# user suffix
+PROFILE
+HOME="$tmp_home" "$script" >/dev/null
+HOME="$tmp_home" "$script" >/dev/null
+assert_count "$tmp_home/.bash_profile" "# >>> gh-auto-auth bashrc bridge >>>" 1
+assert_contains "$tmp_home/.bash_profile" "case \$- in"
+assert_contains "$tmp_home/.bash_profile" "*i*)"
+assert_contains "$tmp_home/.bash_profile" 'source "$HOME/.bashrc"'
+
 echo "gh-auto-auth-bootstrap tests passed"
