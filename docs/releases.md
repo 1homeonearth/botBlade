@@ -1,44 +1,40 @@
-# Android releases and APK artifacts
+# BotBlade Releases
 
-## Trigger behavior
+This project publishes Android artifacts from GitHub Actions (`.github/workflows/android.yml`).
 
-## Naming convention
-- **botBlade** refers to the repository/workflow artifact namespace.
-- **BotBlade** refers to the Android app name shown to users and in release titles.
+## Channels
 
-- `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`): builds debug + unsigned release APKs and uploads workflow artifacts.
-- `push` to `main`: builds APKs and publishes a prerelease channel (`latest`) with release assets.
-- `push` tags matching `v*`: builds APKs and publishes a normal versioned GitHub Release.
-- `workflow_dispatch`: supports `build-only`, `prerelease`, and `versioned-release` modes.
+- **`main` branch pushes:** update rolling prerelease channel (`latest`).
+- **`v*` tags:** publish immutable versioned releases.
+- **Pull requests:** produce downloadable CI artifacts (debug + unsigned release APKs).
 
-## Signing secrets
-- `KEYSTORE_BASE64`
-- `KEYSTORE_PASSWORD`
-- `KEY_ALIAS`
+## Standard release assets
 
-If missing, PR builds still succeed. Versioned release publishing fails before publication if signing is unavailable.
-
-## Public release assets
-- `bot-blade.apk` (stable signed user download)
-- `bot-blade-vVERSION-VERSIONCODE-signed.apk`
+- `bot-blade.apk` (primary user APK)
 - `bot-blade-debug.apk`
+- `bot-blade-vVERSION-VERSIONCODE-signed.apk`
 - `bot-blade-vVERSION-VERSIONCODE-debug.apk`
 - `SHA256SUMS.txt`
 - `release.json`
 - `INSTALL.md`
 
-## PR artifacts
-- `botBlade-...-debug-apk`
-- `botBlade-...-release-unsigned-apk`
-- `botBlade-...-checksums`
+## Release notes policy
 
-Artifacts are available in the workflow run **Artifacts** section.
+Each release should include notes covering:
 
-## Checksum and metadata generation
-The workflow selects final release assets explicitly, generates `SHA256SUMS.txt` only from selected assets, validates with `sha256sum -c`, then uploads exactly that list. `release.json` captures version/build metadata and SHA-256 hashes.
+1. End-user changes (UI, onboarding, behavior)
+2. Developer changes (build, backend, tooling)
+3. Known limitations and migration notes
 
-## Manual recovery
-If a release run fails:
-1. Open the failed Actions run and inspect the step summary.
-2. Fix signing/version mismatch or missing assets.
-3. Re-run with `workflow_dispatch` and the correct mode/tag.
+After every release, sync release-facing docs when relevant:
+
+- `README.md`
+- `INSTALL.md`
+- `docs/releases.md`
+
+## If release fails
+
+1. Open the failed workflow run.
+2. Inspect failing job logs and artifact selection output.
+3. Correct signing/version/input issues.
+4. Re-run with `workflow_dispatch` in the correct mode.
