@@ -19,6 +19,9 @@ val hasReleaseSigningConfig = listOf(
     releaseKeyAlias,
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
+val gitShaProvider = providers.exec {
+    commandLine("git", "rev-parse", "--short=12", "HEAD")
+}.standardOutput.asText.map { it.trim() }.orElse("unknown")
 
 android {
     namespace = "com.princess.botblade"
@@ -36,6 +39,7 @@ android {
         require(resolvedVersionSeq > 0) { "VERSION_SEQ must be > 0 (was $resolvedVersionSeq)." }
         versionCode = providers.gradleProperty("VERSION_CODE").orNull?.toInt() ?: resolvedVersionSeq
         versionName = providers.gradleProperty("VERSION_NAME").orNull ?: "0.${"%03d".format(resolvedVersionSeq)}"
+        buildConfigField("String", "GIT_SHA", "\"${gitShaProvider.get()}\"")
     }
 
     signingConfigs {
@@ -105,6 +109,9 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 

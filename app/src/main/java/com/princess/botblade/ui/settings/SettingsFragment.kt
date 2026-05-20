@@ -2,6 +2,7 @@ package com.princess.botblade.ui.settings
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.content.Context
 import android.os.Bundle
 import android.text.InputType
@@ -17,7 +18,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.princess.botblade.BuildConfig
 import com.princess.botblade.R
+import com.princess.botblade.StartupDiagnostics
 import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.data.api.ApiResult
 import com.princess.botblade.data.api.BotBladeApiClient
@@ -83,6 +86,7 @@ class SettingsFragment : Fragment() {
         apiStatus = view.findViewById(R.id.api_settings_status)
         backendUrlInput = view.findViewById(R.id.backend_url_input)
         testConnectionButton = view.findViewById(R.id.test_backend_connection_button)
+        val shareDiagnosticsButton = view.findViewById<Button>(R.id.share_startup_diagnostics_button)
         list = view.findViewById(R.id.secrets_list_container)
         nameInput = view.findViewById(R.id.secret_name_input)
         typeInput = view.findViewById(R.id.secret_type_input)
@@ -106,6 +110,10 @@ class SettingsFragment : Fragment() {
         githubBranchInput.setText("main")
         view.findViewById<Button>(R.id.save_backend_url_button).setOnClickListener { saveBackendUrl() }
         testConnectionButton.setOnClickListener { testBackendConnection() }
+        if (BuildConfig.DEBUG) {
+            shareDiagnosticsButton.visibility = View.VISIBLE
+            shareDiagnosticsButton.setOnClickListener { shareStartupDiagnostics() }
+        }
         view.findViewById<Button>(R.id.create_secret_button).setOnClickListener { createSecret() }
         view.findViewById<Button>(R.id.connect_github_button).setOnClickListener { connectGitHub() }
         view.findViewById<Button>(R.id.link_github_repo_button).setOnClickListener { linkGitHubRepo() }
@@ -251,6 +259,20 @@ class SettingsFragment : Fragment() {
         }
     }
 
+
+    private fun shareStartupDiagnostics() {
+        val diagnostics = StartupDiagnostics.readLatest(requireActivity().application)
+        if (diagnostics.isNullOrBlank()) {
+            Toast.makeText(requireContext(), getString(R.string.startup_diagnostics_missing), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "botBlade startup diagnostics")
+            putExtra(Intent.EXTRA_TEXT, diagnostics)
+        }
+        startActivity(Intent.createChooser(intent, getString(R.string.share_startup_diagnostics)))
+    }
 
     private fun copyWorkflowInstructions() {
         val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

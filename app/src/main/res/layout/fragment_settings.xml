@@ -78,6 +78,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/test_backend_connection" />
+        <Button
+            android:id="@+id/share_startup_diagnostics_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/share_startup_diagnostics"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="match_parent"
