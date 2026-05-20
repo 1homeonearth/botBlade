@@ -1,108 +1,83 @@
 version: 1
 last_updated: "2026-05-20"
+policy:
+  anti_vendoring:
+    - Do not vendor full GPL application codebases (Termux app, OpenKeychain app) into botBlade.
+    - External app integrations are allowed via intents/providers/platform APIs with policy gates.
+  license_and_provenance_requirements:
+    - Any dependency/adopted code requires license compatibility, provenance validation, pinning, tests, attribution, and rollback plan.
 entries:
   - id: termux_app
     name: termux/termux-app
-    classification: external_app_integration
+    usage_type: external_app_integration
     status: reference_only
     license: GPL-3.0-only
     notes:
-      - Whole app is GPLv3-only.
-      - Do not vendor the full application into botBlade.
-
-  - id: termux_terminal_view
-    name: termux terminal-view
-    classification: candidate_dependency
-    status: review_required
-    license: unknown
-    notes:
-      - License and provenance review required before adoption.
-
-  - id: termux_terminal_emulator
-    name: termux terminal-emulator
-    classification: candidate_dependency
-    status: review_required
-    license: unknown
-    notes:
-      - License and provenance review required before adoption.
-
-  - id: jackpal_android_terminal_emulator
-    name: jackpal/Android-Terminal-Emulator
-    classification: reference_only
-    status: archived_reference
-    license: Apache-2.0
-    notes:
-      - Archived upstream; treat as historical reference, not active dependency.
-
-  - id: openpgp_api
-    name: open-keychain/openpgp-api
-    classification: candidate_dependency
-    status: review_required
-    license: Apache-2.0
-    notes:
-      - Provider compatibility library candidate.
+      - External integration only; no full-app vendoring.
 
   - id: open_keychain_app
     name: open-keychain/open-keychain
-    classification: external_app_integration
+    usage_type: external_app_integration
     status: reference_only
     license: GPL-3.0
     notes:
-      - External app integration only.
-      - Do not vendor the full application into botBlade.
+      - External integration only; no full-app vendoring.
+
+  - id: openpgp_api
+    name: open-keychain/openpgp-api
+    usage_type: candidate_dependency
+    status: review_required
+    license: Apache-2.0
+    notes:
+      - Candidate provider-compatibility library; requires provenance review and tests before adoption.
 
   - id: cargo_ndk
     name: cargo-ndk
-    classification: development_dependency_candidate
+    usage_type: development_dependency_candidate
     status: review_required
     license: unknown
     notes:
-      - Evaluate for Android Rust build workflows.
+      - Candidate Android Rust build helper; verify license/provenance and pin version.
 
-  - id: android_keystore
-    name: Android Keystore
-    classification: platform_feature
+  - id: android_platform_features
+    name: Android platform security/storage features
+    usage_type: platform_feature_bundle
     status: candidate
     license: platform
+    components:
+      - Android Keystore
+      - Android Storage Access Framework (SAF)
     notes:
-      - Candidate for secure key material operations.
+      - Prefer platform APIs over vendored app internals for key and file operations.
 
-  - id: android_saf
-    name: Android Storage Access Framework
-    classification: platform_feature
-    status: candidate
-    license: platform
-    notes:
-      - Candidate for controlled file import/export access.
-
-  - id: github_integration
+  - id: github
     name: GitHub
-    classification: commercial_integration_candidate
+    usage_type: commercial_service_integration_candidate
     status: review_required
     license: service_terms
     notes:
-      - Candidate for repo and workflow integration.
+      - Integrate via approved APIs/tokens with bounded scopes and audit.
 
-  - id: password_manager_integrations
+  - id: password_managers
     name: 1Password / Bitwarden / Proton Pass
-    classification: commercial_integration_candidate
+    usage_type: commercial_service_integration_candidate
     status: review_required
     license: service_terms
     notes:
-      - Integrate via Android Autofill or explicit handoff only.
+      - Use autofill or explicit handoff flows; avoid raw secret persistence.
 
-  - id: cloud_storage_integrations
+  - id: cloud_storage
     name: Google Drive / Dropbox / OneDrive
-    classification: commercial_integration_candidate
+    usage_type: commercial_service_integration_candidate
     status: review_required
     license: service_terms
     notes:
-      - Integrate via SAF, share, or export flows.
+      - Use SAF/share/export flows with scope-limited user consent.
 
-  - id: messaging_integrations
+  - id: messaging_platforms
     name: Slack / Discord / Telegram
-    classification: commercial_integration_candidate
+    usage_type: commercial_service_integration_candidate
     status: review_required
     license: service_terms
     notes:
-      - Integrate via intents, deep links, or share flows.
+      - Support intent/deep-link/share patterns and policy-gated export behavior.

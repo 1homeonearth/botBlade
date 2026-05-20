@@ -1,73 +1,63 @@
 # 05 — Implementation Roadmap
 
-## Phase 0: Documentation groundwork (current)
+## Phase 0 — Manual foundation **[Implemented]**
 
-Deliverables:
-- Security design manual files.
-- Upstream registry seed (`upstreams.yml`).
-- Agent instructions to enforce manual-first edits.
+- Manual set created and normalized.
+- `upstreams.yml` seeded and tracked.
+- Root agent guidance requires manual review/sync.
 
 Exit criteria:
-- Manual committed and referenced by root `AGENTS.md`.
+- Manual and AGENTS guardrails merged.
 
-## Phase 1: Rust validation foundation
-
-Scope:
-- Create Rust crates/modules for path normalization, archive inspection, manifest schema checks, and policy evaluation scaffold.
-- Define canonical verdict artifact schema.
-
-Checks:
-- Unit tests for path traversal, malformed archives, and manifest violations.
-- Golden tests for verdict serialization.
-
-## Phase 2: Policy gates and sandbox enforcement
+## Phase 1 — Rust validation foundation **[Planned]**
 
 Scope:
-- Wire gates before build/runtime/deploy/terminal/module/external-intent actions.
-- Implement deny-by-default enforcement and policy versioning.
+- Rust path/archive/manifest/policy primitives.
+- Canonical verdict schema + deterministic serialization.
 
-Checks:
-- Gate pass/deny matrix tests.
-- Sandbox profile compatibility tests.
-- Secret redaction tests across logs and diagnostics.
+Required tests:
+- path traversal, malformed archive, manifest violation, deny-by-default.
 
-## Phase 3: Terminal and external integration hardening
+## Phase 2 — Policy and sandbox gates **[Planned]**
 
 Scope:
-- Implement command preview/approval flow.
-- Add policy-gated Termux intent handoff integration.
-- Add OpenPGP provider compatibility paths.
+- Enforce gates before build/runtime/deploy/terminal/module/external-intent.
+- Implement capability-scoped sandbox contracts.
 
-Checks:
-- Terminal command-plan validation tests.
-- External intent allow/deny tests.
-- Redacted terminal audit output tests.
+Required tests:
+- gate decision matrix, profile compatibility, redaction coverage.
 
-## Phase 4: Module system and upstream controls
+## Phase 3 — Terminal and external hardening **[Planned]**
 
 Scope:
-- Implement module manifest and lifecycle gates.
-- Enforce upstream governance automation tied to `upstreams.yml`.
+- command preview/approval pipeline
+- policy-gated Termux handoff
+- OpenPGP provider compatibility path
 
-Checks:
-- Module install/update/rollback tests.
-- Upstream policy compliance checks (license/provenance/pinning/test presence).
+Required tests:
+- command-plan validation, intent allow/deny, terminal audit redaction.
 
-## Phase 5: Performance and compatibility stabilization
+## Phase 4 — Module and upstream enforcement **[Planned]**
 
 Scope:
-- Enable validation caching and incremental revalidation.
-- Verify Discord behavior parity while expanding universal workload features.
+- module lifecycle gate automation
+- policy checks linked to `upstreams.yml`
 
-Checks:
-- Cache hit/miss performance benchmarks.
-- Discord regression suite.
-- Cross-workload compatibility smoke tests.
+Required tests:
+- module lifecycle and upstream governance checks.
 
-## Ongoing definition of done
+## Phase 5 — Performance and compatibility **[Planned]**
 
-For security-relevant changes, include:
-- design doc updates
-- policy/gate tests
-- no-secret-exposure validation
-- upstream metadata updates when dependencies/integrations change
+Scope:
+- verdict caching + incremental revalidation
+- Discord behavior parity during universal workload expansion
+
+Required tests:
+- cache hit/miss benchmarks, Discord regression suite, cross-workload smoke tests.
+
+## Definition of done (security-sensitive changes)
+
+- manual updated in same PR
+- gates and redaction tests updated
+- `upstreams.yml` updated for upstream/integration changes
+- no raw secrets introduced

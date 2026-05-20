@@ -1,57 +1,52 @@
 # 02 — Security Policy and Sandboxing
 
-## Policy model
+## Policy framework
 
-botBlade policy is explicit, versioned, and environment-aware.
+- **[Mixed]** Policy is explicit and versioned; full gate coverage remains roadmap work.
+- Layers: baseline policy, environment overlay, workload profile overlay, bounded session override.
+- Conflict rule: most restrictive outcome wins.
 
-Policy layers:
-- Global baseline policy (immutable defaults for critical safety).
-- Deployment/environment overlays (dev/staging/prod/mobile/server).
-- Workload profile overlays (language/runtime/module needs).
-- Session overrides (strictly bounded, audited, and time-limited).
+## Mandatory gates
 
-Conflict rule: most restrictive decision wins.
+Security gates must execute before:
 
-## Mandatory security gates
+- build actions (`build_gate`)
+- runtime activation (`runtime_gate`)
+- deployment actions (`deploy_gate`)
+- terminal sessions and privileged commands (`terminal_gate`)
+- module install/enable/update/remove (`module_gate`)
+- external handoffs/intents (`external_intent_gate`)
 
-Security policy gates must run before:
-- Build execution
-- Runtime activation
-- Deployment actions
-- Terminal session start or privileged command execution
-- Module install/enable/update
-- External intents/app handoffs
+Gate invariants:
+- deny-by-default
+- explicit capability grants only
+- fail-closed for malformed, unsigned, unknown, or profile-mismatched policy inputs
 
-A gate must deny by default when required evidence is missing.
+## Sandbox policy requirements
 
-## Sandbox requirements
-
-- Sandbox policy must be evaluated by Rust policy engine.
-- Sandboxes should apply least privilege for filesystem, process, network, IPC, and external app intents.
-- Gate decisions must include explicit capability grants, not implicit defaults.
-- Fail closed on profile mismatch, malformed manifest, or unsigned/unknown policy artifacts.
+- **[Planned]** Rust policy engine evaluates sandbox capability sets.
+- Least privilege applies to filesystem, process, network, IPC, and external-intent scopes.
+- Capability inheritance across sessions is denied unless explicitly authorized.
 
 ## Secret handling policy
 
-- Secrets are referenced, not embedded.
-- Values are injected only through explicit policy-approved channels.
-- Secrets are redacted in logs, traces, crash reports, terminal previews, and diagnostics.
-- Secret scope includes TTL, destination binding, and purpose tagging.
-- Secret exposure attempts (accidental or malicious) trigger deny+audit.
+- **[Implemented]** No raw secret values in logs/docs/tests/artifacts.
+- **[Planned]** Secret references include TTL, destination binding, and purpose tags.
+- **[Planned]** Exposure attempts trigger deny + audit.
 
-## Repo import and archive safety
+## Import and archive safety gates
 
-- Repo import treats all content as untrusted.
-- Analysis runs without executing imported scripts, hooks, builds, or binaries.
-- Archive validation blocks path traversal, symlink escapes, decompression bombs, and manifest mismatch.
-- Extraction is allowed only after gate approval and destination sandbox binding.
+- `repo_import_gate`: untrusted by default; no scripts/hooks/build execution during analysis.
+- `archive_safety_gate`: blocks traversal, symlink escapes, decompression bombs, manifest mismatch.
+- `extraction_gate`: allows extraction only after approved destination + profile binding.
 
-## Auditing and observability
+## Audit requirements
 
-Gate system must produce:
-- deterministic audit IDs
-- policy version + module version
-- decision summary + redacted rationale
-- escalation path for manual review
+Audit records must include deterministic audit IDs, policy version, gate verdict, and redacted rationale.
 
-Telemetry must never include raw secret values.
+## Test requirements
+
+- Gate matrix tests (allow/deny/review).
+- Sandbox profile compatibility tests.
+- Secret redaction tests (logs, diagnostics, terminal previews).
+- Archive safety tests (traversal, symlink, bomb-shape fixtures).

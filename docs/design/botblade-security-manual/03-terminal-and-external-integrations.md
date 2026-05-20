@@ -1,54 +1,51 @@
 # 03 — Terminal and External Integrations
 
-## Terminal architecture
+## Terminal control model
 
-Terminal support is allowed, but shells are high-risk and must be policy-gated.
+- **[Mixed]** Terminal support exists/expected; full policy-gated command lifecycle is planned hardening work.
+- Shell execution is high-risk and must be gate-controlled.
 
 ### Terminal planes
 
-1. **Preview plane**
-   - Render command plan and environment diff before execution.
-   - Redact secrets and sensitive paths by default.
-2. **Execution plane**
-   - Execute only policy-approved command plans.
-   - Enforce sandbox profile and runtime capability boundaries.
-3. **Audit plane**
-   - Record structured, redacted execution metadata and decisions.
+1. `terminal_preview_plane` — show command plan + env diff with redaction.
+2. `terminal_execution_plane` — run only gate-approved plans in sandbox profile.
+3. `terminal_audit_plane` — emit structured, redacted execution audit events.
 
-### Shell gating rules
+## Terminal gate definitions
 
-- Terminal session start requires gate approval.
-- Each command plan is validated before run.
-- High-risk command classes require explicit elevated policy.
-- Session inheritance of capabilities is disallowed unless policy-authorized.
+- `terminal_session_start_gate`: required before opening a session.
+- `terminal_command_plan_gate`: required for every command plan.
+- `terminal_elevation_gate`: required for high-risk command classes.
 
-## Termux integration strategy
+Constraints:
+- deny capability inheritance unless explicitly policy-approved
+- reject unsigned or profile-mismatched execution contexts
 
-Termux is treated as an external app integration, not a vendored subsystem.
+## External integration policy
 
-Requirements:
-- Command preview is explicit before any handoff.
-- Intent-based handoff is optional, explicit, and policy-controlled.
-- No full-app vendoring of `termux/termux-app`.
-- Any dependency candidate from Termux components requires license/provenance review and tests.
+### Termux
 
-## OpenPGP / OpenKeychain strategy
+- **[Implemented]** Treat Termux app as external integration (not vendored app code).
+- **[Planned]** Explicit preview + policy gate before any intent handoff.
+- **[Implemented]** No full-app vendoring of `termux/termux-app`.
 
-OpenPGP support should use provider APIs/intents where available.
+### OpenPGP / OpenKeychain
 
-Requirements:
-- Use `open-keychain/openpgp-api` style provider compatibility for cryptographic operations when appropriate.
-- Treat OpenKeychain app as external integration; do not vendor full app internals.
-- Gate key operations via policy (who/what/where), with redacted audit trails.
+- **[Planned]** Use provider API compatibility path (e.g., `open-keychain/openpgp-api`) where appropriate.
+- **[Implemented]** OpenKeychain app is external integration; no full-app vendoring.
+- **[Planned]** Gate key operations by actor/workload/destination profile.
 
-## Commercial/external app integrations
+### Commercial/service integrations
 
-Integrations (cloud storage, password managers, messaging) must use:
-- explicit user consent surfaces
-- intent/deep-link/share flows or platform-approved APIs
-- bounded data export/import scopes
-- policy gate checks before handoff
+Applies to GitHub, password managers, cloud storage, Slack/Discord/Telegram:
+- explicit user consent surface
+- bounded import/export scope
+- policy gate before handoff
+- redacted audit trail after handoff
 
-## Discord compatibility
+## Test requirements
 
-Existing Discord behavior is a compatibility baseline and must continue working while universal workload support expands.
+- Terminal command-plan validation tests.
+- Terminal redaction tests for preview/logging/audit.
+- External intent allow/deny matrix tests.
+- Regression tests preserving existing Discord behavior.

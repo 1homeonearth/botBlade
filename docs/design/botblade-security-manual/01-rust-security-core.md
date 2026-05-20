@@ -1,61 +1,55 @@
 # 01 — Rust Security Core
 
-## Purpose
+## Purpose and trust model
 
-Rust is the security core for botBlade. It owns hostile-input handling and trust decisions before higher-level app/runtime execution.
+- **[Planned]** Rust is the security core that owns hostile-input parsing and security verdicts before build/runtime/deploy execution.
+- **[Implemented]** Kotlin Android and Node/TypeScript remain product/orchestration layers.
+- **[Implemented]** Downstream layers must treat security verdict artifacts as authoritative when present.
 
-Kotlin Android and Node/TypeScript remain product layers for UX, orchestration, integrations, and workload delivery.
+## Security-critical ownership (Rust)
 
-## Trust boundaries
+The following controls are Rust-owned by design:
 
-The Rust security core is the only component allowed to:
-- Parse untrusted repo/import payloads for security verdicts.
-- Normalize paths and enforce canonical filesystem boundaries.
-- Validate archives and manifests against policy.
-- Validate command plans and repo safety profiles.
-- Evaluate policy rules used by build/runtime/deploy/terminal/integration gates.
-- Compute or verify checksums/signatures used by integrity controls.
+1. **[Planned]** Hostile-input parsing and strict decoding.
+2. **[Planned]** Path normalization and traversal prevention.
+3. **[Planned]** Archive validation without extraction side effects.
+4. **[Planned]** Manifest schema + policy validation.
+5. **[Planned]** Command/build-plan policy validation.
+6. **[Planned]** Repository safety/risk scanning.
+7. **[Planned]** Checksum/signature primitives.
+8. **[Planned]** Shared policy evaluation engine used by all gates.
 
-All other layers consume Rust-produced verdict artifacts and must not bypass them.
+## Gate definitions (core)
 
-## Security-critical Rust responsibilities
+- `import_analysis_gate` — blocks execution while repository/archive input is still untrusted.
+- `manifest_integrity_gate` — requires schema validity + policy compatibility.
+- `build_plan_gate` — validates command plans against allow/deny constraints.
+- `runtime_profile_gate` — validates runtime profile capabilities and provenance.
 
-Implement in Rust (priority order):
-1. Hostile-input parsing and strict decoding.
-2. Path normalization and traversal prevention.
-3. Archive validation (zip/tar/gzip/etc.) without extraction side effects.
-4. Manifest validation (schema + policy constraints).
-5. Command-plan validation (allowlist, denylist, argument constraints).
-6. Repo safety scanning (dangerous patterns, executable risk signals).
-7. Checksum/signature helper primitives.
-8. Policy evaluation engine used by all security gates.
+All core gates are **deny-by-default** when required evidence is missing.
 
-## Execution model
+## Validation lifecycle
 
-1. **Import phase**: inspect untrusted content as data only.
-2. **Validation phase**: run Rust checks and policy evaluation.
-3. **Verdict cache phase**: persist signed/hashed verdict artifacts.
-4. **Runtime enablement**: allow downstream actions only if gate verdicts permit.
+1. **Import phase** (data only, no execution).
+2. **Validation phase** (Rust checks + policy evaluation).
+3. **Verdict artifact phase** (hash-linked, redaction-safe output).
+4. **Runtime enablement** (only if gates pass).
 
-No code from imported repositories executes during import or analysis.
+## Verdict artifact minimum schema
 
-## Performance model
+- input identity (content hash + source metadata)
+- policy/profile version
+- verdict (`allow` | `deny` | `review`)
+- reasons + redaction-safe evidence
+- timestamp + toolchain version
 
-- Run expensive validation pre-runtime.
-- Cache results by deterministic identity (content hash + policy version + environment profile).
-- Revalidate only when content, policy, or relevant environment changes.
-- Keep active bots fast by consuming cached verdicts and incremental deltas.
+## Test requirements
 
-## Data contracts
+- Unit tests: path traversal, malformed archive headers, manifest violations.
+- Golden tests: deterministic verdict serialization.
+- Regression tests: deny-by-default on missing/malformed evidence.
 
-Every validation result should emit a machine-readable artifact with at least:
-- input identity (hashes, source metadata)
-- policy version/profile
-- verdict (allow/deny/review)
-- reasons and redaction-safe evidence
-- timestamp and toolchain version
+## Performance and compatibility
 
-## Compatibility commitments
-
-- Preserve existing Discord behavior while adding universal workload support.
-- Support phased rollout where legacy validators remain temporarily, but Rust verdicts are source-of-truth for security-critical decisions.
+- **[Planned]** Cache by `content hash + policy version + environment profile`.
+- **[Implemented]** Preserve Discord behavior while universal workload support expands.

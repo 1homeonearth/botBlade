@@ -73,3 +73,8 @@ For required GitHub Actions signing secrets and setup notes, see `docs/ci/androi
 - Do not vendor upstream code without an `upstreams.yml` entry, license review, attribution, and tests.
 - Prefer Rust for security-critical validation.
 - Preserve existing Discord behavior while universal workload support evolves.
+
+## Security manual enforcement (required)
+- Before modifying repo import, archive extraction, manifests, build plans, runtime profiles, terminal sessions, external integrations, secrets, sandboxing, upstream deps, Rust crates, deployment security, or modules/plugins, review `docs/design/botblade-security-manual/README.md` and the relevant section files.
+- Keep `docs/design/botblade-security-manual/` synchronized in the same PR whenever behavior in those areas changes.
+- Update `docs/design/botblade-security-manual/upstreams.yml` whenever upstream dependency/integration behavior changes.

@@ -1,60 +1,43 @@
-# 04 — Native Modules and Upstream Governance
+# 04 — Modules and Upstream Governance
 
-## Native module system plan
+## Module system constraints
 
-botBlade will support controlled native modules/plugins across these classes:
-- Language modules
-- Platform modules
-- Deployment modules
-- Terminal modules
-- Secure integration modules
+- **[Planned]** Controlled native modules/plugins for language, platform, deployment, terminal, and secure integrations.
+- Module manifests must declare capabilities, touched runtime surfaces, data classes, required gates, and rollback behavior.
 
-Each module type must declare:
-- capabilities requested
-- runtime surface touched
-- data classes accessed
-- required policy gates
-- rollback/uninstall behavior
+## Module lifecycle gates
 
-## Module lifecycle controls
+Required for install/enable/update/remove:
+- `module_manifest_gate`
+- `module_provenance_gate`
+- `module_policy_compat_gate`
+- `module_sandbox_diff_gate`
+- `module_regression_gate`
 
-For install, enable, update, and removal:
-- validate manifests with Rust core
-- validate checksums/signatures where supported
-- evaluate policy compatibility
-- run sandbox capability diff review
-- run regression tests for impacted gates
-
-Deny activation if module metadata is incomplete or provenance is untrusted.
+Default action: deny activation when metadata is incomplete/untrusted.
 
 ## Upstream governance policy
 
-Trusted code may be borrowed only when all are satisfied:
-1. License reviewed and compatible for intended use.
-2. Provenance verified (source origin and ownership).
-3. Version/commit pinned.
-4. Security and behavior tests added or updated.
-5. Attribution recorded.
-6. Rollback plan documented.
+Any borrowed upstream code/dependency requires all of:
 
-No full vendoring of upstream app code without explicit governance approval.
+1. License compatibility review.
+2. Provenance verification (origin + ownership).
+3. Version/commit pinning.
+4. Security/behavior tests.
+5. Attribution record.
+6. Rollback plan.
 
-## `upstreams.yml` as source of truth
+- **[Implemented]** No vendoring of full upstream app code without explicit governance approval.
+- **[Implemented]** `upstreams.yml` is mandatory source of provenance and usage-mode truth.
 
-`docs/design/botblade-security-manual/upstreams.yml` tracks:
-- upstream identity and classification
-- integration mode (reference/dependency/external app/platform feature)
-- licensing notes and restrictions
-- review status and required follow-ups
+## License/provenance boundaries
 
-Any upstream-related change must update `upstreams.yml` and tests.
+- GPL app integrations can be external-app integrations without vendoring app internals.
+- Candidate dependencies are blocked until license/provenance status moves to approved.
+- Security-sensitive Rust crates must be actively maintained, pinned, and test-covered.
 
-## Rust crate governance
+## Test requirements
 
-Security-critical validation should prefer Rust crates with:
-- actively maintained releases
-- clear licensing
-- reproducible dependency graph
-- pinned versions and update cadence
-
-Crate additions affecting security decisions require policy and regression tests.
+- Module lifecycle gate tests (install/update/rollback/remove).
+- Provenance/license policy tests tied to `upstreams.yml` entries.
+- Regression tests for upstream-policy deny paths.
