@@ -38,3 +38,6 @@ For required GitHub Actions signing secrets and setup notes, see `docs/ci/androi
   on main, regardless of whether the PR itself touches the workflow file.
 - After merging any PR that modifies .github/workflows/android.yml, verify the
   next workflow run succeeds before opening or merging further PRs.
+- If workflow status cannot be queried because runtime auth is missing, mark the gate as
+  **not verifiable (token unavailable)** and follow `docs/project/gh-cli-auth.md`
+  (Token-less CI verification fallback playbook). Do **not** classify this as CI failing.

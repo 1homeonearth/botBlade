@@ -33,6 +33,24 @@ gh auth login --hostname github.com --with-token
 gh auth setup-git
 ```
 
+## Token-less CI verification fallback playbook
+
+Use this when CI health checks cannot run because no GitHub token is available in the runtime.
+
+- **Exact failure signature:** `Unable to query workflow runs because GitHub CLI is not authenticated.` (from `./scripts/check-android-ci-health.sh`).
+- **Who provides token/access:** the environment owner or repository maintainer with permission to provide `GH_TOKEN`/`GITHUB_TOKEN` (or a token file at `~/.config/gh/token`).
+- **Required command to re-run after access is provided:** `./scripts/check-android-ci-health.sh main`.
+- **Audit output status when blocked:** record CI gate as **"not verifiable (token unavailable)"**, not **"failing"**.
+
+Suggested audit snippet:
+
+```text
+CI health gate: not verifiable (token unavailable in runtime).
+Required follow-up: inject GH_TOKEN/GITHUB_TOKEN, run ./scripts/gh-auto-auth.sh, then rerun ./scripts/check-android-ci-health.sh main.
+```
+
+This status means authentication is missing in the local runtime. It does **not** mean `.github/workflows/android.yml` is currently failing.
+
 ## Debug mode (optional)
 
 Set `GH_AUTO_AUTH_DEBUG=1` to print which token source checks were performed without printing token values:
