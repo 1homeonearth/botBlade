@@ -15,6 +15,8 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.backend.BotEngineBindingState
 import com.princess.botblade.backend.BotEngineService
 import com.princess.botblade.data.api.ApiConfig
+import com.princess.botblade.data.repository.LocalProjectRepository
+import com.princess.botblade.data.store.ActiveProjectStore
 import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorFragment
@@ -57,6 +59,8 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
     override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }
     fun showEditorForProject(projectName: String) {
+        val project = LocalProjectRepository(this).findProjectByName(projectName)
+        ActiveProjectStore(this).setActiveProject(project?.id ?: projectName, projectName)
         showFragment(CodeEditorFragment())
         findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
     }
