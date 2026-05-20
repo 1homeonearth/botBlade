@@ -18,6 +18,7 @@ Set one of the following before starting a new shell:
 
 - `GH_TOKEN`
 - `GITHUB_TOKEN`
+- `GH_Token` (legacy mixed-case fallback)
 
 Or store a token in `~/.config/gh/token` (first line only).
 

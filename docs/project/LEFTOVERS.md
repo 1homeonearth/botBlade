@@ -1,10 +1,11 @@
 # LEFTOVERS
 
-- Blocker: Container network/proxy policy prevents installing GitHub CLI and reaching Ubuntu/GitHub endpoints (`apt` and direct `curl` return 403; direct no-proxy DNS fails).
+- Blocker: `GH_TOKEN`/`GITHUB_TOKEN`/`GH_Token` are not present in this session environment, so `gh auth login --with-token` cannot run.
 - Relevant files:
-  - `.github/workflows/android.yml`
+  - `scripts/gh-auto-auth.sh`
+  - `docs/project/gh-cli-auth.md`
   - `docs/project/LEFTOVERS.md`
 - Exact next action:
-  1. In a GitHub-authenticated environment with working network egress (or preinstalled `gh`), run `gh auth status`.
-  2. Trigger/re-run `android.yml` for the PR branch and `main`, record run URLs/outcomes in `docs/project/ISSUES.md`.
-  3. Verify sticky PR comment updates in-place (existing marker comment edited, not duplicated).
+  1. Launch Codex with one of these env vars set to a PAT: `GH_TOKEN` (preferred), `GITHUB_TOKEN`, or `GH_Token`.
+  2. Run `./scripts/gh-auto-auth.sh && gh auth status --hostname github.com`.
+  3. Run `./scripts/gh-auto-auth-bootstrap.sh` once to persist auto-login on new shells.
