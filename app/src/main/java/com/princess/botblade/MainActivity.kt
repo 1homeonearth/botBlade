@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        StartupDiagnostics.mark("main_activity_on_create_start")
         ApiConfig.initialize(this)
         setContentView(R.layout.activity_main)
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
@@ -54,6 +55,7 @@ class MainActivity : AppCompatActivity() {
             if (!done) { bottomNavigation.visibility = android.view.View.GONE; showFragment(OnboardingFragment()) }
             else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
+        window.decorView.post { StartupDiagnostics.mark("first_render") }
     }
     fun finishOnboarding() {
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
