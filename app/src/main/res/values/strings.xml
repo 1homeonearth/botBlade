@@ -86,6 +86,7 @@
     <string name="stop_runtime">Stop</string>
     <string name="restart_runtime">Restart</string>
     <string name="view_logs">View Logs</string>
+    <string name="runtime_terminal_title">Runtime terminal</string>
     <string name="open_deployments_for_logs">Open Deployments to view runtime and deployment logs.</string>
     <string name="dashboard_legacy_status_loaded">Status loaded from legacy /api/bot-status/.</string>
     <string name="dashboard_project_status_loaded">Status loaded from project runtime endpoint.</string>

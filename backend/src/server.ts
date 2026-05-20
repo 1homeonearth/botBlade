@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+type Socket = any;
 import crypto from "node:crypto";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
 import { AuditService } from "./services/auditService.js";
@@ -59,8 +60,12 @@ export function createRequestListener() {
   };
 }
 
+const logClients = new Set<Socket>();
+
 if (process.env.NODE_ENV !== "test") {
-  (createServer(createRequestListener()) as any).listen(port, host, () => console.info(JSON.stringify({ level: "info", message: "botBlade backend listening", host, port })));
+  const server = createServer(createRequestListener()) as any;
+  server.on("upgrade", (req: IncomingMessage, socket: Socket) => handleLogsUpgrade(req, socket));
+  server.listen(port, host, () => console.info(JSON.stringify({ level: "info", message: "botBlade backend listening", host, port })));
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, requestId: string): Promise<void> {
@@ -396,3 +401,36 @@ function notFoundCommand(commandId: string): never {
 function isHttpError(value: unknown): value is { statusCode: number; code: string; message: string; details: unknown } {
   return Boolean(value && typeof value === "object" && "statusCode" in value && "code" in value && "message" in value);
 }
+
+
+function handleLogsUpgrade(req: IncomingMessage, socket: Socket) {
+  if (extractPathname(req.url) !== "/logs") { socket.destroy(); return; }
+  const key = req.headers["sec-websocket-key"];
+  if (typeof key !== "string") { socket.destroy(); return; }
+  const accept = crypto.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64" as any);
+  socket.write([
+    "HTTP/1.1 101 Switching Protocols",
+    "Upgrade: websocket",
+    "Connection: Upgrade",
+    `Sec-WebSocket-Accept: ${accept}`,
+    "",
+    ""
+  ].join("\r\n"));
+  logClients.add(socket);
+  socket.on("close", () => logClients.delete(socket));
+  socket.on("error", () => logClients.delete(socket));
+}
+
+function broadcastLogLine(line: string) {
+  const payload = Buffer.from(line, "utf8");
+  const header = payload.length < 126 ? Buffer.from([0x81, payload.length]) : Buffer.from([0x81, 126, (payload.length >> 8) & 0xff, payload.length & 0xff]);
+  const frame = Buffer.concat([header, payload]);
+  for (const client of logClients) {
+    if (!client.destroyed) client.write(frame);
+  }
+}
+
+const originalInfo = console.info.bind(console);
+const originalError = console.error.bind(console);
+console.info = (...args: unknown[]) => { originalInfo(...args); broadcastLogLine(args.map(String).join(" ")); };
+console.error = (...args: unknown[]) => { originalError(...args); broadcastLogLine(args.map(String).join(" ")); };
