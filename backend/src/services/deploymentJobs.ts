@@ -142,6 +142,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function stringField(object: Record<string, unknown>, field: string): string {
-  if (typeof object[field] === "string" && object[field].trim()) return object[field].trim();
+  const candidate = object[field];
+  if (typeof candidate === "string") {
+    const trimmed = candidate.trim();
+    if (trimmed) return trimmed;
+  }
   throw new RequestValidationError([{ field, message: `${field} is required.` }]);
 }
