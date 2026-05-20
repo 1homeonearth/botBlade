@@ -1,6 +1,7 @@
 package com.princess.botblade.ui.projects
 
 import android.os.Bundle
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +39,7 @@ class ProjectsFragment : Fragment() {
         (activity as? MainActivity)?.showEditorForProject(project.name)
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
     @Composable
     private fun ProjectsScreen(onOpen: (LocalProjectRepository.LocalProjectSummary) -> Unit) {
         var showWizard by remember { mutableStateOf(false) }

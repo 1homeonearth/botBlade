@@ -34,7 +34,7 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
             BotEngineBindingState.serviceRunning.collectLatest { running ->
                 if (running != null) {
                     val status = if (running) "running" else "stopped"
-                    _status.value = RuntimeStatusResponse("bound", status, "Status from bound BotEngineService")
+                    _status.value = RuntimeStatusResponse("bound", status, running, "Status from bound BotEngineService")
                     _controls.value = if (running) DashboardControlState(true, false, true, true) else DashboardControlState(false, true, false, false)
                 }
             }
