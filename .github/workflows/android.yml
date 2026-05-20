@@ -427,19 +427,21 @@ jobs:
         name: Ensure release tag ref exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
+          REQUESTED_TAG: ${{ needs.preflight.outputs.release_tag }}
+          API_URL: ${{ github.api_url }}/repos/${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG="${{ needs.preflight.outputs.release_tag }}"
+          TAG="$REQUESTED_TAG"
           TAG_REF_STATUS="not-required"
 
-          if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
+          if [[ "$RELEASE_KIND" == "prerelease" ]]; then
             TAG="latest"
             git tag -f "$TAG" "$GITHUB_SHA"
             if git push --force origin "refs/tags/$TAG"; then
               TAG_REF_STATUS="updated-via-git-push"
             else
-              API_URL="${{ github.api_url }}/repos/${{ github.repository }}"
               curl -fsS -X PATCH \
                 -H "Authorization: Bearer $GH_TOKEN" \
                 -H "Accept: application/vnd.github+json" \
@@ -464,70 +466,92 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_API_URL: ${{ github.api_url }}
           REPOSITORY: ${{ github.repository }}
+          TAG: ${{ steps.ensure_tag.outputs.tag }}
+          TITLE: BotBlade Android v${{ needs.build.outputs.app_version_name }}
+          RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
+          APP_VERSION_NAME: ${{ needs.build.outputs.app_version_name }}
+          APP_VERSION_CODE: ${{ needs.build.outputs.app_version_code }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG="${{ steps.ensure_tag.outputs.tag }}"
-          TITLE="BotBlade Android v${{ needs.build.outputs.app_version_name }}"
           NOTES_FILE=dist/release/notes.md
+          export NOTES_FILE
           cat > "$NOTES_FILE" <<EOF
           | File | Who it is for |
           | --- | --- |
           | bot-blade.apk | Normal users. Download this. |
-          | bot-blade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-signed.apk | Same signed release APK with version in the filename. |
+          | bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-signed.apk | Same signed release APK with version in the filename. |
           | bot-blade-debug.apk | Testers and developers only. |
-          | bot-blade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-debug.apk | Versioned debug APK for testers and developers. |
+          | bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-debug.apk | Versioned debug APK for testers and developers. |
           | SHA256SUMS.txt | Verifies downloaded APKs. |
           | release.json | Build/version metadata for automation. |
           | INSTALL.md | Android install instructions. |
           EOF
 
-          NOTES="$(cat "$NOTES_FILE")"
           API_REPO_URL="${GITHUB_API_URL}/repos/${REPOSITORY}"
+          export API_REPO_URL
           RELEASE_JSON_PATH="dist/release/release-response.json"
+          export RELEASE_JSON_PATH
           COMMON_HEADERS=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
           JSON_HEADERS=("${COMMON_HEADERS[@]}" -H "Content-Type: application/json")
 
           if curl -fsS "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/tags/$TAG" > "$RELEASE_JSON_PATH"; then
+            export TAG TITLE
             RELEASE_ID="$(python - <<'PY'
           import json
+          import os
           from pathlib import Path
-          print(json.loads(Path("dist/release/release-response.json").read_text())["id"])
+          print(json.loads(Path(os.environ["RELEASE_JSON_PATH"]).read_text())["id"])
           PY
             )"
+            export RELEASE_ID
+            curl -fsS "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/$RELEASE_ID/assets?per_page=100" > dist/release/release-existing-assets.json
             python - <<'PY'
-          import json, os
+          import json
           from pathlib import Path
-          p = Path("dist/release/release-assets.txt")
-          rid = os.environ["RELEASE_ID"]
-          base = os.environ["API_REPO_URL"]
-          lines = [line.strip() for line in p.read_text().splitlines() if line.strip()]
-          with Path("dist/release/delete-asset-urls.txt").open("w") as out:
-              for name in lines:
-                  out.write(f"{base}/releases/{rid}/assets?name={name}\n")
+          desired = [line.strip() for line in Path("dist/release/release-assets.txt").read_text().splitlines() if line.strip()]
+          existing = json.loads(Path("dist/release/release-existing-assets.json").read_text())
+          desired_set = set(desired)
+          with Path("dist/release/delete-assets.tsv").open("w") as out:
+            for asset in existing:
+              name = asset.get("name", "")
+              if name in desired_set:
+                out.write(f"{asset['id']}\t{name}\n")
           PY
-            while read -r delete_url; do
-              curl -fsS -X DELETE "${COMMON_HEADERS[@]}" "$delete_url" >/dev/null || true
-            done < dist/release/delete-asset-urls.txt
+            while IFS=$'\t' read -r asset_id asset_name; do
+              [[ -n "$asset_id" ]] || continue
+              curl -fsS -X DELETE "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/assets/$asset_id" >/dev/null || {
+                echo "::error::Failed to delete existing release asset '$asset_name' (id: $asset_id)."
+                exit 1
+              }
+            done < dist/release/delete-assets.tsv
             while read -r asset; do
+              ASSET_NAME="$asset" encoded_name="$(python - <<'PY'
+          import os
+          from urllib.parse import quote
+          print(quote(os.environ["ASSET_NAME"], safe=""))
+          PY
+              )"
               curl -fsS -X POST "${COMMON_HEADERS[@]}" \
                 -H "Content-Type: application/octet-stream" \
                 --data-binary "@dist/release/$asset" \
-                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$asset" >/dev/null
+                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$encoded_name" >/dev/null
             done < dist/release/release-assets.txt
-            if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
+            if [[ "$RELEASE_KIND" == "prerelease" ]]; then
               PRERELEASE_VALUE=true
               MAKE_LATEST=legacy
             else
               PRERELEASE_VALUE=false
               MAKE_LATEST=true
             fi
+            export PRERELEASE_VALUE MAKE_LATEST
             python - <<'PY' > dist/release/update-release.json
           import json, os
+          from pathlib import Path
           print(json.dumps({
               "tag_name": os.environ["TAG"],
               "name": os.environ["TITLE"],
-              "body": os.environ["NOTES"],
+              "body": Path(os.environ["NOTES_FILE"]).read_text(),
               "prerelease": os.environ["PRERELEASE_VALUE"] == "true",
               "make_latest": os.environ["MAKE_LATEST"],
           }))
@@ -536,19 +560,21 @@ jobs:
               "$API_REPO_URL/releases/$RELEASE_ID" \
               --data-binary @dist/release/update-release.json >/dev/null
           else
-            if [[ "${{ needs.preflight.outputs.release_kind }}" == "prerelease" ]]; then
+            if [[ "$RELEASE_KIND" == "prerelease" ]]; then
               PRERELEASE_VALUE=true
               MAKE_LATEST=legacy
             else
               PRERELEASE_VALUE=false
               MAKE_LATEST=true
             fi
+            export TAG TITLE PRERELEASE_VALUE MAKE_LATEST
             python - <<'PY' > dist/release/create-release.json
           import json, os
+          from pathlib import Path
           print(json.dumps({
               "tag_name": os.environ["TAG"],
               "name": os.environ["TITLE"],
-              "body": os.environ["NOTES"],
+              "body": Path(os.environ["NOTES_FILE"]).read_text(),
               "prerelease": os.environ["PRERELEASE_VALUE"] == "true",
               "make_latest": os.environ["MAKE_LATEST"],
           }))
@@ -558,15 +584,23 @@ jobs:
               --data-binary @dist/release/create-release.json > "$RELEASE_JSON_PATH"
             RELEASE_ID="$(python - <<'PY'
           import json
+          import os
           from pathlib import Path
-          print(json.loads(Path("dist/release/release-response.json").read_text())["id"])
+          print(json.loads(Path(os.environ["RELEASE_JSON_PATH"]).read_text())["id"])
           PY
             )"
+            export RELEASE_ID
             while read -r asset; do
+              ASSET_NAME="$asset" encoded_name="$(python - <<'PY'
+          import os
+          from urllib.parse import quote
+          print(quote(os.environ["ASSET_NAME"], safe=""))
+          PY
+              )"
               curl -fsS -X POST "${COMMON_HEADERS[@]}" \
                 -H "Content-Type: application/octet-stream" \
                 --data-binary "@dist/release/$asset" \
-                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$asset" >/dev/null
+                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$encoded_name" >/dev/null
             done < dist/release/release-assets.txt
           fi
       - name: Release checklist summary

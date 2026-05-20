@@ -16,6 +16,7 @@ declare module "node:http" {
 declare class Buffer extends Uint8Array {
   static isBuffer(value: unknown): value is Buffer;
   static from(value: unknown, encoding?: string): Buffer;
+  static byteLength(value: string, encoding?: string): number;
   static concat(chunks: Buffer[]): Buffer;
   toString(encoding?: string): string;
 }
