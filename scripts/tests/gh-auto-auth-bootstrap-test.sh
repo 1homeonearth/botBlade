@@ -28,6 +28,19 @@ assert_count() {
 tmp_home="$(mktemp -d)"
 trap 'rm -rf "$tmp_home"' EXIT
 
+set +e
+missing_gh_output=$(HOME="$tmp_home" PATH="/definitely-missing" /bin/bash "$script" 2>&1)
+missing_gh_status=$?
+set -e
+if [ "$missing_gh_status" -eq 0 ]; then
+  echo "Expected bootstrap to fail when gh is missing" >&2
+  exit 1
+fi
+if [[ "$missing_gh_output" != *"missing command: gh"* ]]; then
+  echo "Expected missing gh error message, got: $missing_gh_output" >&2
+  exit 1
+fi
+
 HOME="$tmp_home" "$script" >/dev/null
 assert_contains "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>"
 assert_count "$tmp_home/.bashrc" "# >>> botBlade gh auto-auth >>>" 1
