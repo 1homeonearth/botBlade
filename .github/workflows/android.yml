@@ -224,6 +224,94 @@ jobs:
           else
             gradle :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
           fi
+      - name: Validate APK outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_ROOT="app/build/outputs/apk"
+          if [[ ! -d "$APK_ROOT" ]]; then
+            echo "::error::Expected APK output directory '$APK_ROOT' was not created by Gradle."
+            exit 1
+          fi
+
+          mapfile -d '' -t all_apks < <(find "$APK_ROOT" -type f -name '*.apk' -print0 | sort -z)
+          mapfile -d '' -t debug_candidates < <(find "$APK_ROOT" -type f -name '*debug*.apk' -print0 | sort -z)
+          mapfile -d '' -t release_unsigned_candidates < <(find "$APK_ROOT" -type f -name '*release*unsigned*.apk' -print0 | sort -z)
+
+          debug_selected=()
+          for candidate in "${debug_candidates[@]}"; do
+            base_name="$(basename "$candidate")"
+            if [[ "$base_name" == *"-androidTest-"* ]]; then
+              continue
+            fi
+            debug_selected+=("$candidate")
+          done
+
+          release_unsigned_selected=()
+          for candidate in "${release_unsigned_candidates[@]}"; do
+            base_name="$(basename "$candidate")"
+            if [[ "$base_name" == *"-androidTest-"* ]]; then
+              continue
+            fi
+            release_unsigned_selected+=("$candidate")
+          done
+
+          {
+            echo "### APK output validation"
+            echo ""
+            echo "| Path | Type | Selected |"
+            echo "|---|---|---|"
+            if [[ "${#all_apks[@]}" -eq 0 ]]; then
+              echo "| _none found_ | n/a | n/a |"
+            else
+              for apk in "${all_apks[@]}"; do
+                kind="other"
+                selected="no"
+                base_name="$(basename "$apk")"
+                if [[ "$base_name" == *debug* ]]; then
+                  kind="debug-candidate"
+                fi
+                if [[ "$base_name" == *release*unsigned* ]]; then
+                  kind="release-unsigned-candidate"
+                fi
+                for selected_debug in "${debug_selected[@]}"; do
+                  if [[ "$apk" == "$selected_debug" ]]; then
+                    selected="yes (debug)"
+                    break
+                  fi
+                done
+                if [[ "$selected" == "no" ]]; then
+                  for selected_release in "${release_unsigned_selected[@]}"; do
+                    if [[ "$apk" == "$selected_release" ]]; then
+                      selected="yes (release-unsigned)"
+                      break
+                    fi
+                  done
+                fi
+                echo "| \`$apk\` | $kind | $selected |"
+              done
+            fi
+            echo ""
+            echo "- Expected selected debug APK count: 1 (actual: ${#debug_selected[@]})."
+            echo "- Expected selected release unsigned APK count: 1 (actual: ${#release_unsigned_selected[@]})."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${#debug_selected[@]}" -ne 1 || "${#release_unsigned_selected[@]}" -ne 1 ]]; then
+            echo "::group::APK output validation diagnostics"
+            echo "Discovered all APK files (${#all_apks[@]}):"
+            printf '  - %s\n' "${all_apks[@]:-<none>}"
+            echo "Discovered debug APK candidates (${#debug_candidates[@]}):"
+            printf '  - %s\n' "${debug_candidates[@]:-<none>}"
+            echo "Selected debug APK candidates (${#debug_selected[@]}):"
+            printf '  - %s\n' "${debug_selected[@]:-<none>}"
+            echo "Discovered release unsigned APK candidates (${#release_unsigned_candidates[@]}):"
+            printf '  - %s\n' "${release_unsigned_candidates[@]:-<none>}"
+            echo "Selected release unsigned APK candidates (${#release_unsigned_selected[@]}):"
+            printf '  - %s\n' "${release_unsigned_selected[@]:-<none>}"
+            echo "::endgroup::"
+            echo "::error::APK output validation failed. Expected exactly one selected debug APK and one selected unsigned release APK in '$APK_ROOT'."
+            exit 1
+          fi
       - name: Stage APKs
         shell: bash
         run: |
