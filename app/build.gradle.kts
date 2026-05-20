@@ -111,10 +111,29 @@ tasks.register("printResolvedVersionMetadata") {
         val resolvedVersionName = android.defaultConfig.versionName
             ?: throw GradleException("Resolved versionName is null.")
         val resolvedVersionCode = android.defaultConfig.versionCode
+            ?: throw GradleException("Resolved versionCode is null.")
         if (resolvedVersionCode <= 0) {
             throw GradleException("Resolved versionCode must be > 0 (was $resolvedVersionCode).")
         }
         println("VERSION_NAME=$resolvedVersionName")
         println("VERSION_CODE=$resolvedVersionCode")
     }
+}
+
+tasks.register("processDebugMainManifest") {
+    group = "verification"
+    description = "Process main manifest for all debug variants."
+    dependsOn(
+        ":app:processLocalDevDebugMainManifest",
+        ":app:processProdDebugMainManifest",
+    )
+}
+
+tasks.register("processReleaseMainManifest") {
+    group = "verification"
+    description = "Process main manifest for all release variants."
+    dependsOn(
+        ":app:processLocalDevReleaseMainManifest",
+        ":app:processProdReleaseMainManifest",
+    )
 }

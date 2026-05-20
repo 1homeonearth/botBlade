@@ -35,3 +35,6 @@ google-services.json
 
 /backend/dist/
 /backend/node_modules/
+
+# Keep wrapper JAR local-only in this repo clone
+gradle/wrapper/gradle-wrapper.jar
