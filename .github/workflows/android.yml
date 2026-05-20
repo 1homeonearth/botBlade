@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup actionlint
-        uses: reviewdog/action-actionlint@eae4ecd8c66737642cb1445fa059c2506208bcd2 # v1.57.0
+        uses: reviewdog/action-actionlint@7eeec1dd160c2301eb28e1568721837d084558ad # v1.57.0
         with:
           actionlint_flags: -version
       - name: Lint android workflow
