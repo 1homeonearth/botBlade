@@ -456,22 +456,35 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - name: Fail if signing secrets are missing
+      - name: Check signing secrets availability
+        id: signing_secrets
+        shell: bash
         run: |
           missing=()
           [[ -z "${{ secrets.KEYSTORE_BASE64 }}" ]] && missing+=("KEYSTORE_BASE64")
           [[ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]] && missing+=("KEYSTORE_PASSWORD")
           [[ -z "${{ secrets.KEY_ALIAS }}" ]] && missing+=("KEY_ALIAS")
           if [[ ${#missing[@]} -gt 0 ]]; then
-            echo "::error::Missing signing secrets: ${missing[*]}"
-            exit 1
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+            echo "missing=${missing[*]}" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Release skipped"
+              echo "- Reason: signing secrets are not fully configured for release publishing."
+              echo "- Missing: ${missing[*]}"
+              echo "- Build artifacts are available from the build job."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        if: steps.signing_secrets.outputs.has_secrets == 'true'
       - name: Download APK artifacts
+        if: steps.signing_secrets.outputs.has_secrets == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist/incoming
       - name: Select final assets and generate metadata
+        if: steps.signing_secrets.outputs.has_secrets == 'true'
         shell: bash
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -556,7 +569,7 @@ jobs:
           for f in "${FINAL_APK_ASSETS[@]}"; do RELEASE_ASSETS+=("$f"); done
           printf '%s\n' "${RELEASE_ASSETS[@]}" > dist/release/release-assets.txt
       - name: Create artifact attestations
-        if: needs.build.outputs.signing_status == 'signed'
+        if: steps.signing_secrets.outputs.has_secrets == 'true' && needs.build.outputs.signing_status == 'signed'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: |
@@ -564,6 +577,7 @@ jobs:
             dist/release/SHA256SUMS.txt
             dist/release/release.json
       - id: ensure_tag
+        if: steps.signing_secrets.outputs.has_secrets == 'true'
         name: Ensure release tag ref exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -602,6 +616,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "- Tag ref guard: $TAG_REF_STATUS ($TAG)" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish release
+        if: steps.signing_secrets.outputs.has_secrets == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_API_URL: ${{ github.api_url }}
@@ -744,6 +759,7 @@ jobs:
             done < dist/release/release-assets.txt
           fi
       - name: Release checklist summary
+        if: steps.signing_secrets.outputs.has_secrets == 'true'
         shell: bash
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
