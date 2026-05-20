@@ -53,14 +53,16 @@ android {
             applicationIdSuffix = ".localdev"
             versionNameSuffix = "-local-dev"
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+            buildConfigField("boolean", "USE_REMOTE_BACKEND", "false")
         }
         create("prod") {
             dimension = "environment"
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${providers.gradleProperty("PROD_API_BASE_URL").orNull ?: "https://api.royalscepter.app"}\"",
+                "\"${providers.gradleProperty("PROD_API_BASE_URL").orNull ?: "http://127.0.0.1:7432"}\"",
             )
+            buildConfigField("boolean", "USE_REMOTE_BACKEND", "false")
         }
     }
 
@@ -90,6 +92,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    sourceSets {
+        getByName("main") {
+            assets.srcDir("../backend")
+        }
+    }
 }
 
 dependencies {
@@ -102,6 +110,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.2.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("com.github.LiquidPlayer:LiquidCore:0.6.2")
 }
 
 tasks.register("printResolvedVersionMetadata") {
