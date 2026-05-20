@@ -28,7 +28,14 @@ npm --prefix backend run start
 
 If no database URL is set, non-test server runs use `sqlite://./backend/data/botblade.sqlite`. Tests stay in memory unless a database URL is explicitly set.
 
-`BOTBLADE_SECRET_KEY` accepts a 64-character hex key, a 32-byte base64 key, or any passphrase. Passphrases are hashed with SHA-256 before use. Local development falls back to a deterministic development key, but production deployments must provide a managed secret key.
+`BOTBLADE_SECRET_KEY` accepts a 64-character hex key, a 32-byte base64 key, or any passphrase. Passphrases are hashed with SHA-256 before use.
+`BOTBLADE_SECRET_KEY` is required at startup. If it is missing, SQLite persistence fails closed with an actionable startup error. For explicit local/dev test-only runs, you may opt in to the deterministic fallback key by setting:
+
+```bash
+export BOTBLADE_ALLOW_INSECURE_DEV_KEY=true
+```
+
+Do not enable `BOTBLADE_ALLOW_INSECURE_DEV_KEY` outside local development or test environments.
 
 ## Secret storage model
 

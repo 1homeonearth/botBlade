@@ -16,7 +16,7 @@ import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput,
 import { validateProject } from "./services/projectValidation.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
-const persistence = process.env.NODE_ENV === "test" && !process.env.BOTBLADE_DATABASE_URL && !process.env.DATABASE_URL ? undefined : SqlitePersistence.fromUrl();
+const persistence = createPersistence();
 const projectStore = new ProjectStore(persistence);
 const secretStore = new SecretStore(persistence);
 const fileService = new ProjectFileService();
@@ -32,6 +32,16 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
 const port = Number(process.env.PORT ?? 8000);
+
+function createPersistence(): SqlitePersistence | undefined {
+  if (process.env.NODE_ENV === "test" && !process.env.BOTBLADE_DATABASE_URL && !process.env.DATABASE_URL) return undefined;
+  try {
+    return SqlitePersistence.fromUrl();
+  } catch (error) {
+    if (error instanceof Error) throw new Error(`Persistence startup failed: ${error.message}`);
+    throw error;
+  }
+}
 
 export function createRequestListener() {
   return async (req: IncomingMessage, res: ServerResponse) => {

@@ -157,6 +157,14 @@ npm run build
 npm start
 ```
 
+Set a persistence encryption key before starting the backend:
+
+```bash
+export BOTBLADE_SECRET_KEY=$(openssl rand -hex 32)
+```
+
+If `BOTBLADE_SECRET_KEY` is missing, startup fails closed with an actionable persistence error. For explicit local/dev test-only fallback to a deterministic key, set `BOTBLADE_ALLOW_INSECURE_DEV_KEY=true`. Do not enable that override in production.
+
 The backend listens on `PORT` or `8000` by default:
 
 ```bash

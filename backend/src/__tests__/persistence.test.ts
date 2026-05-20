@@ -52,3 +52,48 @@ test("SQLite persistence survives store restart and keeps secret values encrypte
   assert.equal(secondPersistence.loadDeploymentJobs()[0].job.deploymentId, deployment.deploymentId);
   assert.equal(secondPersistence.loadDeploymentJobs()[0].logs, "deployment log");
 });
+
+test("SQLite persistence fails closed when BOTBLADE_SECRET_KEY is missing", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "botblade-persistence-missing-key-"));
+  const dbPath = path.join(dir, "state.sqlite");
+  const originalSecret = process.env.BOTBLADE_SECRET_KEY;
+  const originalOverride = process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY;
+  delete process.env.BOTBLADE_SECRET_KEY;
+  delete process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY;
+  try {
+    let capturedError: unknown;
+    try {
+      new SqlitePersistence(dbPath);
+    } catch (error) {
+      capturedError = error;
+    }
+    assert.ok(capturedError instanceof Error);
+    const errorMessage = capturedError instanceof Error ? capturedError.message : "";
+    assert.ok(/Missing BOTBLADE_SECRET_KEY[\s\S]*BOTBLADE_ALLOW_INSECURE_DEV_KEY=true/.test(errorMessage));
+  } finally {
+    if (originalSecret === undefined) delete process.env.BOTBLADE_SECRET_KEY;
+    else process.env.BOTBLADE_SECRET_KEY = originalSecret;
+    if (originalOverride === undefined) delete process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY;
+    else process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY = originalOverride;
+  }
+});
+
+test("SQLite persistence allows explicit insecure dev key override when BOTBLADE_SECRET_KEY is missing", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "botblade-persistence-dev-override-"));
+  const dbPath = path.join(dir, "state.sqlite");
+  const originalSecret = process.env.BOTBLADE_SECRET_KEY;
+  const originalOverride = process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY;
+  delete process.env.BOTBLADE_SECRET_KEY;
+  process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY = "true";
+  try {
+    const persistence = new SqlitePersistence(dbPath);
+    const projects = new ProjectStore(persistence);
+    const project = projects.create({ name: "Override Project", description: "dev override" });
+    assert.equal(project.name, "Override Project");
+  } finally {
+    if (originalSecret === undefined) delete process.env.BOTBLADE_SECRET_KEY;
+    else process.env.BOTBLADE_SECRET_KEY = originalSecret;
+    if (originalOverride === undefined) delete process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY;
+    else process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY = originalOverride;
+  }
+});

@@ -99,7 +99,13 @@ function q(value: string | null): string {
 function ensureSqliteAvailable(): void { execFileSync("sqlite3", ["--version"], { encoding: "utf8" }); }
 
 function deriveKey(secretKey?: string): Buffer {
-  if (!secretKey) return crypto.createHash("sha256").update("botBlade-local-dev-secret-key").digest();
+  const allowInsecureDevKey = process.env.BOTBLADE_ALLOW_INSECURE_DEV_KEY === "true";
+  if (!secretKey) {
+    if (!allowInsecureDevKey) {
+      throw new Error("Missing BOTBLADE_SECRET_KEY. Set BOTBLADE_SECRET_KEY to a managed secret value (recommended: `openssl rand -hex 32`). For local/dev test-only fallback, explicitly set BOTBLADE_ALLOW_INSECURE_DEV_KEY=true.");
+    }
+    return crypto.createHash("sha256").update("botBlade-local-dev-secret-key").digest();
+  }
   if (/^[a-f0-9]{64}$/i.test(secretKey)) return Buffer.from(secretKey, "hex");
   const base64 = Buffer.from(secretKey, "base64");
   if (base64.length === 32) return base64;
