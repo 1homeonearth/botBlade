@@ -8,7 +8,9 @@ Use this repo's helper scripts to configure `gh` automatic login for each new sh
 ./scripts/gh-auto-auth-bootstrap.sh
 ```
 
-That command writes a small managed block to `~/.bash_profile` which runs `scripts/gh-auto-auth.sh` on shell startup.
+That command writes a small managed block to `~/.bashrc` (or `GH_PROFILE_FILE` when set) which runs `scripts/gh-auto-auth.sh` on shell startup.
+
+For login shell compatibility, the bootstrap also writes a managed bridge block in `~/.bash_profile` to source `~/.bashrc`.
 
 ## Provide your secret token
 
@@ -29,5 +31,5 @@ gh auth setup-git
 ## Verify
 
 ```bash
-gh auth status
+gh auth status --hostname github.com
 ```
