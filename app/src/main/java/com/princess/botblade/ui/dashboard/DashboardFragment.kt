@@ -27,6 +27,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.MainActivity
 import com.princess.botblade.ui.theme.BotBladeTheme
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.ComposeView
@@ -41,7 +42,7 @@ class DashboardFragment : Fragment() {
         activeProjectStore = ActiveProjectStore(requireContext())
         return ComposeView(requireContext()).apply {
             setContent {
-                BotBladeTheme { DashboardScreen(viewModel, started) }
+                BotBladeTheme { DashboardScreen(viewModel, started) { (activity as? MainActivity)?.openLogsScreen() } }
             }
         }
     }
@@ -58,7 +59,7 @@ class DashboardFragment : Fragment() {
 }
 
 @Composable
-private fun DashboardScreen(vm: DashboardViewModel, started: Long) {
+private fun DashboardScreen(vm: DashboardViewModel, started: Long, onLogs: () -> Unit) {
     val status by vm.status.collectAsState()
     val logs by vm.logs.collectAsState()
     val controls by vm.controls.collectAsState()
@@ -74,6 +75,7 @@ private fun DashboardScreen(vm: DashboardViewModel, started: Long) {
             Button(onClick = vm::start, enabled = controls.canStart) { Text("Start") }
             Button(onClick = vm::stop, enabled = controls.canStop) { Text("Stop") }
             Button(onClick = vm::restart, enabled = controls.canRestart) { Text("Restart") }
+            Button(onClick = onLogs) { Text("Logs") }
         }
     }
 }

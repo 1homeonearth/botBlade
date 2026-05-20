@@ -15,6 +15,30 @@
             android:text="@string/settings_title"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
+        
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Bot Token"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:id="@+id/bot_token_masked"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Not set" />
+
+        <Button android:id="@+id/change_bot_token_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Change" />
+        <Button android:id="@+id/clear_bot_token_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Clear" />
+
+        <Switch
+            android:id="@+id/auto_start_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start bot automatically on device boot." />
+        <TextView android:id="@+id/auto_start_disclaimer" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Your bot will start when this device powers on, as long as the app is installed." android:visibility="gone" />
+
         <TextView
             android:id="@+id/secrets_status"
             android:layout_width="match_parent"

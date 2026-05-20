@@ -30,6 +30,8 @@ import com.princess.botblade.data.model.SecretSummary
 import com.princess.botblade.data.model.displayNameOrNull
 import com.princess.botblade.data.repository.ProjectRepository
 import com.princess.botblade.data.repository.SecretRepository
+import com.princess.botblade.backend.EnginePreferences
+import com.princess.botblade.data.repository.TokenRepository
 import com.princess.botblade.data.store.ActiveProjectStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,6 +61,7 @@ class SettingsFragment : Fragment() {
     private lateinit var apkDownloadsText: TextView
     private var activeProject: BotProject? = null
     private var currentGitHubStatus: GitHubStatusResponse? = null
+    private lateinit var tokenRepository: TokenRepository
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_settings, container, false)
@@ -75,6 +78,7 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        tokenRepository = TokenRepository(requireContext())
         status = view.findViewById(R.id.secrets_status)
         apiStatus = view.findViewById(R.id.api_settings_status)
         backendUrlInput = view.findViewById(R.id.backend_url_input)
@@ -109,6 +113,8 @@ class SettingsFragment : Fragment() {
         copyWorkflowHelpButton.setOnClickListener { copyWorkflowInstructions() }
         pushGitHubButton.setOnClickListener { pushGitHub() }
         apkDownloadsText.text = getString(R.string.apk_download_links, "princessraven/botBlade")
+        setupTokenSection(view)
+        setupAutoStart(view)
         loadSecrets()
         loadGitHubSection()
     }
@@ -308,5 +314,34 @@ class SettingsFragment : Fragment() {
             list.addView(row)
         }
         status.text = "Loaded ${secrets.size} secret reference(s). Values stay hidden."
+    }
+
+    private fun setupTokenSection(view: View) {
+        val tokenMasked = view.findViewById<TextView>(R.id.bot_token_masked)
+        val changeButton = view.findViewById<Button>(R.id.change_bot_token_button)
+        val clearButton = view.findViewById<Button>(R.id.clear_bot_token_button)
+        fun refresh() { tokenMasked.text = tokenRepository.getTokenMasked() ?: "Not set" }
+        refresh()
+        changeButton.setOnClickListener {
+            val input = EditText(requireContext())
+            AlertDialog.Builder(requireContext()).setTitle("Change Bot Token").setView(input).setPositiveButton("Save") { _, _ ->
+                val token = input.text.toString().trim()
+                if (token.isNotBlank()) tokenRepository.setToken(token)
+                refresh()
+            }.setNegativeButton("Cancel", null).show()
+        }
+        clearButton.setOnClickListener { tokenRepository.clearToken(); refresh() }
+    }
+
+    private fun setupAutoStart(view: View) {
+        val autoStart = view.findViewById<android.widget.Switch>(R.id.auto_start_switch)
+        val disclaimer = view.findViewById<TextView>(R.id.auto_start_disclaimer)
+        lifecycleScope.launch {
+            EnginePreferences.autoStartOnBoot(requireContext()).collect { enabled ->
+                autoStart.isChecked = enabled
+                disclaimer.visibility = if (enabled) View.VISIBLE else View.GONE
+            }
+        }
+        autoStart.setOnCheckedChangeListener { _, checked -> lifecycleScope.launch { EnginePreferences.setAutoStartOnBoot(requireContext(), checked) } }
     }
 }
