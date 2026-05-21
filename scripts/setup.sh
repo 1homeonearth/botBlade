@@ -11,8 +11,8 @@ warm_gradle_cache_without_wrapper() {
   fi
   chmod +x ./gradlew
   log "Pre-fetching Gradle dependencies (network available during setup)"
-  ./gradlew --no-daemon --version >/dev/null || true
-  ./gradlew --no-daemon resolveAllDependencies || true
+  ./gradlew --no-daemon --version >/dev/null
+  ./gradlew --no-daemon resolveAllDependencies
   log "Gradle dependency pre-fetch complete"
 }
 
