@@ -21,6 +21,15 @@ jobs:
           git init .
           git fetch --no-tags --depth=1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
           git checkout --force FETCH_HEAD
+      - name: Install Node 22
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_version=22.16.0
+          node_archive="node-v${node_version}-linux-x64.tar.xz"
+          curl --fail --location --silent --show-error --output "$node_archive" "https://nodejs.org/dist/v${node_version}/${node_archive}"
+          tar -xf "$node_archive"
+          echo "$PWD/node-v${node_version}-linux-x64/bin" >> "$GITHUB_PATH"
       - name: Verify Node runtime
         shell: bash
         run: |
