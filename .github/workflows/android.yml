@@ -5,258 +5,76 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
-    tags:
-      - 'v*'
   workflow_dispatch:
-    inputs:
-      release_mode:
-        description: build-only | prerelease | versioned-release
-        required: true
-        default: build-only
-        type: choice
-        options: [build-only, prerelease, versioned-release]
-      release_tag:
-        description: Required for versioned-release, for example v1.2.3
-        required: false
-        type: string
 
 concurrency:
   group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  lint-workflow:
-    name: Android workflow lint
+  build:
+    name: Android build
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      checks: write
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4, Node 20
-      - name: Lint android workflow
-        uses: reviewdog/action-actionlint@0d952c597ef8459f634d7145b0b044a9699e5e43 # v1.71.0
-        with:
-          actionlint_flags: .github/workflows/android.yml
-          fail_level: error
-
-  preflight:
-    name: Android preflight
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      should_release: ${{ steps.mode.outputs.should_release }}
-      release_kind: ${{ steps.mode.outputs.release_kind }}
-      release_tag: ${{ steps.mode.outputs.release_tag }}
-      is_tag_release: ${{ steps.mode.outputs.is_tag_release }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4, Node 20
-      - name: Validate repository and workflow preconditions
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git fetch --no-tags --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+      - name: Validate repository preconditions
         shell: bash
         run: |
           set -euo pipefail
           [ -f app/build.gradle.kts ] || { echo '::error::Missing app/build.gradle.kts.'; exit 1; }
-          [ -f .github/workflows/android.yml ] || { echo '::error::Missing workflow file .github/workflows/android.yml.'; exit 1; }
           [ -d app/src/main ] || { echo '::error::Missing Android source directory app/src/main.'; exit 1; }
-          if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
-          if [ -f dist/apk/SHA256SUMS.txt ]; then
-            echo '::error::dist/apk/SHA256SUMS.txt exists before final asset selection. Remove checked-in generated artifacts.'
-            exit 1
-          fi
-          echo '::notice::Repository preflight checks passed.'
-      - id: mode
-        name: Resolve release mode
+          [ -f gradlew ] || { echo '::error::Missing Gradle wrapper.'; exit 1; }
+          chmod +x ./gradlew
+      - name: Verify Android and Java tools
         shell: bash
-        env:
-          INPUT_RELEASE_MODE: ${{ github.event.inputs.release_mode }}
-          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
-          SHOULD_RELEASE=false
-          RELEASE_KIND=none
-          RELEASE_TAG=''
-          IS_TAG_RELEASE=false
-
-          if [[ "${GITHUB_EVENT_NAME}" == 'push' && "${GITHUB_REF}" == 'refs/heads/main' ]]; then
-            SHOULD_RELEASE=true
-            RELEASE_KIND=prerelease
-            RELEASE_TAG=latest
-          elif [[ "${GITHUB_EVENT_NAME}" == 'push' && "${GITHUB_REF}" == refs/tags/v* ]]; then
-            SHOULD_RELEASE=true
-            RELEASE_KIND=versioned
-            RELEASE_TAG="${GITHUB_REF_NAME}"
-            IS_TAG_RELEASE=true
-          elif [[ "${GITHUB_EVENT_NAME}" == 'workflow_dispatch' ]]; then
-            MODE="${INPUT_RELEASE_MODE:-build-only}"
-            INPUT_TAG="${INPUT_RELEASE_TAG:-}"
-            case "$MODE" in
-              build-only) ;;
-              prerelease)
-                SHOULD_RELEASE=true
-                RELEASE_KIND=prerelease
-                RELEASE_TAG=latest
-                ;;
-              versioned-release)
-                if [[ ! "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
-                  echo '::error::workflow_dispatch versioned-release requires release_tag like v1.2.3 or v1.2.3-rc.1'
-                  exit 1
-                fi
-                SHOULD_RELEASE=true
-                RELEASE_KIND=versioned
-                RELEASE_TAG="$INPUT_TAG"
-                IS_TAG_RELEASE=true
-                ;;
-              *)
-                echo "::error::Unsupported release_mode: $MODE"
-                exit 1
-                ;;
-            esac
+          java -version
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          if [[ -z "${ANDROID_HOME:-}" ]]; then
+            echo '::error::ANDROID_HOME is not set on this runner.'
+            exit 1
           fi
-
-          {
-            echo "should_release=$SHOULD_RELEASE"
-            echo "release_kind=$RELEASE_KIND"
-            echo "release_tag=$RELEASE_TAG"
-            echo "is_tag_release=$IS_TAG_RELEASE"
-          } >> "$GITHUB_OUTPUT"
-
-  build:
-    name: Android build and APK artifacts
-    runs-on: ubuntu-latest
-    needs: [lint-workflow, preflight]
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      app_version_name: ${{ steps.meta.outputs.app_version_name }}
-      app_version_code: ${{ steps.meta.outputs.app_version_code }}
-      short_sha: ${{ steps.meta.outputs.short_sha }}
-      debug_file: ${{ steps.meta.outputs.debug_file }}
-      release_unsigned_file: ${{ steps.meta.outputs.release_unsigned_file }}
-      release_signed_file: ${{ steps.meta.outputs.release_signed_file }}
-      signing_status: ${{ steps.sign_status.outputs.signing_status }}
-    env:
-      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4, Node 20
-      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4, Node 20
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4, Node 20
-        with:
-          add-job-summary: always
-          add-job-summary-as-pr-comment: never
-      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3, Node 20
-        with:
-          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
       - name: Extract app metadata
         id: meta
         shell: bash
         env:
-          IS_TAG_RELEASE: ${{ needs.preflight.outputs.is_tag_release }}
-          RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
           VERSION_SEQ: ${{ github.run_number }}
         run: |
           set -euo pipefail
-          if [ -x ./gradlew ]; then
-            METADATA_OUTPUT="$(./gradlew -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" --no-daemon)"
-          else
-            METADATA_OUTPUT="$(gradle -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" --no-daemon)"
-          fi
-          VERSION_NAME="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_NAME=//p' | tail -n1)"
-          VERSION_CODE="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
-          SHORT_SHA="${GITHUB_SHA::7}"
-          if [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then
+          metadata_output="$(./gradlew -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" --no-daemon)"
+          version_name="$(printf '%s\n' "$metadata_output" | sed -n 's/^VERSION_NAME=//p' | tail -n1)"
+          version_code="$(printf '%s\n' "$metadata_output" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
+          if [[ -z "$version_name" || -z "$version_code" ]]; then
             echo '::error::Failed to extract VERSION_NAME/VERSION_CODE from Gradle output.'
-            printf '%s\n' "$METADATA_OUTPUT"
+            printf '%s\n' "$metadata_output"
             exit 1
           fi
-          if [[ "$IS_TAG_RELEASE" == 'true' && "$RELEASE_TAG" != "v${VERSION_NAME}" ]]; then
-            echo "::error::Tag $RELEASE_TAG conflicts with versionName $VERSION_NAME"
-            exit 1
-          fi
-          {
-            echo "app_version_name=$VERSION_NAME"
-            echo "app_version_code=$VERSION_CODE"
-            echo "short_sha=$SHORT_SHA"
-            echo "debug_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-debug.apk"
-            echo "release_unsigned_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-unsigned.apk"
-            echo "release_signed_file=bot-blade-v${VERSION_NAME}-${VERSION_CODE}-${SHORT_SHA}-release-signed.apk"
-          } >> "$GITHUB_OUTPUT"
+          echo "app_version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "app_version_code=$version_code" >> "$GITHUB_OUTPUT"
       - name: Build debug and release APKs
         shell: bash
         env:
           VERSION_SEQ: ${{ github.run_number }}
-        run: |
-          set -euo pipefail
-          if [ -x ./gradlew ]; then
-            ./gradlew :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
-          else
-            gradle :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
-          fi
-      - name: Stage APKs
+        run: ./gradlew :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
+      - name: Verify APK outputs
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist/apk
-          DEBUG_APK=app/build/outputs/apk/prod/debug/app-prod-debug.apk
-          RELEASE_UNSIGNED_APK=app/build/outputs/apk/prod/release/app-prod-release-unsigned.apk
-          [[ -f "$DEBUG_APK" ]] || { echo "::error::Missing debug APK: $DEBUG_APK"; exit 1; }
-          [[ -f "$RELEASE_UNSIGNED_APK" ]] || { echo "::error::Missing unsigned release APK: $RELEASE_UNSIGNED_APK"; exit 1; }
-          cp "$DEBUG_APK" "dist/apk/${{ steps.meta.outputs.debug_file }}"
-          cp "$RELEASE_UNSIGNED_APK" "dist/apk/${{ steps.meta.outputs.release_unsigned_file }}"
-      - name: Sign release APK when secrets are available
-        id: sign
-        if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
-          apksigner sign --ks /tmp/release.keystore --ks-key-alias "$KEY_ALIAS" --ks-pass pass:"$KEYSTORE_PASSWORD" --key-pass pass:"$KEYSTORE_PASSWORD" --out "dist/apk/${{ steps.meta.outputs.release_signed_file }}" "dist/apk/${{ steps.meta.outputs.release_unsigned_file }}"
-          apksigner verify --verbose --print-certs "dist/apk/${{ steps.meta.outputs.release_signed_file }}" | tee dist/apk/apksigner-verify.txt
-          rm -f /tmp/release.keystore
-          echo 'signing_status=signed' >> "$GITHUB_OUTPUT"
-      - name: Resolve signing status
-        id: sign_status
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ steps.sign.outcome }}" == 'success' ]]; then
-            echo 'signing_status=signed' >> "$GITHUB_OUTPUT"
-          else
-            echo 'signing_status=skipped' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Generate checksum manifest
-        shell: bash
-        run: |
-          set -euo pipefail
-          (cd dist/apk && sha256sum -- ./*.apk > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, Node 20
-        with:
-          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
-          path: dist/apk/${{ steps.meta.outputs.debug_file }}
-          retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, Node 20
-        with:
-          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
-          path: dist/apk/${{ steps.meta.outputs.release_unsigned_file }}
-          retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, Node 20
-        if: steps.sign_status.outputs.signing_status == 'signed'
-        with:
-          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-signed-apk
-          path: |
-            dist/apk/${{ steps.meta.outputs.release_signed_file }}
-            dist/apk/apksigner-verify.txt
-          retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, Node 20
-        with:
-          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-checksums
-          path: dist/apk/SHA256SUMS.txt
-          retention-days: 14
+          debug_apk=app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          release_unsigned_apk=app/build/outputs/apk/prod/release/app-prod-release-unsigned.apk
+          [[ -f "$debug_apk" ]] || { echo "::error::Missing debug APK: $debug_apk"; exit 1; }
+          [[ -f "$release_unsigned_apk" ]] || { echo "::error::Missing unsigned release APK: $release_unsigned_apk"; exit 1; }
+          sha256sum "$debug_apk" "$release_unsigned_apk"
       - name: Write workflow summary
         shell: bash
         run: |
@@ -264,55 +82,6 @@ jobs:
           ## Android build summary
           - Debug APK built: yes
           - Unsigned release APK built: yes
-          - Signed release APK built: ${{ steps.sign_status.outputs.signing_status == 'signed' && 'yes' || 'no' }}
           - App version name: ${{ steps.meta.outputs.app_version_name }}
           - App version code: ${{ steps.meta.outputs.app_version_code }}
           EOF
-
-  release:
-    name: Publish Android release
-    runs-on: ubuntu-latest
-    needs: [lint-workflow, preflight, build]
-    if: needs.preflight.outputs.should_release == 'true'
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4, Node 20
-        with:
-          path: dist/incoming
-      - name: Prepare release assets
-        shell: bash
-        env:
-          SIGNING_STATUS: ${{ needs.build.outputs.signing_status }}
-          RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
-        run: |
-          set -euo pipefail
-          mkdir -p dist/release
-          cp dist/incoming/*/*.apk dist/release/
-          cp dist/incoming/*/SHA256SUMS.txt dist/release/ || true
-          if [[ "$SIGNING_STATUS" != 'signed' && "$RELEASE_KIND" == 'versioned' ]]; then
-            echo '::error::Versioned release requires signing secrets.'
-            exit 1
-          fi
-          if [[ "$SIGNING_STATUS" == 'signed' ]]; then
-            cp "dist/release/${{ needs.build.outputs.release_signed_file }}" dist/release/bot-blade.apk
-          else
-            cp "dist/release/${{ needs.build.outputs.release_unsigned_file }}" dist/release/bot-blade-release-unsigned.apk
-          fi
-          cp "dist/release/${{ needs.build.outputs.debug_file }}" dist/release/bot-blade-debug.apk
-          (cd dist/release && sha256sum -- *.apk > SHA256SUMS.txt)
-          cat > dist/release/INSTALL.md <<'EOF'
-          # Install BotBlade on Android
-
-          Download the APK from this release and open it on your Android device. Debug APKs are for testers and developers.
-          EOF
-      - name: Publish release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2, Node 20
-        with:
-          tag_name: ${{ needs.preflight.outputs.release_tag }}
-          name: BotBlade Android v${{ needs.build.outputs.app_version_name }}
-          prerelease: ${{ needs.preflight.outputs.release_kind == 'prerelease' }}
-          files: |
-            dist/release/*.apk
-            dist/release/SHA256SUMS.txt
-            dist/release/INSTALL.md
