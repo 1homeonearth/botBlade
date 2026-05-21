@@ -12,8 +12,8 @@
 ## LEFTOVERS.md usage
 - Review `LEFTOVERS.md` (if present) before new work.
 - Complete listed tasks before starting new prompt work.
-- If you cannot finish all requested work in one session, update/create `LEFTOVERS.md`
-  with concrete next steps.
+- If work cannot be completed in one session, update/create `LEFTOVERS.md`
+  with concrete continuation steps.
 
 ---
 
@@ -44,17 +44,29 @@ and release uploads fall back to the unsigned APK.
 **MANDATORY READ**: Before any work involving repository import, archive extraction,
 manifests, build plans, runtime profiles, terminal sessions, external app integrations,
 secrets, sandboxing, upstream dependencies, Rust crates, deployment security, or
-module/plugin systems — read:
+module/plugin systems, read:
 
   docs/design/botblade-security-manual/README.md
 
-## Codex runtime network constraints
-- **NEVER run `./gradlew` or `gradle`** to verify code changes. Ever.
+## Environment-scoped verification policy
+
+### Codex sandbox / cloud agent execution
+- Avoid `./gradlew` and `gradle` verification when the environment lacks network access,
+  Android SDK packages, or wrapper/bootstrap support.
 - Use `actionlint .github/workflows/android.yml` for workflow file verification.
-- Use static file inspection (read, grep) for all Kotlin error verification.
-- **All Gradle/APK build verification happens exclusively in GitHub Actions CI.**
+- Use static file inspection (`read`, `grep`, `rg`) for Kotlin error triage when Gradle
+  execution is unavailable.
+- Treat GitHub Actions CI as the source of truth for APK compilation in restricted agent
+  environments.
+
+### GitHub Actions / local developer runner
+- Run the smallest relevant check available for the change.
+- Android SDK preflight: `./scripts/android-sdk-preflight.sh`
+- Android debug assemble: `gradle :app:assembleDebug`
+- Android unit tests: `gradle :app:testLocalDevDebugUnitTest`
+- Backend build: `npm run build`
 
 ## APK compile failure triage protocol
-1. Run `actionlint .github/workflows/android.yml` → confirm exit 0.
+1. Run `actionlint .github/workflows/android.yml` and confirm exit 0.
 2. Read the first failing Gradle task from the CI log.
-3. Check if the failure is dependency resolution; if so, infra issue not code bug.
+3. Check if the failure is dependency resolution; if so, identify the infra or mirror issue before changing app code.
