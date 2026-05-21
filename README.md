@@ -12,6 +12,8 @@
 
 BotBlade is a mobile-first Android app plus local backend for creating, editing, building, and operating Discord bot projects.
 
+> Note: Android release publishing is temporarily paused while CI checks are being stabilized. APK build verification still runs in CI.
+
 ## What you can do today
 
 - Build and manage projects from Android: Dashboard, Projects, Editor, Deployments, and Settings.
