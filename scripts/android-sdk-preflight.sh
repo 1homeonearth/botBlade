@@ -27,6 +27,29 @@ MESSAGE
   exit 1
 }
 
+
+check_repo_access() {
+  local url="${ANDROID_PREFLIGHT_REPO_URL:-https://dl.google.com/dl/android/maven2/}"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "Android SDK preflight warning: curl not found; skipping optional repository reachability check." >&2
+    return 0
+  fi
+
+  local code
+  code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "$url" || true)
+  case "$code" in
+    200|301|302|403|404)
+      echo "Android SDK preflight repository check: reachable enough for diagnostics ($url -> HTTP $code)." >&2
+      ;;
+    000)
+      echo "Android SDK preflight warning: cannot reach $url (network/DNS/proxy). SDK install checks passed; continuing." >&2
+      ;;
+    *)
+      echo "Android SDK preflight warning: unexpected HTTP status $code from $url. SDK install checks passed; continuing." >&2
+      ;;
+  esac
+}
+
 if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
   ANDROID_HOME="$ANDROID_SDK_ROOT"
 fi
@@ -57,6 +80,10 @@ fi
 
 if (( ${#missing[@]} > 0 )); then
   fail "missing required SDK directory/directories: ${missing[*]}"
+fi
+
+if [[ "${ANDROID_PREFLIGHT_CHECK_NETWORK:-0}" == "1" ]]; then
+  check_repo_access
 fi
 
 echo "Android SDK preflight passed for $ANDROID_HOME"
