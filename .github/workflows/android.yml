@@ -184,6 +184,11 @@ jobs:
         run: |
           set -euo pipefail
           sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Android dependency repository preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/android-sdk-preflight.sh
       - name: Extract app metadata
         id: meta
         shell: bash
@@ -370,17 +375,17 @@ jobs:
         run: |
           set -euo pipefail
           (cd dist/apk && sha256sum -- ./*.apk > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 (Node 24)
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
           path: dist/apk/${{ steps.meta.outputs.debug_file }}
           retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 (Node 24)
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
           path: dist/apk/${{ steps.meta.outputs.release_unsigned_file }}
           retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 (Node 24)
         if: steps.sign.outputs.signing_status == 'signed'
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-signed-apk
@@ -388,7 +393,7 @@ jobs:
             dist/apk/${{ steps.meta.outputs.release_signed_file }}
             dist/apk/apksigner-verify.txt
           retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 (Node 24)
         if: github.event_name == 'pull_request'
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-checksums
