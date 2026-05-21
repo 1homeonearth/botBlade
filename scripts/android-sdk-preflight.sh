@@ -12,27 +12,55 @@ check_android_home() {
     ANDROID_HOME="$ANDROID_SDK_ROOT"
     export ANDROID_HOME
   fi
+
   if [[ -z "${ANDROID_HOME:-}" ]]; then
     fail "ANDROID_HOME is not set"
-  else
-    pass "ANDROID_HOME=$ANDROID_HOME"
+    return
   fi
+
+  if [[ ! -d "$ANDROID_HOME" ]]; then
+    fail "ANDROID_HOME does not point to an existing directory: $ANDROID_HOME"
+    return
+  fi
+
+  pass "ANDROID_HOME=$ANDROID_HOME"
+
+  local required_components=(
+    "platforms/android-35"
+    "build-tools/35.0.0"
+    "platform-tools"
+  )
+  local component
+  for component in "${required_components[@]}"; do
+    if [[ -d "$ANDROID_HOME/$component" ]]; then
+      pass "Android SDK component present: $component"
+    else
+      fail "Missing Android SDK component: $ANDROID_HOME/$component"
+    fi
+  done
 }
 
 check_repo_access() {
-  local url="https://dl.google.com/dl/android/maven2/"
+  if [[ "${ANDROID_PREFLIGHT_CHECK_NETWORK:-0}" != "1" ]]; then
+    warn "Skipping Maven network probe; set ANDROID_PREFLIGHT_CHECK_NETWORK=1 for connectivity diagnostics."
+    return 0
+  fi
+
+  local url="${ANDROID_PREFLIGHT_MAVEN_URL:-https://dl.google.com/dl/android/maven2/}"
   local http_code
   http_code=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || echo "000")
   case "$http_code" in
-    200|301|302|403|404)
+    200|301|302|404)
       pass "Maven repo reachable (HTTP $http_code)"
       ;;
     000)
-      fail "Maven repo unreachable (network/proxy/DNS failure). Set HTTPS_PROXY or fix DNS."
+      warn "Maven repo unreachable (network/proxy/DNS failure). Builds may still work with cached dependencies or mirrors."
+      ;;
+    403)
+      warn "Maven repo returned HTTP 403. Check proxy/auth policy if dependency resolution later fails."
       ;;
     *)
-      warn "Maven repo returned HTTP $http_code — investigate if builds fail"
-      pass "Maven probe completed"
+      warn "Maven repo returned HTTP $http_code. Investigate if builds fail."
       ;;
   esac
 }
@@ -44,7 +72,7 @@ main() {
     echo "[preflight] $FAIL check(s) failed. Fix before building." >&2
     exit 1
   fi
-  log "All preflight checks passed."
+  log "All required preflight checks passed."
 }
 
 main "$@"
