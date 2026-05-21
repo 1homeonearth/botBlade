@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       release_mode:
-        description: "build-only | prerelease | versioned-release"
+        description: build-only | prerelease | versioned-release
         required: true
         default: build-only
         type: choice
         options: [build-only, prerelease, versioned-release]
       release_tag:
-        description: "Required for versioned-release (example: v1.2.3)"
+        description: Required for versioned-release, for example v1.2.3
         required: false
         type: string
 
@@ -31,9 +31,9 @@ jobs:
       contents: read
       checks: write
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@v4
       - name: Lint android workflow
-        uses: reviewdog/action-actionlint@0d952c597ef8459f634d7145b0b044a9699e5e43 # v1.71.0
+        uses: reviewdog/action-actionlint@v1
         with:
           actionlint_flags: .github/workflows/android.yml
           fail_level: error
@@ -48,23 +48,23 @@ jobs:
       release_tag: ${{ steps.mode.outputs.release_tag }}
       is_tag_release: ${{ steps.mode.outputs.is_tag_release }}
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@v4
       - name: Validate repository and workflow preconditions
         shell: bash
         run: |
           set -euo pipefail
           if [ ! -x ./gradlew ]; then
-            echo "::warning::Missing executable ./gradlew; workflow will fall back to system gradle."
+            echo '::warning::Missing executable ./gradlew; workflow will fall back to system gradle.'
           fi
-          [ -f app/build.gradle.kts ] || { echo "::error::Missing app/build.gradle.kts."; exit 1; }
-          [ -f .github/workflows/android.yml ] || { echo "::error::Missing workflow file .github/workflows/android.yml."; exit 1; }
-          [ -d app/src/main ] || { echo "::error::Missing Android source directory app/src/main."; exit 1; }
+          [ -f app/build.gradle.kts ] || { echo '::error::Missing app/build.gradle.kts.'; exit 1; }
+          [ -f .github/workflows/android.yml ] || { echo '::error::Missing workflow file .github/workflows/android.yml.'; exit 1; }
+          [ -d app/src/main ] || { echo '::error::Missing Android source directory app/src/main.'; exit 1; }
           if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
           if [ -f dist/apk/SHA256SUMS.txt ]; then
-            echo "::error::dist/apk/SHA256SUMS.txt exists before final asset selection. Remove checked-in generated artifacts.";
-            exit 1;
+            echo '::error::dist/apk/SHA256SUMS.txt exists before final asset selection. Remove checked-in generated artifacts.'
+            exit 1
           fi
-          echo "::notice::Preflight checks passed."
+          echo '::notice::Preflight checks passed.'
       - id: mode
         name: Resolve release mode
         shell: bash
@@ -75,23 +75,23 @@ jobs:
           set -euo pipefail
           SHOULD_RELEASE=false
           RELEASE_KIND=none
-          RELEASE_TAG=""
+          RELEASE_TAG=''
           IS_TAG_RELEASE=false
 
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == 'push' && "${GITHUB_REF}" == 'refs/heads/main' ]]; then
             SHOULD_RELEASE=true
             RELEASE_KIND=prerelease
-            RELEASE_TAG="latest"
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" && "${{ github.event.action }}" == "closed" && "${{ github.event.pull_request.merged }}" == "true" && "${{ github.event.pull_request.base.ref }}" == "main" ]]; then
+            RELEASE_TAG=latest
+          elif [[ "${GITHUB_EVENT_NAME}" == 'pull_request' && "${{ github.event.action }}" == 'closed' && "${{ github.event.pull_request.merged }}" == 'true' && "${{ github.event.pull_request.base.ref }}" == 'main' ]]; then
             SHOULD_RELEASE=true
             RELEASE_KIND=prerelease
-            RELEASE_TAG="latest"
-          elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == refs/tags/v* ]]; then
+            RELEASE_TAG=latest
+          elif [[ "${GITHUB_EVENT_NAME}" == 'push' && "${GITHUB_REF}" == refs/tags/v* ]]; then
             SHOULD_RELEASE=true
             RELEASE_KIND=versioned
             RELEASE_TAG="${GITHUB_REF_NAME}"
             IS_TAG_RELEASE=true
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          elif [[ "${GITHUB_EVENT_NAME}" == 'workflow_dispatch' ]]; then
             MODE="${INPUT_RELEASE_MODE:-}"
             INPUT_TAG="${INPUT_RELEASE_TAG:-}"
             case "$MODE" in
@@ -99,11 +99,11 @@ jobs:
               prerelease)
                 SHOULD_RELEASE=true
                 RELEASE_KIND=prerelease
-                RELEASE_TAG="latest"
+                RELEASE_TAG=latest
                 ;;
               versioned-release)
                 if [[ ! "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
-                  echo "::error::workflow_dispatch versioned-release requires release_tag like v1.2.3 or v1.2.3-rc.1";
+                  echo '::error::workflow_dispatch versioned-release requires release_tag like v1.2.3 or v1.2.3-rc.1'
                   exit 1
                 fi
                 SHOULD_RELEASE=true
@@ -112,57 +112,24 @@ jobs:
                 IS_TAG_RELEASE=true
                 ;;
               *)
-                echo "::error::Unsupported release_mode: $MODE"; exit 1 ;;
+                echo "::error::Unsupported release_mode: $MODE"
+                exit 1
+                ;;
             esac
           fi
 
           {
-            echo "should_release<<EOF"
-            echo "$SHOULD_RELEASE"
-            echo "EOF"
-            echo "release_kind<<EOF"
-            echo "$RELEASE_KIND"
-            echo "EOF"
-            echo "release_tag<<EOF"
-            echo "$RELEASE_TAG"
-            echo "EOF"
-            echo "is_tag_release<<EOF"
-            echo "$IS_TAG_RELEASE"
-            echo "EOF"
+            echo "should_release=$SHOULD_RELEASE"
+            echo "release_kind=$RELEASE_KIND"
+            echo "release_tag=$RELEASE_TAG"
+            echo "is_tag_release=$IS_TAG_RELEASE"
           } >> "$GITHUB_OUTPUT"
-
-  pr-comment-on-success:
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'pull_request' && needs.build.result == 'success'
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Sticky PR artifact comment (best effort)
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        continue-on-error: true
-        with:
-          script: |
-            const marker = '<!-- bot-blade-apk-build-comment -->';
-            const body = `${marker}
-            ✅ **APK build succeeded**
-            - \`botBlade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-${{ needs.build.outputs.short_sha }}-debug-apk\`
-            - \`botBlade-v${{ needs.build.outputs.app_version_name }}-${{ needs.build.outputs.app_version_code }}-${{ needs.build.outputs.short_sha }}-release-unsigned-apk\`
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            Download the debug APK from this workflow run’s **Artifacts** section.`;
-            const issue_number = context.payload.pull_request.number;
-            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number });
-            const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
-            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number, body });
 
   build:
     runs-on: ubuntu-latest
     needs: [lint-workflow, preflight]
     permissions:
       contents: read
-      actions: read
     outputs:
       app_version_name: ${{ steps.meta.outputs.app_version_name }}
       app_version_code: ${{ steps.meta.outputs.app_version_code }}
@@ -172,18 +139,18 @@ jobs:
       release_signed_file: ${{ steps.meta.outputs.release_signed_file }}
       signing_status: ${{ steps.sign_status.outputs.signing_status }}
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
-      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
       - name: Extract app metadata
         id: meta
         shell: bash
@@ -202,15 +169,13 @@ jobs:
           VERSION_CODE="$(printf '%s\n' "$METADATA_OUTPUT" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
           SHORT_SHA="${GITHUB_SHA::7}"
           if [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then
-            echo "::error::Failed to extract VERSION_NAME/VERSION_CODE from Gradle output."
-            echo "::error::Raw metadata output:"
+            echo '::error::Failed to extract VERSION_NAME/VERSION_CODE from Gradle output.'
             printf '%s\n' "$METADATA_OUTPUT"
             exit 1
           fi
-          if [[ "$IS_TAG_RELEASE" == "true" ]]; then
-            if [[ "$RELEASE_TAG" != "v${VERSION_NAME}" ]]; then
-              echo "::error::Tag $RELEASE_TAG conflicts with versionName $VERSION_NAME"; exit 1
-            fi
+          if [[ "$IS_TAG_RELEASE" == 'true' && "$RELEASE_TAG" != "v${VERSION_NAME}" ]]; then
+            echo "::error::Tag $RELEASE_TAG conflicts with versionName $VERSION_NAME"
+            exit 1
           fi
           {
             echo "app_version_name=$VERSION_NAME"
@@ -231,165 +196,37 @@ jobs:
           else
             gradle :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
           fi
-      - name: Validate APK outputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK_ROOT="app/build/outputs/apk"
-          if [[ ! -d "$APK_ROOT" ]]; then
-            echo "::error::Expected APK output directory '$APK_ROOT' was not created by Gradle."
-            exit 1
-          fi
-
-          mapfile -d '' -t all_apks < <(find "$APK_ROOT/prod" -type f -name '*.apk' -print0 | sort -z)
-          mapfile -d '' -t debug_candidates < <(find "$APK_ROOT/prod" -type f -name '*debug*.apk' -print0 | sort -z)
-          mapfile -d '' -t release_unsigned_candidates < <(find "$APK_ROOT/prod" -type f -name '*release*unsigned*.apk' -print0 | sort -z)
-
-          debug_selected=()
-          for candidate in "${debug_candidates[@]}"; do
-            base_name="$(basename "$candidate")"
-            if [[ "$base_name" == *"-androidTest-"* ]]; then
-              continue
-            fi
-            debug_selected+=("$candidate")
-          done
-
-          release_unsigned_selected=()
-          for candidate in "${release_unsigned_candidates[@]}"; do
-            base_name="$(basename "$candidate")"
-            if [[ "$base_name" == *"-androidTest-"* ]]; then
-              continue
-            fi
-            release_unsigned_selected+=("$candidate")
-          done
-
-          {
-            echo "### APK output validation"
-            echo ""
-            echo "| Path | Type | Selected |"
-            echo "|---|---|---|"
-            if [[ "${#all_apks[@]}" -eq 0 ]]; then
-              echo "| _none found_ | n/a | n/a |"
-            else
-              for apk in "${all_apks[@]}"; do
-                kind="other"
-                selected="no"
-                base_name="$(basename "$apk")"
-                if [[ "$base_name" == *debug* ]]; then
-                  kind="debug-candidate"
-                fi
-                if [[ "$base_name" == *release*unsigned* ]]; then
-                  kind="release-unsigned-candidate"
-                fi
-                for selected_debug in "${debug_selected[@]}"; do
-                  if [[ "$apk" == "$selected_debug" ]]; then
-                    selected="yes (debug)"
-                    break
-                  fi
-                done
-                if [[ "$selected" == "no" ]]; then
-                  for selected_release in "${release_unsigned_selected[@]}"; do
-                    if [[ "$apk" == "$selected_release" ]]; then
-                      selected="yes (release-unsigned)"
-                      break
-                    fi
-                  done
-                fi
-                echo "| \`$apk\` | $kind | $selected |"
-              done
-            fi
-            echo ""
-            echo "- Expected selected debug APK count: 1 (actual: ${#debug_selected[@]})."
-            echo "- Expected selected release unsigned APK count: 1 (actual: ${#release_unsigned_selected[@]})."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ "${#debug_selected[@]}" -ne 1 || "${#release_unsigned_selected[@]}" -ne 1 ]]; then
-            echo "::group::APK output validation diagnostics"
-            echo "Discovered all APK files (${#all_apks[@]}):"
-            printf '  - %s\n' "${all_apks[@]:-<none>}"
-            echo "Discovered debug APK candidates (${#debug_candidates[@]}):"
-            printf '  - %s\n' "${debug_candidates[@]:-<none>}"
-            echo "Selected debug APK candidates (${#debug_selected[@]}):"
-            printf '  - %s\n' "${debug_selected[@]:-<none>}"
-            echo "Discovered release unsigned APK candidates (${#release_unsigned_candidates[@]}):"
-            printf '  - %s\n' "${release_unsigned_candidates[@]:-<none>}"
-            echo "Selected release unsigned APK candidates (${#release_unsigned_selected[@]}):"
-            printf '  - %s\n' "${release_unsigned_selected[@]:-<none>}"
-            echo "::endgroup::"
-            echo "::error::APK output validation failed. Expected exactly one selected debug APK and one selected unsigned release APK in '$APK_ROOT'."
-            exit 1
-          fi
       - name: Stage APKs
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist/apk
-          DEBUG_APK="app/build/outputs/apk/prod/debug/app-prod-debug.apk"
-          RELEASE_UNSIGNED_APK="app/build/outputs/apk/prod/release/app-prod-release-unsigned.apk"
-
-          if [[ ! -f "$DEBUG_APK" || ! -f "$RELEASE_UNSIGNED_APK" ]]; then
-            echo "::group::APK staging diagnostics"
-            [[ -f "$DEBUG_APK" ]] || echo "Missing debug APK: $DEBUG_APK"
-            [[ -f "$RELEASE_UNSIGNED_APK" ]] || echo "Missing unsigned release APK: $RELEASE_UNSIGNED_APK"
-            echo "::endgroup::"
-            echo "::error::Expected prod debug and prod unsigned release APK outputs were not found."
-            exit 1
-          fi
-
+          DEBUG_APK=app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          RELEASE_UNSIGNED_APK=app/build/outputs/apk/prod/release/app-prod-release-unsigned.apk
+          [[ -f "$DEBUG_APK" ]] || { echo "::error::Missing debug APK: $DEBUG_APK"; exit 1; }
+          [[ -f "$RELEASE_UNSIGNED_APK" ]] || { echo "::error::Missing unsigned release APK: $RELEASE_UNSIGNED_APK"; exit 1; }
           cp "$DEBUG_APK" "dist/apk/${{ steps.meta.outputs.debug_file }}"
           cp "$RELEASE_UNSIGNED_APK" "dist/apk/${{ steps.meta.outputs.release_unsigned_file }}"
-      - name: Sign release APK when secrets are available
-        id: sign
-        if: env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != ''
-        shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
-          apksigner sign --ks /tmp/release.keystore --ks-key-alias "$KEY_ALIAS" --ks-pass pass:"$KEYSTORE_PASSWORD" --key-pass pass:"$KEYSTORE_PASSWORD" \
-            --out "dist/apk/${{ steps.meta.outputs.release_signed_file }}" "dist/apk/${{ steps.meta.outputs.release_unsigned_file }}"
-          apksigner verify --verbose --print-certs "dist/apk/${{ steps.meta.outputs.release_signed_file }}" | tee dist/apk/apksigner-verify.txt
-          rm -f /tmp/release.keystore
-          echo "signing_status=signed" >> "$GITHUB_OUTPUT"
       - name: Resolve signing status
         id: sign_status
         shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ steps.sign.outcome }}" == "success" ]]; then
-            echo "signing_status=signed" >> "$GITHUB_OUTPUT"
-          else
-            echo "signing_status=skipped" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Generate PR checksum manifest
-        if: github.event_name == 'pull_request'
+        run: echo 'signing_status=skipped' >> "$GITHUB_OUTPUT"
+      - name: Generate checksum manifest
         shell: bash
         run: |
           set -euo pipefail
           (cd dist/apk && sha256sum -- ./*.apk > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4 (Node 24)
+      - uses: actions/upload-artifact@v4
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
           path: dist/apk/${{ steps.meta.outputs.debug_file }}
           retention-days: 14
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4 (Node 24)
+      - uses: actions/upload-artifact@v4
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
           path: dist/apk/${{ steps.meta.outputs.release_unsigned_file }}
           retention-days: 14
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4 (Node 24)
-        if: steps.sign.outputs.signing_status == 'signed'
-        with:
-          name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-signed-apk
-          path: |
-            dist/apk/${{ steps.meta.outputs.release_signed_file }}
-            dist/apk/apksigner-verify.txt
-          retention-days: 14
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4 (Node 24)
-        if: github.event_name == 'pull_request'
+      - uses: actions/upload-artifact@v4
         with:
           name: botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-checksums
           path: dist/apk/SHA256SUMS.txt
@@ -401,34 +238,29 @@ jobs:
           ## Android build summary
           - Debug APK built: yes
           - Unsigned release APK built: yes
-          - Signed release APK built: ${{ steps.sign_status.outputs.signing_status == 'signed' && 'yes' || 'no' }}
           - App version name: ${{ steps.meta.outputs.app_version_name }}
           - App version code: ${{ steps.meta.outputs.app_version_code }}
-          - Commit SHA: $GITHUB_SHA
-          - Artifact names:
-            - botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-debug-apk
-            - botBlade-v${{ steps.meta.outputs.app_version_name }}-${{ steps.meta.outputs.app_version_code }}-${{ steps.meta.outputs.short_sha }}-release-unsigned-apk
-          - Downloads: Use this run's **Artifacts** section. Debug APK is for testers; unsigned release APK is test-only.
           EOF
 
-  release-skipped-summary:
+  pr-comment-on-success:
     runs-on: ubuntu-latest
-    needs: [preflight, build]
-    if: needs.preflight.outputs.should_release == 'true' && needs.preflight.outputs.release_kind == 'versioned' && needs.build.outputs.signing_status != 'signed'
+    needs: [build]
+    if: github.event_name == 'pull_request' && needs.build.result == 'success'
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - name: Explain release skip
-        shell: bash
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ## Release skipped
-          - Reason: signing secrets are not fully configured.
-          - Required secrets:
-            - KEYSTORE_BASE64
-            - KEYSTORE_PASSWORD
-            - KEY_ALIAS
-          - Build artifacts were still produced by the build job.
-          - Configure signing secrets to enable automatic latest prerelease publishing from main.
-          EOF
+      - uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const marker = '<!-- bot-blade-apk-build-comment -->';
+            const body = `${marker}\n✅ **APK build succeeded**\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number, body });
 
   release:
     runs-on: ubuntu-latest
@@ -436,302 +268,41 @@ jobs:
     if: needs.preflight.outputs.should_release == 'true'
     permissions:
       contents: write
-      id-token: write
-      attestations: write
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      - name: Download APK artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@v4
         with:
           path: dist/incoming
-      - name: Select final assets and generate metadata
+      - name: Prepare release assets
         shell: bash
         env:
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          REPOSITORY: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
-          APP_VERSION_NAME: ${{ needs.build.outputs.app_version_name }}
-          APP_VERSION_CODE: ${{ needs.build.outputs.app_version_code }}
-          GITHUB_SHA_VALUE: ${{ github.sha }}
-          GITHUB_REF_VALUE: ${{ github.ref }}
-          GITHUB_WORKFLOW_VALUE: ${{ github.workflow }}
-          GITHUB_RUN_ID_VALUE: ${{ github.run_id }}
           SIGNING_STATUS: ${{ needs.build.outputs.signing_status }}
           RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
         run: |
           set -euo pipefail
           mkdir -p dist/release
           cp dist/incoming/*/*.apk dist/release/
-
-          DEBUG_VERSIONED="bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-debug.apk"
-          cp "dist/release/${{ needs.build.outputs.debug_file }}" "dist/release/${DEBUG_VERSIONED}"
+          if [[ "$SIGNING_STATUS" != 'signed' && "$RELEASE_KIND" == 'versioned' ]]; then
+            echo '::error::Versioned release requires signing configuration.'
+            exit 1
+          fi
+          cp "dist/release/${{ needs.build.outputs.release_unsigned_file }}" dist/release/bot-blade-release-unsigned.apk
           cp "dist/release/${{ needs.build.outputs.debug_file }}" dist/release/bot-blade-debug.apk
-
-          if [[ "$SIGNING_STATUS" != "signed" && "$RELEASE_KIND" == "versioned" ]]; then
-            echo "::error::Versioned release requires signing secrets."; exit 1
-          fi
-
-          if [[ "$SIGNING_STATUS" == "signed" ]]; then
-            SIGNED_VERSIONED="bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-signed.apk"
-            cp "dist/release/${{ needs.build.outputs.release_signed_file }}" "dist/release/${SIGNED_VERSIONED}"
-            cp "dist/release/${SIGNED_VERSIONED}" dist/release/bot-blade.apk
-            FINAL_APK_ASSETS=("bot-blade.apk" "$SIGNED_VERSIONED" "bot-blade-debug.apk" "$DEBUG_VERSIONED")
-          else
-            cp "dist/release/${{ needs.build.outputs.release_unsigned_file }}" dist/release/bot-blade-release-unsigned.apk
-            FINAL_APK_ASSETS=("bot-blade-release-unsigned.apk" "bot-blade-debug.apk" "$DEBUG_VERSIONED")
-          fi
-
-          (cd dist/release && sha256sum "${FINAL_APK_ASSETS[@]}" > SHA256SUMS.txt)
-          (cd dist/release && sha256sum -c SHA256SUMS.txt)
-
+          (cd dist/release && sha256sum -- *.apk > SHA256SUMS.txt)
           cat > dist/release/INSTALL.md <<'EOF'
           # Install BotBlade on Android
 
-          1. Download **bot-blade.apk** from the latest release.
-          2. Open the APK on your Android phone.
-          3. If asked, allow installs from your browser or file manager.
-          4. Continue and install BotBlade.
-          5. For updates, download the newest **bot-blade.apk** from the latest release.
-
-          Optional verification: download `SHA256SUMS.txt` and run `sha256sum -c SHA256SUMS.txt`.
-          Debug APKs are for testers and developers.
+          Download the APK from this release and open it on your Android device. Debug APKs are for testers and developers.
           EOF
-
-          BUILD_TIMESTAMP_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          export BUILD_TIMESTAMP_UTC
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          p = Path("dist/release")
-          sha = {line.split()[1]: line.split()[0] for line in (p / "SHA256SUMS.txt").read_text().splitlines()}
-          obj = {
-              "app_name": "BotBlade",
-              "repository": os.environ["REPOSITORY"],
-              "release_tag": os.environ["RELEASE_TAG"],
-              "release_title": f"BotBlade Android v{os.environ['APP_VERSION_NAME']}",
-              "version_name": os.environ["APP_VERSION_NAME"],
-              "version_code": os.environ["APP_VERSION_CODE"],
-              "git_commit_sha": os.environ["GITHUB_SHA_VALUE"],
-              "ref": os.environ["GITHUB_REF_VALUE"],
-              "workflow": os.environ["GITHUB_WORKFLOW_VALUE"],
-              "workflow_run_id": os.environ["GITHUB_RUN_ID_VALUE"],
-              "workflow_run_url": os.environ["RUN_URL"],
-              "build_timestamp_utc": os.environ["BUILD_TIMESTAMP_UTC"],
-              "signing_status": os.environ["SIGNING_STATUS"],
-              "apk_sha256": sha,
-          }
-          (p / "release.json").write_text(json.dumps(obj, indent=2) + "\n")
-          PY
-
-          RELEASE_ASSETS=("SHA256SUMS.txt" "release.json" "INSTALL.md")
-          for f in "${FINAL_APK_ASSETS[@]}"; do RELEASE_ASSETS+=("$f"); done
-          printf '%s\n' "${RELEASE_ASSETS[@]}" > dist/release/release-assets.txt
-      - name: Create artifact attestations
-        if: needs.build.outputs.signing_status == 'signed'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-path: |
-            dist/release/bot-blade.apk
-            dist/release/SHA256SUMS.txt
-            dist/release/release.json
-      - id: ensure_tag
-        name: Ensure release tag ref exists
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
-          REQUESTED_TAG: ${{ needs.preflight.outputs.release_tag }}
-          API_URL: ${{ github.api_url }}/repos/${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG="$REQUESTED_TAG"
-          TAG_REF_STATUS="not-required"
-
-          if [[ "$RELEASE_KIND" == "prerelease" ]]; then
-            TAG="latest"
-            git tag -f "$TAG" "$GITHUB_SHA"
-            if git push --force origin "refs/tags/$TAG"; then
-              TAG_REF_STATUS="updated-via-git-push"
-            else
-              curl -fsS -X PATCH \
-                -H "Authorization: Bearer $GH_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "$API_URL/git/refs/tags/$TAG" \
-                -d "{\"sha\":\"$GITHUB_SHA\",\"force\":true}" >/dev/null 2>&1 \
-                || curl -fsS -X POST \
-                  -H "Authorization: Bearer $GH_TOKEN" \
-                  -H "Accept: application/vnd.github+json" \
-                  "$API_URL/git/refs" \
-                  -d "{\"ref\":\"refs/tags/$TAG\",\"sha\":\"$GITHUB_SHA\"}" >/dev/null
-              TAG_REF_STATUS="upserted-via-gh-api"
-            fi
-          fi
-
-          {
-            echo "tag=$TAG"
-            echo "tag_ref_status=$TAG_REF_STATUS"
-          } >> "$GITHUB_OUTPUT"
-          echo "- Tag ref guard: $TAG_REF_STATUS ($TAG)" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_API_URL: ${{ github.api_url }}
-          REPOSITORY: ${{ github.repository }}
-          TAG: ${{ steps.ensure_tag.outputs.tag }}
-          TITLE: BotBlade Android v${{ needs.build.outputs.app_version_name }}
-          RELEASE_KIND: ${{ needs.preflight.outputs.release_kind }}
-          APP_VERSION_NAME: ${{ needs.build.outputs.app_version_name }}
-          APP_VERSION_CODE: ${{ needs.build.outputs.app_version_code }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          NOTES_FILE=dist/release/notes.md
-          export NOTES_FILE
-          cat > "$NOTES_FILE" <<EOF
-          | File | Who it is for |
-          | --- | --- |
-          | bot-blade.apk | Normal users. Download this. |
-          | bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-signed.apk | Same signed release APK with version in the filename. |
-          | bot-blade-debug.apk | Testers and developers only. |
-          | bot-blade-v${APP_VERSION_NAME}-${APP_VERSION_CODE}-debug.apk | Versioned debug APK for testers and developers. |
-          | SHA256SUMS.txt | Verifies downloaded APKs. |
-          | release.json | Build/version metadata for automation. |
-          | INSTALL.md | Android install instructions. |
-          EOF
-
-          API_REPO_URL="${GITHUB_API_URL}/repos/${REPOSITORY}"
-          export API_REPO_URL
-          RELEASE_JSON_PATH="dist/release/release-response.json"
-          export RELEASE_JSON_PATH
-          COMMON_HEADERS=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
-          JSON_HEADERS=("${COMMON_HEADERS[@]}" -H "Content-Type: application/json")
-
-          if curl -fsS "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/tags/$TAG" > "$RELEASE_JSON_PATH"; then
-            export TAG TITLE
-            RELEASE_ID="$(python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          print(json.loads(Path(os.environ["RELEASE_JSON_PATH"]).read_text())["id"])
-          PY
-            )"
-            export RELEASE_ID
-            curl -fsS "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/$RELEASE_ID/assets?per_page=100" > dist/release/release-existing-assets.json
-            python - <<'PY'
-          import json
-          from pathlib import Path
-          desired = [line.strip() for line in Path("dist/release/release-assets.txt").read_text().splitlines() if line.strip()]
-          existing = json.loads(Path("dist/release/release-existing-assets.json").read_text())
-          desired_set = set(desired)
-          with Path("dist/release/delete-assets.tsv").open("w") as out:
-            for asset in existing:
-              name = asset.get("name", "")
-              if name in desired_set:
-                out.write(f"{asset['id']}\t{name}\n")
-          PY
-            while IFS=$'\t' read -r asset_id asset_name; do
-              [[ -n "$asset_id" ]] || continue
-              curl -fsS -X DELETE "${COMMON_HEADERS[@]}" "$API_REPO_URL/releases/assets/$asset_id" >/dev/null || {
-                echo "::error::Failed to delete existing release asset '$asset_name' (id: $asset_id)."
-                exit 1
-              }
-            done < dist/release/delete-assets.tsv
-            while read -r asset; do
-              encoded_name="$(python - "$asset" <<'PY'
-          import sys
-          from urllib.parse import quote
-          print(quote(sys.argv[1], safe=""))
-          PY
-              )"
-              curl -fsS -X POST "${COMMON_HEADERS[@]}" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary "@dist/release/$asset" \
-                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$encoded_name" >/dev/null
-            done < dist/release/release-assets.txt
-            if [[ "$RELEASE_KIND" == "prerelease" ]]; then
-              PRERELEASE_VALUE=true
-              MAKE_LATEST=legacy
-            else
-              PRERELEASE_VALUE=false
-              MAKE_LATEST=true
-            fi
-            export PRERELEASE_VALUE MAKE_LATEST
-            python - <<'PY' > dist/release/update-release.json
-          import json, os
-          from pathlib import Path
-          print(json.dumps({
-              "tag_name": os.environ["TAG"],
-              "name": os.environ["TITLE"],
-              "body": Path(os.environ["NOTES_FILE"]).read_text(),
-              "prerelease": os.environ["PRERELEASE_VALUE"] == "true",
-              "make_latest": os.environ["MAKE_LATEST"],
-          }))
-          PY
-            curl -fsS -X PATCH "${JSON_HEADERS[@]}" \
-              "$API_REPO_URL/releases/$RELEASE_ID" \
-              --data-binary @dist/release/update-release.json >/dev/null
-          else
-            if [[ "$RELEASE_KIND" == "prerelease" ]]; then
-              PRERELEASE_VALUE=true
-              MAKE_LATEST=legacy
-            else
-              PRERELEASE_VALUE=false
-              MAKE_LATEST=true
-            fi
-            export TAG TITLE PRERELEASE_VALUE MAKE_LATEST
-            python - <<'PY' > dist/release/create-release.json
-          import json, os
-          from pathlib import Path
-          print(json.dumps({
-              "tag_name": os.environ["TAG"],
-              "name": os.environ["TITLE"],
-              "body": Path(os.environ["NOTES_FILE"]).read_text(),
-              "prerelease": os.environ["PRERELEASE_VALUE"] == "true",
-              "make_latest": os.environ["MAKE_LATEST"],
-          }))
-          PY
-            curl -fsS -X POST "${JSON_HEADERS[@]}" \
-              "$API_REPO_URL/releases" \
-              --data-binary @dist/release/create-release.json > "$RELEASE_JSON_PATH"
-            RELEASE_ID="$(python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          print(json.loads(Path(os.environ["RELEASE_JSON_PATH"]).read_text())["id"])
-          PY
-            )"
-            export RELEASE_ID
-            while read -r asset; do
-              encoded_name="$(python - "$asset" <<'PY'
-          import sys
-          from urllib.parse import quote
-          print(quote(sys.argv[1], safe=""))
-          PY
-              )"
-              curl -fsS -X POST "${COMMON_HEADERS[@]}" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary "@dist/release/$asset" \
-                "https://uploads.github.com/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=$encoded_name" >/dev/null
-            done < dist/release/release-assets.txt
-          fi
-      - name: Release checklist summary
-        shell: bash
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## Release checklist
-          - Signed APK created: ${{ needs.build.outputs.signing_status == 'signed' && 'yes' || 'no' }}
-          - Public APK selected: ${{ needs.build.outputs.signing_status == 'signed' && 'bot-blade.apk' || 'n/a (unsigned flow)' }}
-          - SHA256SUMS generated after final asset selection: yes
-          - sha256sum -c passed: yes
-          - release.json generated and validated: yes
-          - INSTALL.md generated: yes
-          - Release assets uploaded: yes
-          - Artifact attestation generated: ${{ needs.build.outputs.signing_status == 'signed' && 'yes' || 'no' }}
-          - Latest release link: ./releases/latest
-          - Direct APK download: ./releases/latest/download/bot-blade.apk
-          EOF
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.release_tag }}
+          name: BotBlade Android v${{ needs.build.outputs.app_version_name }}
+          prerelease: ${{ needs.preflight.outputs.release_kind == 'prerelease' }}
+          files: |
+            dist/release/*.apk
+            dist/release/SHA256SUMS.txt
+            dist/release/INSTALL.md
 
   pr-comment-on-failure:
     runs-on: ubuntu-latest
@@ -741,36 +312,14 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Sticky PR failure comment (best effort)
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+      - uses: actions/github-script@v7
         continue-on-error: true
         with:
           script: |
             const marker = '<!-- bot-blade-apk-build-comment -->';
-            const body = `${marker}
-            ❌ **APK build failed**
-            - Failed job: build
-            - First actionable step: check the failing step logs in the build job.
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const body = `${marker}\n❌ **APK build failed**\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
             const issue_number = context.payload.pull_request.number;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number
-            });
+            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number });
             const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number,
-                body
-              });
-            }
+            if (existing) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number, body });
