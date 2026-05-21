@@ -11,15 +11,35 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    defaults:
-      run:
-        working-directory: backend
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4, Node 20
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, Node 20
-        with:
-          node-version: '22'
-      - run: npm install
-      - run: npm run preflight:node
-      - run: npm run build
-      - run: npm test
+      - name: Checkout repository
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" fetch --no-tags --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+      - name: Verify Node runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+      - name: Install backend dependencies
+        shell: bash
+        working-directory: backend
+        run: npm install
+      - name: Run backend preflight
+        shell: bash
+        working-directory: backend
+        run: npm run preflight:node
+      - name: Build backend
+        shell: bash
+        working-directory: backend
+        run: npm run build
+      - name: Test backend
+        shell: bash
+        working-directory: backend
+        run: npm test
