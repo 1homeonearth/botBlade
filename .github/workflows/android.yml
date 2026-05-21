@@ -13,7 +13,6 @@ concurrency:
 
 jobs:
   build:
-    name: Android build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,7 +32,7 @@ jobs:
           [ -d app/src/main ] || { echo '::error::Missing Android source directory app/src/main.'; exit 1; }
           [ -f gradlew ] || { echo '::error::Missing Gradle wrapper.'; exit 1; }
           chmod +x ./gradlew
-      - name: Verify Android and Java tools
+      - name: Verify Java and Android home
         shell: bash
         run: |
           set -euo pipefail
@@ -43,7 +42,6 @@ jobs:
             echo '::error::ANDROID_HOME is not set on this runner.'
             exit 1
           fi
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
       - name: Extract app metadata
         id: meta
         shell: bash
