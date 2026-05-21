@@ -4,7 +4,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
 }
 
-
 allprojects {
     tasks.register("resolveAllDependencies") {
         group = "dependency"
@@ -14,10 +13,7 @@ allprojects {
                 .filter { it.isCanBeResolved }
                 .forEach { config ->
                     println("Resolving ${config.name} in ${project.name}")
-                    try { config.resolve() }
-                    catch (e: Exception) {
-                        println("Skipped ${config.name}: ${e.message}")
-                    }
+                    config.resolve()
                 }
         }
     }
