@@ -1,43 +1,61 @@
 # botBlade Security Design Manual
 
-This manual defines the architecture and guardrails for botBlade's Rust-centered security framework, terminal controls, external integrations, module system, and upstream governance.
+## Purpose
+This manual is the implementation-groundwork contract for botBlade's
+security architecture. Every agent working on repository import,
+archive extraction, manifests, build plans, runtime profiles, terminal
+sessions, external integrations, secrets, sandboxing, upstream
+dependencies, Rust crates, deployment security, or module/plugin
+systems must read this file before making changes.
 
-## Scope and intent
+## Scope
+Covers: Rust security core, policy/sandbox model, terminal and external
+integrations, module/upstream governance, and phased implementation roadmap.
 
-This manual is design-level groundwork for phased implementation. It does **not** claim that every control described here is already implemented.
+## Current state (as of this writing)
+- Design manual: complete (this document set)
+- Rust workspace: NOT YET IMPLEMENTED
+- Repo safety scanner: NOT YET IMPLEMENTED
+- Security policy gates: NOT YET IMPLEMENTED
+- Terminal backend sessions: NOT YET IMPLEMENTED
+- External integration registry: NOT YET IMPLEMENTED
+- Module/plugin system: NOT YET IMPLEMENTED
+- Android UI surfacing for security features: NOT YET IMPLEMENTED
 
-Primary goals:
-- Establish Rust as the security core for hostile-input and policy validation.
-- Preserve Kotlin Android and Node/TypeScript backend as product/app layers.
-- Keep active bots fast by validating early, caching verdicts, and avoiding unsafe runtime behavior.
-- Support universal workloads without regressing existing Discord behavior.
+Do not claim any of the above as implemented. Only add "implemented" next
+to an item when the code actually exists.
 
-## Document map
+## Non-negotiable security rules
 
-1. [01-rust-security-core.md](./01-rust-security-core.md)
-   - Security core responsibilities, trust boundaries, validation pipeline.
-2. [02-security-policy-and-sandboxing.md](./02-security-policy-and-sandboxing.md)
-   - Policy model, gates, profiles, and enforcement lifecycle.
-3. [03-terminal-and-external-integrations.md](./03-terminal-and-external-integrations.md)
-   - Terminal architecture, shell gating, Termux and OpenPGP integration model.
-4. [04-modules-upstream-governance.md](./04-modules-upstream-governance.md)
-   - Native module model and upstream code/dependency governance.
-5. [05-implementation-roadmap.md](./05-implementation-roadmap.md)
-   - Sequenced implementation plan, milestones, and test expectations.
-6. [upstreams.yml](./upstreams.yml)
-   - Registry for approved, candidate, and reference upstream components.
+1. Repository analysis MUST NEVER execute code. Static inspection only.
+2. Safety checks are preflight, cached, and policy-gated. Runtime hot
+   paths must not rescan the full repository while a bot is running.
+3. Secrets are stored as references with metadata. Secret VALUES are
+   never returned in API responses, logs, audit events, screenshots,
+   docs, tests, or fixtures.
+4. Every terminal path is scoped, gated, audited, and sanitized.
+5. External integrations use intents, deep links, OAuth, SAF, and
+   browser/custom tabs. No bundled proprietary SDKs without explicit
+   review and justification.
+6. No GPL-licensed code is vendored into the source tree. Ever.
+7. No upstream code is vendored without an upstreams.yml entry, license
+   review, and attribution comment.
+8. Rust is the preferred language for hostile-input parsing, path
+   normalization, archive validation, manifest validation, command-plan
+   validation, checksum/signature helpers, and policy evaluation.
+9. Fail closed: when a safety decision cannot be made, default to blocked.
+10. Existing Discord bot behavior must keep working throughout all changes.
 
-## Non-negotiable principles
+## Manual map
+- 01-rust-security-core.md — Rust workspace, crates, CLI contract, cache model
+- 02-security-policy-and-sandboxing.md — Gates, policy model, sandbox defaults, secrets
+- 03-terminal-and-external-integrations.md — Terminal modes, sanitizer, intent safety
+- 04-modules-upstream-governance.md — Module manifest, trust levels, upstream governance
+- 05-implementation-roadmap.md — Phased delivery plan
 
-- No repository code execution during import analysis.
-- No raw secret values in logs, docs, tests, screenshots, fixtures, or reports.
-- No implicit privileged operations; all sensitive actions require explicit policy.
-- No full-app vendoring of GPL applications (for example Termux app and OpenKeychain app).
-- No upstream vendoring without license review, provenance, pinning, tests, and attribution.
-
-## Maintenance contract
-
-When behavior changes in repo import, archive handling, manifests, build plans, runtime profiles, terminal sessions, external integrations, secret handling, sandboxing, upstream dependencies, Rust crates, deployment security, or native modules/plugins:
-- Update this manual in the same change set.
-- Add or update security-focused tests.
-- Ensure `upstreams.yml` remains consistent with integration and vendoring decisions.
+## How future agents use this manual
+- Read README.md before any work in the scope areas listed above.
+- Keep this manual updated when behavior changes.
+- Add tests for every security-gate, terminal, archive, repo-import,
+  or secret-handling change.
+- Do not mark a phase complete in the roadmap unless the code exists.

@@ -1,0 +1,8 @@
+{
+  "name": "botblade-workspace",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix backend run build",
+    "typecheck": "npm --prefix backend run typecheck 2>/dev/null || npm --prefix backend run build"
+  }
+}
