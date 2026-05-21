@@ -19,11 +19,19 @@ After editing, run the smallest useful check available.
 - Prefer targeted edits and preserve existing project conventions.
 - Use existing tooling/package managers already used by the repo.
 
-## Common build/test/lint checks
-- Android SDK preflight: `./scripts/android-sdk-preflight.sh`
-- Android debug assemble: `gradle :app:assembleDebug`
-- Android unit tests (flavor-specific): `gradle :app:testLocalDevDebugUnitTest`
-- Backend build: `npm run build`
+## Environment-scoped check policy
+
+### Codex sandbox / cloud agent execution
+- **Do not run Gradle commands** (`gradle`, `./gradlew`, or Android assemble/test tasks) from Codex sandbox sessions.
+- Use only the smallest offline-capable checks that do not require Android toolchain downloads (for example: targeted `npm` scripts, static validation, or file-level checks).
+- Never treat Gradle commands as universally required in Codex; defer Android triage to CI/local runners.
+
+### GitHub Actions / local developer runner
+- Use the following commands for Android triage when validating Android build/test issues in CI or on a fully provisioned local machine:
+  - Android SDK preflight: `./scripts/android-sdk-preflight.sh`
+  - Android debug assemble: `gradle :app:assembleDebug`
+  - Android unit tests (flavor-specific): `gradle :app:testLocalDevDebugUnitTest`
+- Backend build check (all environments when applicable): `npm run build`
 
 ## Android release signing secrets
 For required GitHub Actions signing secrets and setup notes, see `docs/ci/android-signing.md`.
@@ -47,11 +55,6 @@ For required GitHub Actions signing secrets and setup notes, see `docs/ci/androi
 - On each release (or at minimum every 5 releases), review and refresh user-facing release docs: `README.md`, `INSTALL.md`, and `docs/releases.md`.
 - Remove stale/manual release links in README and rely on the repository main page + latest-release automation paths.
 - Keep release notes concise: end-user changes, developer changes, known limitations.
-
-## Codex local check policy
-- In Codex/offline environments, avoid `./gradlew` checks that require wrapper downloads.
-- Prefer smallest offline-capable checks first (for example: `gradle` if available locally, targeted `npm`/script checks, and static file validation).
-- Do not change GitHub workflow validation behavior just to satisfy local Codex constraints.
 
 ## botBlade security design manual
 - Before modifying any of the following areas, read `docs/design/botblade-security-manual/README.md` and relevant linked sections:
