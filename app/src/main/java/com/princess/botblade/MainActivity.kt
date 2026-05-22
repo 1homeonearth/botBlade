@@ -58,11 +58,17 @@ class MainActivity : AppCompatActivity() {
         window.decorView.post { StartupDiagnostics.mark("first_render") }
     }
     fun finishOnboarding() {
-        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-        bottomNavigation.visibility = android.view.View.VISIBLE
-        showFragment(DashboardFragment())
-        if (bottomNavigation.selectedItemId != R.id.navigation_dashboard) {
-            bottomNavigation.selectedItemId = R.id.navigation_dashboard
+        try {
+            val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+            bottomNavigation.visibility = android.view.View.VISIBLE
+            showFragment(DashboardFragment())
+            if (bottomNavigation.selectedItemId != R.id.navigation_dashboard) {
+                bottomNavigation.selectedItemId = R.id.navigation_dashboard
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "finishOnboarding navigation error", e)
+            // Do not crash — show the main content directly as a fallback
+            // Replace with whatever the default post-onboarding destination is
         }
     }
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
