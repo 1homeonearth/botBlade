@@ -10,7 +10,7 @@
   <a href="../../releases/latest/download/bot-blade-debug.apk"><img alt="Download APK" src="https://img.shields.io/badge/Android-Download%20Debug%20APK-2ea44f" /></a>
 </p>
 
-BotBlade is a mobile-first Android app plus local backend for creating, editing, building, and operating Discord bot projects.
+BotBlade is a mobile-first Android app plus local backend for importing, creating, editing, building, and operating bot projects.
 
 > Debug APK releases are published automatically after successful merges to `main`. Versioning starts at `0.001` and increments by thousandths.
 
