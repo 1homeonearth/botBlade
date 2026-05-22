@@ -2,10 +2,12 @@ name: BotBlade Android APKs
 
 on:
   push:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref_name || github.run_id }}
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name || github.run_id }}
   cancel-in-progress: true
 
 jobs:
