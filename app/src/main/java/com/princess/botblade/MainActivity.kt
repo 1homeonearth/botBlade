@@ -67,8 +67,7 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "finishOnboarding navigation error", e)
-            // Do not crash — show the main content directly as a fallback
-            // Replace with whatever the default post-onboarding destination is
+            throw e
         }
     }
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
