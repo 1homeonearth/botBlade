@@ -1,101 +1,95 @@
 package com.princess.botblade
 
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
 import androidx.appcompat.app.AppCompatActivity
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.backend.BotEngineBindingState
 import com.princess.botblade.backend.BotEngineService
 import com.princess.botblade.data.api.ApiConfig
-import com.princess.botblade.data.repository.LocalProjectRepository
-import com.princess.botblade.data.store.ActiveProjectStore
 import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorFragment
-import com.princess.botblade.ui.logs.LogsFragment
-import com.princess.botblade.ui.onboarding.OnboardingFragment
 import com.princess.botblade.ui.projects.ProjectsFragment
 import com.princess.botblade.ui.settings.SettingsFragment
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-
-private val Context.dataStore by preferencesDataStore("onboarding")
-private val onboardingCompleteKey = booleanPreferencesKey("onboarding_complete")
 
 class MainActivity : AppCompatActivity() {
     private var bound = false
     private var binder: BotEngineService.LocalBinder? = null
+
     private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) { binder = service as? BotEngineService.LocalBinder; bound = true; BotEngineBindingState.serviceRunning.value = binder?.isRunning() }
-        override fun onServiceDisconnected(name: ComponentName?) { bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            binder = service as? BotEngineService.LocalBinder
+            bound = true
+            BotEngineBindingState.serviceRunning.value = binder?.isRunning()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            bound = false
+            binder = null
+            BotEngineBindingState.serviceRunning.value = null
+        }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         StartupDiagnostics.mark("main_activity_on_create_start")
         ApiConfig.initialize(this)
         setContentView(R.layout.activity_main)
-        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-        bottomNavigation.setOnItemSelectedListener { item -> when (item.itemId) {
-            R.id.navigation_dashboard -> { showFragment(DashboardFragment()); true }
-            R.id.navigation_projects -> { showFragment(ProjectsFragment()); true }
-            R.id.navigation_editor -> { showFragment(CodeEditorFragment()); true }
-            R.id.navigation_deployments -> { showFragment(DeploymentsFragment()); true }
-            R.id.navigation_settings -> { showFragment(SettingsFragment()); true }
-            else -> false
-        } }
-        lifecycleScope.launch {
-            val done = dataStore.data.first()[onboardingCompleteKey] == true
-            if (!done) { bottomNavigation.visibility = android.view.View.GONE; showFragment(OnboardingFragment()) }
-            else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
-        }
-        window.decorView.post { StartupDiagnostics.mark("first_render") }
-    }
-    fun finishOnboarding() {
-        if (isFinishing || isDestroyed) return
-        lifecycleScope.launch {
-            applicationContext.dataStore.edit { prefs -> prefs[onboardingCompleteKey] = true }
-            showDashboardAfterOnboarding()
-        }
-    }
 
-    private fun showDashboardAfterOnboarding() {
-        if (isFinishing || isDestroyed) return
-        val action = {
-            val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-            bottomNavigation.visibility = android.view.View.VISIBLE
-            if (supportFragmentManager.isStateSaved) {
-                bottomNavigation.selectedItemId = R.id.navigation_dashboard
-            } else {
-                showFragment(DashboardFragment())
-                if (bottomNavigation.selectedItemId != R.id.navigation_dashboard) {
-                    bottomNavigation.selectedItemId = R.id.navigation_dashboard
+        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.navigation_dashboard -> {
+                    showFragment(DashboardFragment())
+                    true
                 }
+                R.id.navigation_projects -> {
+                    showFragment(ProjectsFragment())
+                    true
+                }
+                R.id.navigation_editor -> {
+                    showFragment(CodeEditorFragment())
+                    true
+                }
+                R.id.navigation_deployments -> {
+                    showFragment(DeploymentsFragment())
+                    true
+                }
+                R.id.navigation_settings -> {
+                    showFragment(SettingsFragment())
+                    true
+                }
+                else -> false
             }
         }
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) action() else runOnUiThread { action() }
-    }
-    override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
-    override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }
-    fun showEditorForProject(projectName: String) {
-        val project = LocalProjectRepository(this).findProjectByName(projectName)
-        ActiveProjectStore(this).setActiveProject(project?.id ?: projectName, projectName)
-        showFragment(CodeEditorFragment())
-        findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
-    }
 
-    fun openLogsScreen() { showFragment(LogsFragment()) }
+        if (savedInstanceState == null) {
+            bottomNavigation.selectedItemId = R.id.navigation_dashboard
+        }
+
+        window.decorView.post { StartupDiagnostics.mark("first_render") }
+    }
 
     private fun showFragment(fragment: Fragment) {
         val tx = supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment)
         if (supportFragmentManager.isStateSaved) tx.commitAllowingStateLoss() else tx.commit()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        bindService(Intent(this, BotEngineService::class.java), connection, BIND_AUTO_CREATE)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (bound) {
+            unbindService(connection)
+            bound = false
+        }
     }
 }

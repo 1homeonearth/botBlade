@@ -1,4 +1,4 @@
-package com.princess.botblade.ui.onboarding
+package com.princess.botblade.future.onboarding
 
 import android.Manifest
 import android.content.pm.PackageManager
