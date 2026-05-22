@@ -90,6 +90,8 @@ class MainActivity : AppCompatActivity() {
         if (bound) {
             unbindService(connection)
             bound = false
+            binder = null
+            BotEngineBindingState.serviceRunning.value = null
         }
     }
 }
