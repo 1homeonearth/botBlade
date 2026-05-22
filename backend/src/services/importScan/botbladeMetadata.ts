@@ -3,7 +3,9 @@ import { BLADE_PACKS } from "../../bladepacks/packs.js";
 import type { ScanDetectionResult } from "./detector.js";
 
 export async function writeBotbladeMetadata(workspacePath: string, detection: ScanDetectionResult, importSource?: { kind: string; url?: string }): Promise<string> {
-  const selected = detection.matches[0];
+  const selected = detection.recommendedPackId === "unknown"
+    ? undefined
+    : detection.matches.find((match) => match.id === detection.recommendedPackId);
   const selectedPack = BLADE_PACKS.find((pack) => pack.id === selected?.id);
   const packageManager = await detectPackageManager(workspacePath);
   const metadata = {
