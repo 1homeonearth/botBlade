@@ -43,14 +43,17 @@ jobs:
               numeric="${latest_tag#v0.}"
               seq=$((10#$numeric + 1))
             fi
+            version_code=$((100000 + seq))
           else
             seq="${GITHUB_RUN_NUMBER}"
             latest_tag=""
+            version_code="$seq"
           fi
           version="0.$(printf '%03d' "$seq")"
           tag="v${version}"
           echo "release_event=$release_event" >> "$GITHUB_OUTPUT"
           echo "seq=$seq" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$latest_tag" >> "$GITHUB_OUTPUT"
@@ -77,9 +80,10 @@ jobs:
         shell: bash
         env:
           VERSION_SEQ: ${{ steps.version.outputs.seq }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: |
           set -euo pipefail
-          metadata_output="$(./gradlew -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" --no-daemon)"
+          metadata_output="$(./gradlew -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon)"
           version_name="$(printf '%s\n' "$metadata_output" | sed -n 's/^VERSION_NAME=//p' | tail -n1)"
           version_code="$(printf '%s\n' "$metadata_output" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
           if [[ -z "$version_name" || -z "$version_code" ]]; then
@@ -93,7 +97,8 @@ jobs:
         shell: bash
         env:
           VERSION_SEQ: ${{ steps.version.outputs.seq }}
-        run: ./gradlew :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: ./gradlew :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
       - name: Verify APK outputs
         shell: bash
         run: |
