@@ -7,12 +7,12 @@
 <p align="center">
   <a href="../../actions/workflows/android.yml"><img alt="Android CI" src="../../actions/workflows/android.yml/badge.svg" /></a>
   <a href="../../releases/latest"><img alt="Latest Release" src="https://img.shields.io/github/v/release/1homeonearth/botBlade?display_name=release" /></a>
-  <a href="../../releases/latest/download/bot-blade.apk"><img alt="Download APK" src="https://img.shields.io/badge/Android-Download%20APK-2ea44f" /></a>
+  <a href="../../releases/latest/download/bot-blade-debug.apk"><img alt="Download APK" src="https://img.shields.io/badge/Android-Download%20Debug%20APK-2ea44f" /></a>
 </p>
 
 BotBlade is a mobile-first Android app plus local backend for creating, editing, building, and operating Discord bot projects.
 
-> Note: Android release publishing is temporarily paused while CI checks are being stabilized. APK build verification still runs in CI.
+> Debug APK releases are published automatically after successful merges to `main`. Versioning starts at `0.001` and increments by thousandths.
 
 ## What you can do today
 
@@ -25,8 +25,8 @@ BotBlade is a mobile-first Android app plus local backend for creating, editing,
 ## Download and verify (end users)
 
 1. Open the latest release: [Latest Release](../../releases/latest)
-2. Download `bot-blade.apk`
-3. (Recommended) Verify checksum:
+2. Download `bot-blade-debug.apk`
+3. Verify checksum:
 
 ```bash
 sha256sum -c SHA256SUMS.txt
