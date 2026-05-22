@@ -15,6 +15,7 @@ import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUp
 import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
+import { scanAndGenerateBotbladeMetadata } from "./services/importScan/index.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
 const persistence = createPersistence();
@@ -254,6 +255,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "logs"));
     if (method === "GET" && deploymentId && action === "status") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "status"));
     if (method === "POST" && deploymentId && (action === "start" || action === "stop" || action === "restart" || action === "rollback")) { assertExecutionAccess(actor, "deployment actions"); return writeJson(res, 200, await deploymentStore.action(project, deploymentId, action)); }
+  }
+
+
+  const scanMatch = path.match(/^\/api\/projects\/([^/]+)\/scan$/);
+  if (scanMatch) {
+    const [, projectId] = scanMatch;
+    assertProjectAccess(actor, projectId);
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (method === "POST") {
+      assertExecutionAccess(actor, "project scan");
+      const workspacePath = fileService.workspace(projectId);
+      const result = await scanAndGenerateBotbladeMetadata(workspacePath, { kind: "generated-project", url: project.github?.repo ? `https://github.com/${project.github.owner}/${project.github.repo}` : undefined });
+      return writeJson(res, 200, result);
+    }
   }
 
   const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);

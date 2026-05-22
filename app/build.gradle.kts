@@ -79,6 +79,13 @@ android {
             versionNameSuffix = "-debug"
             isDebuggable = true
         }
+        create("ci") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".ci"
+            versionNameSuffix = "-ci"
+            isDebuggable = true
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isDebuggable = false
             isMinifyEnabled = false
