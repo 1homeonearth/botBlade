@@ -1,21 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="BotBlade app icon">
   <defs>
-    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#111f66"/>
-      <stop offset="1" stop-color="#08113f"/>
-    </linearGradient>
-    <linearGradient id="blade" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#dff7ff"/>
-      <stop offset="1" stop-color="#7ca4d6"/>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="pinkCyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff4ccb"/>
+      <stop offset="1" stop-color="#75efff"/>
     </linearGradient>
   </defs>
-  <rect x="24" y="24" width="976" height="976" rx="180" fill="url(#bg)" stroke="#2f4fa8" stroke-width="12"/>
-  <path d="M512 120 L612 270 L564 740 L460 740 L412 270 Z" fill="url(#blade)" stroke="#c9f5ff" stroke-width="8"/>
-  <path d="M512 220 L552 300 L538 730 L486 730 L472 300 Z" fill="#214687" opacity="0.85"/>
-  <rect x="252" y="560" width="520" height="96" rx="44" fill="#24345f" stroke="#39e6ff" stroke-width="10"/>
-  <rect x="474" y="656" width="76" height="182" fill="#20376f" stroke="#39e6ff" stroke-width="8"/>
-  <circle cx="512" cy="900" r="84" fill="#213a74" stroke="#39e6ff" stroke-width="10"/>
-  <circle cx="512" cy="900" r="34" fill="#36e9ff"/>
-  <rect x="388" y="430" width="84" height="50" rx="18" fill="#79f4ff" fill-opacity="0.32" stroke="#79f4ff" stroke-width="7"/>
-  <rect x="552" y="430" width="84" height="50" rx="18" fill="#79f4ff" fill-opacity="0.32" stroke="#79f4ff" stroke-width="7"/>
+  <rect width="1024" height="1024" rx="180" fill="#000"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M610 342 L806 132 L936 58 L900 270 L716 516" stroke="#75efff" stroke-width="22"/>
+    <path d="M764 380 L764 300 L834 230" stroke="#75efff" stroke-width="10"/>
+    <circle cx="834" cy="230" r="18" stroke="#75efff" stroke-width="10"/>
+    <path d="M190 724 L250 548 L380 486 L424 620 L344 764 L236 820 Z" stroke="#ff4ccb" stroke-width="18"/>
+    <path d="M834 724 L774 548 L644 486 L600 620 L680 764 L788 820 Z" stroke="#75efff" stroke-width="18"/>
+    <path d="M396 178 C456 118 568 118 628 178 L650 328 L610 470 L552 528 L472 528 L414 470 L374 328 Z" stroke="url(#pinkCyan)" stroke-width="18"/>
+    <path d="M374 306 L336 328 L336 430 L382 448 M650 306 L688 328 L688 430 L642 448" stroke="url(#pinkCyan)" stroke-width="14"/>
+    <path d="M412 352 L484 376 L462 398 C426 398 398 382 382 360 Z" fill="#ff2f92" stroke="none"/>
+    <path d="M612 352 L540 376 L562 398 C598 398 626 382 642 360 Z" fill="#ff2f92" stroke="none"/>
+    <path d="M414 438 C456 502 568 502 610 438" stroke="#ff2f92" stroke-width="24"/>
+    <path d="M334 548 L430 618 L594 618 L690 548 L724 804 L300 804 Z" stroke="url(#pinkCyan)" stroke-width="16"/>
+    <path d="M360 666 C428 596 596 596 664 666" stroke="#75efff" stroke-width="52"/>
+    <path d="M420 734 C470 684 554 684 604 734" stroke="#75efff" stroke-width="44"/>
+    <circle cx="512" cy="796" r="34" fill="#75efff" stroke="none"/>
+    <path d="M316 810 L708 810 Q738 810 738 840 L714 954 L310 954 L286 840 Q286 810 316 810 Z" stroke="url(#pinkCyan)" stroke-width="18"/>
+    <path d="M474 872 L430 912 L474 950 M550 872 L594 912 L550 950 M532 858 L492 964" stroke="#75efff" stroke-width="22"/>
+  </g>
 </svg>

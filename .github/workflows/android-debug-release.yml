@@ -18,9 +18,12 @@ jobs:
     steps:
       - name: Checkout repository
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git init .
+          gh auth setup-git
           git fetch --depth=250 --tags "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
           git checkout --force FETCH_HEAD
       - name: Resolve next debug version

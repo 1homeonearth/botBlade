@@ -84,9 +84,10 @@ private data class OnboardingPage(val icon: ImageVector, val title: String, val 
 @Composable
 private fun OnboardingPager(onFinish: () -> Unit) {
     val pages = listOf(
-        OnboardingPage(Icons.Default.Dashboard, "Monitor bots", "Watch builds, logs, and runtime health from one workspace."),
-        OnboardingPage(Icons.Default.Build, "Manage projects", "Edit project files with clear structure and repeatable workflow tools."),
-        OnboardingPage(Icons.Default.RocketLaunch, "Deploy faster", "Ship updates confidently with guided checks and quick actions."),
+        OnboardingPage(Icons.Default.Build, "Import or build bots", "Bring in a bot project or start a new one."),
+        OnboardingPage(Icons.Default.Dashboard, "Monitor bots", "Watch logs, builds, and runtime health."),
+        OnboardingPage(Icons.Default.Build, "Manage projects", "Edit files and keep each project organized."),
+        OnboardingPage(Icons.Default.RocketLaunch, "Deploy faster", "Run checks and ship updates with confidence."),
     )
     var index by remember { mutableStateOf(0) }
     val page = pages[index]
