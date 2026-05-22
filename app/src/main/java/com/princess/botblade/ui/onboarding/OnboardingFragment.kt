@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material3.Button
@@ -62,17 +61,8 @@ private val Context.dataStore by preferencesDataStore("onboarding")
 
 class OnboardingFragment : Fragment() {
     private val finishTriggered = AtomicBoolean(false)
-
-    override fun onCreateView(
-        inflater: android.view.LayoutInflater,
-        container: android.view.ViewGroup?,
-        savedInstanceState: android.os.Bundle?,
-    ) = ComposeView(requireContext()).apply {
-        setContent {
-            BotBladeTheme(useDynamicColor = isDynamicColorEnabled(requireContext())) {
-                OnboardingPager(onFinish = ::finishOnboardingFlow)
-            }
-        }
+    override fun onCreateView(inflater: android.view.LayoutInflater, container: android.view.ViewGroup?, savedInstanceState: android.os.Bundle?) = ComposeView(requireContext()).apply {
+        setContent { BotBladeTheme { OnboardingPager { finishOnboardingFlow() } } }
     }
 
     private fun finishOnboardingFlow() {
@@ -80,11 +70,8 @@ class OnboardingFragment : Fragment() {
         val host = activity as? MainActivity ?: return
         val appContext = requireContext().applicationContext
         host.lifecycleScope.launch {
-            runCatching {
-                appContext.dataStore.edit { prefs -> prefs[booleanPreferencesKey("onboarding_complete")] = true }
-            }
-            runCatching { host.finishOnboarding() }
-                .onFailure { finishTriggered.set(false) }
+            appContext.dataStore.edit { prefs -> prefs[booleanPreferencesKey("onboarding_complete")] = true }
+            host.finishOnboarding()
         }
     }
 }
@@ -97,7 +84,6 @@ private fun OnboardingPager(onFinish: () -> Unit) {
     val pages = listOf(
         OnboardingPage(Icons.Default.Build, "Import or build bots", "Bring in a bot project or start a new one."),
         OnboardingPage(Icons.Default.Dashboard, "Monitor bots", "Watch logs, builds, and runtime health."),
-        OnboardingPage(Icons.Default.Folder, "Manage projects", "Edit files and keep each project organized."),
         OnboardingPage(Icons.Default.Notifications, "Allow notifications", "Get build status and deployment updates."),
         OnboardingPage(Icons.Default.RocketLaunch, "Deploy faster", "Run checks and ship updates with confidence."),
     )
@@ -105,61 +91,44 @@ private fun OnboardingPager(onFinish: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val isLastPage = pagerState.currentPage == pages.lastIndex
-    var permissionStatus by remember { mutableStateOf("Optional") }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        permissionStatus = if (granted) "Allowed" else "Not allowed"
-    }
+    val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 30.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Spacer(modifier = Modifier.height(120.dp))
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth()) { pageIndex ->
+            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { pageIndex ->
                 val page = pages[pageIndex]
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(290.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(30.dp))
-                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(28.dp)).padding(horizontal = 24.dp, vertical = 28.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Icon(imageVector = page.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(imageVector = page.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
                         Text(text = page.title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
                         Text(text = page.description, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (pageIndex == 3) {
+                        if (pageIndex == 2 && Build.VERSION.SDK_INT >= 33) {
                             Button(onClick = {
-                                if (Build.VERSION.SDK_INT < 33) {
-                                    permissionStatus = "Already allowed on this Android version"
-                                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-                                    permissionStatus = "Already allowed"
-                                } else {
-                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                    requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
                             }) { Text("Grant notification permission") }
-                            Text(permissionStatus, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 repeat(pages.size) { index ->
                     val isSelected = pagerState.currentPage == index
-                    Box(
-                        modifier = Modifier.padding(horizontal = 4.dp).size(if (isSelected) 10.dp else 8.dp)
-                            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f), CircleShape),
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 4.dp).size(if (isSelected) 10.dp else 8.dp).background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f), CircleShape))
                 }
             }
-            Spacer(modifier = Modifier.height(14.dp))
-            Button(
-                onClick = { if (isLastPage) onFinish() else scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (isLastPage) "Finish" else "Next") }
+            Spacer(modifier = Modifier.height(4.dp))
+            Button(onClick = { if (isLastPage) onFinish() else scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (isLastPage) "Finish" else "Next")
+            }
         }
     }
 }

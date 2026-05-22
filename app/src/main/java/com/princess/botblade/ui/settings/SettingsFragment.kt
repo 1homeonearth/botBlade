@@ -114,7 +114,7 @@ class SettingsFragment : Fragment() {
         apkDownloadsText.text = getString(R.string.apk_download_links, "princessraven/botBlade")
         val dynamicColorSwitch = view.findViewById<SwitchMaterial>(R.id.dynamic_color_switch)
         val prefs = requireContext().getSharedPreferences("botblade_prefs", Context.MODE_PRIVATE)
-        dynamicColorSwitch.isChecked = isDynamicColorEnabled(requireContext())
+        dynamicColorSwitch.isChecked = prefs.getBoolean("use_dynamic_color", false)
         dynamicColorSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean("use_dynamic_color", checked).apply()
             requireActivity().recreate()

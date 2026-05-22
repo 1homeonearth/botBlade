@@ -37,10 +37,9 @@ fun BotBladeTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val dynamicColorAvailable = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colorScheme = when {
-        dynamicColorAvailable && darkTheme -> dynamicDarkColorScheme(context)
-        dynamicColorAvailable && !darkTheme -> dynamicLightColorScheme(context)
+        useDynamicColor && darkTheme -> dynamicDarkColorScheme(context)
+        useDynamicColor && !darkTheme -> dynamicLightColorScheme(context)
         darkTheme -> DarkColors
         else -> LightColors
     }
