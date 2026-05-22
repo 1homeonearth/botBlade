@@ -66,42 +66,30 @@ jobs:
         env:
           VERSION_SEQ: ${{ steps.version.outputs.seq }}
         run: ./gradlew :app:assembleDebug -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
-      - name: Stage release assets
+      - name: Stage release assets and notes
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
           PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
         run: |
           set -euo pipefail
           mkdir -p dist/release
           source_apk=app/build/outputs/apk/prod/debug/app-prod-debug.apk
           [ -f "$source_apk" ] || { echo "::error::Missing debug APK: $source_apk"; exit 1; }
-          cp "$source_apk" "dist/release/bot-blade-${VERSION}-debug.apk"
           cp "$source_apk" dist/release/bot-blade-debug.apk
-          (cd dist/release && sha256sum -- *.apk > SHA256SUMS.txt)
-          if [[ -n "$PREVIOUS_TAG" ]]; then
-            git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..HEAD" > dist/release/CHANGELOG.md
-          else
-            git log --pretty=format:'- %s (%h)' -n 50 > dist/release/CHANGELOG.md
-          fi
-          if [[ ! -s dist/release/CHANGELOG.md ]]; then
-            echo '- Initial debug release.' > dist/release/CHANGELOG.md
-          fi
-          cat > dist/release/release.json <<EOF
+          (cd dist/release && sha256sum bot-blade-debug.apk > SHA256SUMS.txt)
           {
-            "channel": "debug",
-            "version": "$VERSION",
-            "tag": "$TAG",
-            "commit": "$GITHUB_SHA",
-            "apk": "bot-blade-debug.apk"
-          }
-          EOF
-          cat > dist/release/INSTALL.md <<'EOF'
-          # Install BotBlade debug APK
-
-          Download `bot-blade-debug.apk` from this release and open it on your Android device.
-          EOF
+            echo "## BotBlade ${VERSION} Debug"
+            echo
+            echo "Debug APK generated automatically after merge to main."
+            echo
+            echo "### Changes"
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..HEAD"
+            else
+              git log --pretty=format:'- %s (%h)' -n 50
+            fi
+          } > dist/release/RELEASE_NOTES.md
       - name: Publish GitHub release
         shell: bash
         env:
@@ -111,9 +99,9 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/release/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG" dist/release/bot-blade-debug.apk dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$TAG" dist/release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/CHANGELOG.md --prerelease
+            gh release create "$TAG" dist/release/bot-blade-debug.apk dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/RELEASE_NOTES.md --prerelease
           fi
       - name: Write workflow summary
         shell: bash
