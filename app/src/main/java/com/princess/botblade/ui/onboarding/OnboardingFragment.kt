@@ -1,7 +1,6 @@
 package com.princess.botblade.ui.onboarding
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,11 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -48,18 +43,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.princess.botblade.MainActivity
 import com.princess.botblade.ui.theme.BotBladeTheme
-import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
-
-private val Context.dataStore by preferencesDataStore("onboarding")
 
 class OnboardingFragment : Fragment() {
     private val finishTriggered = AtomicBoolean(false)
@@ -69,12 +57,7 @@ class OnboardingFragment : Fragment() {
 
     private fun finishOnboardingFlow() {
         if (!isAdded || !finishTriggered.compareAndSet(false, true)) return
-        val host = activity as? MainActivity ?: return
-        val appContext = requireContext().applicationContext
-        host.lifecycleScope.launch {
-            appContext.dataStore.edit { prefs -> prefs[booleanPreferencesKey("onboarding_complete")] = true }
-            host.finishOnboarding()
-        }
+        (activity as? MainActivity)?.finishOnboarding()
     }
 }
 
@@ -138,8 +121,8 @@ private fun OnboardingPager(onFinish: () -> Unit) {
                     onClick = { if (isLastPage) onFinish() else scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
                     modifier = Modifier.weight(1f).padding(start = 12.dp),
                 ) {
-                Text(if (isLastPage) "Finish" else "Next")
-            }
+                    Text(if (isLastPage) "Finish" else "Next")
+                }
             }
         }
     }
