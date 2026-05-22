@@ -167,7 +167,7 @@ class SettingsFragment : Fragment() {
 
     private fun loadGitHubSection() = lifecycleScope.launch {
         githubStatus.text = getString(R.string.github_loading)
-        val activeProjectId = ActiveProjectStore(requireContext()).getActiveProjectId()
+        val activeProjectId = context?.let { ActiveProjectStore(it).getActiveProjectId() }
         val statusResult = projectRepository.getGitHubStatus()
         if (statusResult is ApiResult.Success) currentGitHubStatus = statusResult.data
         if (activeProjectId != null) {
@@ -219,7 +219,7 @@ class SettingsFragment : Fragment() {
     }
 
     private fun linkGitHubRepo() = lifecycleScope.launch {
-        val projectId = ActiveProjectStore(requireContext()).getActiveProjectId()
+        val projectId = context?.let { ActiveProjectStore(it).getActiveProjectId() }
         if (projectId == null) { githubStatus.text = getString(R.string.select_project_first); return@launch }
         val owner = githubOwnerInput.text.toString().trim()
         val repo = githubRepoInput.text.toString().trim()
@@ -237,7 +237,8 @@ class SettingsFragment : Fragment() {
     }
 
     private fun createWorkflow() = lifecycleScope.launch {
-        val projectId = ActiveProjectStore(requireContext()).getActiveProjectId() ?: return@launch
+        val projectId = context?.let { ActiveProjectStore(it).getActiveProjectId() }
+        if (projectId == null) { githubStatus.text = getString(R.string.select_project_first); return@launch }
         githubStatus.text = getString(R.string.github_workflow_creating)
         when (val result = projectRepository.createGitHubWorkflow(projectId)) {
             is ApiResult.Success -> githubStatus.text = getString(R.string.github_workflow_created, result.data.path)
@@ -247,7 +248,8 @@ class SettingsFragment : Fragment() {
     }
 
     private fun pushGitHub() = lifecycleScope.launch {
-        val projectId = ActiveProjectStore(requireContext()).getActiveProjectId() ?: return@launch
+        val projectId = context?.let { ActiveProjectStore(it).getActiveProjectId() }
+        if (projectId == null) { githubStatus.text = getString(R.string.select_project_first); return@launch }
         if (!pushGitHubButton.isEnabled) return@launch
         githubStatus.text = getString(R.string.github_push_starting)
         when (val result = projectRepository.pushGitHub(projectId)) {
@@ -285,7 +287,10 @@ class SettingsFragment : Fragment() {
 
     private fun createSecret() = lifecycleScope.launch {
         val value = valueInput.text.toString()
-        val request = SecretCreateRequest(projectId = projectInput.text.toString().takeIf { it.isNotBlank() }, name = nameInput.text.toString(), type = typeInput.text.toString().ifBlank { "custom" }, value = value)
+        val name = nameInput.text.toString().trim()
+        if (name.isBlank()) { status.text = "Secret name is required."; return@launch }
+        if (value.isBlank()) { status.text = "Secret value is required."; return@launch }
+        val request = SecretCreateRequest(projectId = projectInput.text.toString().takeIf { it.isNotBlank() }, name = name, type = typeInput.text.toString().ifBlank { "custom" }, value = value)
         status.text = "Saving secret reference…"
         when (val result = secretRepository.createSecret(request)) {
             is ApiResult.Success -> { valueInput.text?.clear(); status.text = getString(R.string.secret_saved_hidden); loadSecrets() }
