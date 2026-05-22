@@ -142,7 +142,11 @@ class CodeEditorFragment : Fragment() {
     }
 
     private fun renderScanCards(scan: ProjectScanResponse) {
-        val top = scan.matches.firstOrNull()
+        val top = if (scan.recommendedPackId == "unknown") {
+            null
+        } else {
+            scan.matches.firstOrNull { it.id == scan.recommendedPackId } ?: scan.matches.firstOrNull()
+        }
         if (top == null) {
             detectedPackCard.text = "Detected pack\nUnknown project\nConfidence: weak\nRuntime: unknown"
             missingSecretsCard.text = "Missing secrets\nNo required secrets detected."

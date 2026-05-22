@@ -99,7 +99,7 @@ async function buildContext(workspacePath: string): Promise<ScanContext> {
 
 function matchDetector(detector: BladePackDetector, ctx: ScanContext): string | null {
   if (detector.kind === "packageDependency") {
-    const hit = [...ctx.packageDeps].some((dep) => dep === detector.name || dep.startsWith(detector.name));
+    const hit = ctx.packageDeps.has(detector.name);
     return hit ? `dependency:${detector.name}` : null;
   }
   if (detector.kind === "packageScript") return ctx.packageScripts.has(detector.name) ? `script:${detector.name}` : null;

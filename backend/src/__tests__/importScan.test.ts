@@ -34,3 +34,8 @@ test("unknown folder returns unknown", async () => {
   const result = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "unknown"));
   assert.equal(result.recommendedPackId, "unknown");
 });
+
+test("dependency prefix does not trigger exact package detector", async () => {
+  const result = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "prefix"));
+  assert.equal(result.recommendedPackId, "unknown");
+});
