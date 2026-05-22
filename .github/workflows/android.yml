@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,24 +53,6 @@ jobs:
             echo '::error::ANDROID_HOME is not set on this runner.'
             exit 1
           fi
-      - name: Extract app metadata
-        id: meta
-        shell: bash
-        env:
-          VERSION_SEQ: ${{ steps.version.outputs.seq }}
-          VERSION_CODE: ${{ steps.version.outputs.version_code }}
-        run: |
-          set -euo pipefail
-          metadata_output="$(./gradlew -q :app:printResolvedVersionMetadata -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon)"
-          version_name="$(printf '%s\n' "$metadata_output" | sed -n 's/^VERSION_NAME=//p' | tail -n1)"
-          version_code="$(printf '%s\n' "$metadata_output" | sed -n 's/^VERSION_CODE=//p' | tail -n1)"
-          if [[ -z "$version_name" || -z "$version_code" ]]; then
-            echo '::error::Failed to extract VERSION_NAME/VERSION_CODE from Gradle output.'
-            printf '%s\n' "$metadata_output"
-            exit 1
-          fi
-          echo "app_version_name=$version_name" >> "$GITHUB_OUTPUT"
-          echo "app_version_code=$version_code" >> "$GITHUB_OUTPUT"
       - name: Build CI APK
         shell: bash
         env:
@@ -87,14 +70,13 @@ jobs:
         shell: bash
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## Android build summary
+          ## Android PR build summary
           - CI APK built: yes
-          - App version name: ${{ steps.meta.outputs.app_version_name }}
-          - App version code: ${{ steps.meta.outputs.app_version_code }}
+          - App version name: ${{ steps.version.outputs.version }}-ci
+          - App version code: ${{ steps.version.outputs.version_code }}
           EOF
 
   publish_debug_release:
-    needs: build
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -127,6 +109,24 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+      - name: Validate repository preconditions
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -f app/build.gradle.kts ] || { echo '::error::Missing app/build.gradle.kts.'; exit 1; }
+          [ -d app/src/main ] || { echo '::error::Missing Android source directory app/src/main.'; exit 1; }
+          [ -f gradlew ] || { echo '::error::Missing Gradle wrapper.'; exit 1; }
+          chmod +x ./gradlew
+      - name: Verify Java and Android home
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          if [[ -z "${ANDROID_HOME:-}" ]]; then
+            echo '::error::ANDROID_HOME is not set on this runner.'
+            exit 1
+          fi
       - name: Build release CI APK
         shell: bash
         env:
@@ -156,3 +156,13 @@ jobs:
             fi
           } > dist/release/RELEASE_NOTES.md
           gh release create "$TAG" "dist/release/botBlade-ci-v${VERSION}.apk" dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION CI" --notes-file dist/release/RELEASE_NOTES.md --prerelease
+      - name: Write workflow summary
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Android release summary
+          - CI APK published: yes
+          - App version name: ${{ steps.release_version.outputs.version }}-ci
+          - App version code: ${{ steps.release_version.outputs.version_code }}
+          - Tag: ${{ steps.release_version.outputs.tag }}
+          EOF
