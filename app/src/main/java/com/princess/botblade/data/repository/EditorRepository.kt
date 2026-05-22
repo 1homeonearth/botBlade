@@ -6,6 +6,7 @@ import com.princess.botblade.data.model.BuildRequest
 import com.princess.botblade.data.model.BuildSummary
 import com.princess.botblade.data.model.ProjectFileContent
 import com.princess.botblade.data.model.ProjectFileSummary
+import com.princess.botblade.data.model.ProjectScanResponse
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,6 +19,7 @@ class EditorRepository(
     suspend fun getFile(projectId: String, path: String): ApiResult<ProjectFileContent> = apiCall { apiClient.getProjectFile(projectId, path) }
     suspend fun saveFile(projectId: String, path: String, content: String): ApiResult<ProjectFileContent> = apiCall { apiClient.saveProjectFile(projectId, path, content) }
     suspend fun createBuild(projectId: String): ApiResult<BuildSummary> = apiCall { apiClient.createBuild(projectId, BuildRequest()) }
+    suspend fun scanProject(projectId: String): ApiResult<ProjectScanResponse> = apiCall { apiClient.scanProject(projectId) }
 
     private suspend fun <T> apiCall(block: () -> T): ApiResult<T> = withContext(Dispatchers.IO) {
         runCatching { block() }.fold(

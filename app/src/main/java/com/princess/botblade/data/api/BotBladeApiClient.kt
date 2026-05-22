@@ -18,6 +18,8 @@ import com.princess.botblade.data.model.ProjectFileContent
 import com.princess.botblade.data.model.BuildSummary
 import com.princess.botblade.data.model.BuildRequest
 import com.princess.botblade.data.model.RuntimeStatusResponse
+import com.princess.botblade.data.model.ProjectScanResponse
+import com.princess.botblade.data.model.ScanDetectionMatch
 import com.princess.botblade.data.model.DeploymentTargetSummary
 import com.princess.botblade.data.model.DeploymentTargetCreateRequest
 import com.princess.botblade.data.model.DeploymentTargetTestResponse
@@ -272,6 +274,10 @@ class BotBladeApiClient(
         val body = request(path = "/api/projects/${projectId.encodedPathSegment()}/runtime/logs", method = "GET")
         return body.asJsonOrNull()?.optionalString("logs") ?: body
     }
+
+    @Throws(IOException::class)
+    fun scanProject(projectId: String): ProjectScanResponse =
+        request(path = "/api/projects/${projectId.encodedPathSegment()}/scan", method = "POST", requestBody = "{}").toProjectScanResponse()
 
     @Throws(IOException::class)
     fun listDeploymentTargets(): List<DeploymentTargetSummary> {
@@ -564,6 +570,26 @@ class BotBladeApiClient(
     private fun String.toGitHubStatusResponse(): GitHubStatusResponse {
         val json = requireNotNull(asJsonOrNull()) { "Invalid GitHub status response." }
         return GitHubStatusResponse(json.optBoolean("connected"), json.optionalString("tokenSecretRef"), json.optionalString("message"))
+    }
+
+    private fun String.toProjectScanResponse(): ProjectScanResponse {
+        val json = requireNotNull(asJsonOrNull()) { "Invalid scan response." }
+        val detection = json.optJSONObject("detection") ?: JSONObject()
+        val matchesJson = detection.optJSONArray("matches") ?: JSONArray()
+        val matches = (0 until matchesJson.length()).map { index ->
+            val match = matchesJson.getJSONObject(index)
+            val requiredSecrets = match.optJSONArray("requiredSecrets") ?: JSONArray()
+            ScanDetectionMatch(
+                id = match.optString("id"),
+                name = match.optString("name"),
+                score = match.optInt("score", 0),
+                confidence = match.optString("confidence", "weak"),
+                requiredSecrets = (0 until requiredSecrets.length()).mapNotNull { key -> requiredSecrets.optString(key).takeIf { it.isNotBlank() } },
+            )
+        }
+        val warningsJson = detection.optJSONArray("warnings") ?: JSONArray()
+        val warnings = (0 until warningsJson.length()).mapNotNull { index -> warningsJson.optString(index).takeIf { it.isNotBlank() } }
+        return ProjectScanResponse(detection.optString("recommendedPackId", "unknown"), matches, warnings)
     }
 
     private fun String.asJsonOrNull(): JSONObject? = runCatching { JSONObject(this) }.getOrNull()

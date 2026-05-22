@@ -58,17 +58,20 @@ class MainActivity : AppCompatActivity() {
         window.decorView.post { StartupDiagnostics.mark("first_render") }
     }
     fun finishOnboarding() {
-        try {
+        if (isFinishing || isDestroyed) return
+        val action = {
             val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
             bottomNavigation.visibility = android.view.View.VISIBLE
-            showFragment(DashboardFragment())
-            if (bottomNavigation.selectedItemId != R.id.navigation_dashboard) {
+            if (supportFragmentManager.isStateSaved) {
                 bottomNavigation.selectedItemId = R.id.navigation_dashboard
+            } else {
+                showFragment(DashboardFragment())
+                if (bottomNavigation.selectedItemId != R.id.navigation_dashboard) {
+                    bottomNavigation.selectedItemId = R.id.navigation_dashboard
+                }
             }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "finishOnboarding navigation error", e)
-            throw e
         }
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) action() else runOnUiThread { action() }
     }
     override fun onResume() { super.onResume(); bindService(Intent(this, BotEngineService::class.java), connection, Context.BIND_AUTO_CREATE) }
     override fun onPause() { if (bound) { unbindService(connection); bound = false; binder = null; BotEngineBindingState.serviceRunning.value = null }; super.onPause() }
