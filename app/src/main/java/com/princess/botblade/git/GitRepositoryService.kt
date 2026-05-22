@@ -87,5 +87,13 @@ data class GitStatusSummary(
     val conflicting: List<String>,
 ) {
     val dirtyFileCount: Int
-        get() = added.size + changed.size + modified.size + missing.size + removed.size + untracked.size + conflicting.size
+        get() = buildSet {
+            addAll(added)
+            addAll(changed)
+            addAll(modified)
+            addAll(missing)
+            addAll(removed)
+            addAll(untracked)
+            addAll(conflicting)
+        }.size
 }
