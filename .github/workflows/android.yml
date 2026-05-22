@@ -15,48 +15,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout repository
         shell: bash
         run: |
           set -euo pipefail
           git init .
-          git fetch --depth=250 --tags "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
+          git fetch --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
           git checkout --force FETCH_HEAD
       - name: Resolve build version
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          release_event=false
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            if [[ "${GITHUB_EVENT_NAME}" == "push" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-              release_event=true
-            fi
-          fi
-          if [[ "$release_event" == "true" ]]; then
-            latest_tag="$(git tag -l 'v0.[0-9][0-9][0-9]' | sort -V | tail -n 1)"
-            if [[ -z "$latest_tag" ]]; then
-              seq=1
-            else
-              numeric="${latest_tag#v0.}"
-              seq=$((10#$numeric + 1))
-            fi
-            version_code=$((100000 + seq))
-          else
-            seq="${GITHUB_RUN_NUMBER}"
-            latest_tag=""
-            version_code="$seq"
-          fi
+          seq="${GITHUB_RUN_NUMBER}"
           version="0.$(printf '%03d' "$seq")"
-          tag="v${version}"
-          echo "release_event=$release_event" >> "$GITHUB_OUTPUT"
           echo "seq=$seq" >> "$GITHUB_OUTPUT"
-          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "version_code=$seq" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "previous_tag=$latest_tag" >> "$GITHUB_OUTPUT"
       - name: Validate repository preconditions
         shell: bash
         run: |
@@ -93,29 +70,76 @@ jobs:
           fi
           echo "app_version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "app_version_code=$version_code" >> "$GITHUB_OUTPUT"
-      - name: Build debug and release APKs
+      - name: Build debug APK
         shell: bash
         env:
           VERSION_SEQ: ${{ steps.version.outputs.seq }}
           VERSION_CODE: ${{ steps.version.outputs.version_code }}
-        run: ./gradlew :app:assembleDebug :app:assembleRelease -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
-      - name: Verify APK outputs
+        run: ./gradlew :app:assembleProdDebug -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
+      - name: Verify APK output
         shell: bash
         run: |
           set -euo pipefail
           debug_apk=app/build/outputs/apk/prod/debug/app-prod-debug.apk
-          release_unsigned_apk=app/build/outputs/apk/prod/release/app-prod-release-unsigned.apk
           [[ -f "$debug_apk" ]] || { echo "::error::Missing debug APK: $debug_apk"; exit 1; }
-          [[ -f "$release_unsigned_apk" ]] || { echo "::error::Missing unsigned release APK: $release_unsigned_apk"; exit 1; }
-          sha256sum "$debug_apk" "$release_unsigned_apk"
+          sha256sum "$debug_apk"
+      - name: Write workflow summary
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Android build summary
+          - Debug APK built: yes
+          - App version name: ${{ steps.meta.outputs.app_version_name }}
+          - App version code: ${{ steps.meta.outputs.app_version_code }}
+          EOF
+
+  publish_debug_release:
+    needs: build
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git fetch --depth=250 --tags "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+      - name: Resolve release version
+        id: release_version
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_tag="$(git tag -l 'v0.[0-9][0-9][0-9]' | sort -V | tail -n 1)"
+          if [[ -z "$latest_tag" ]]; then
+            seq=1
+          else
+            numeric="${latest_tag#v0.}"
+            seq=$((10#$numeric + 1))
+          fi
+          version="0.$(printf '%03d' "$seq")"
+          version_code=$((100000 + seq))
+          tag="v${version}"
+          echo "seq=$seq" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+      - name: Build release debug APK
+        shell: bash
+        env:
+          VERSION_SEQ: ${{ steps.release_version.outputs.seq }}
+          VERSION_CODE: ${{ steps.release_version.outputs.version_code }}
+        run: ./gradlew :app:assembleProdDebug -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
       - name: Publish debug release
-        if: steps.version.outputs.release_event == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
-          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
+          VERSION: ${{ steps.release_version.outputs.version }}
+          TAG: ${{ steps.release_version.outputs.tag }}
+          PREVIOUS_TAG: ${{ steps.release_version.outputs.previous_tag }}
         run: |
           set -euo pipefail
           mkdir -p dist/release
@@ -132,14 +156,3 @@ jobs:
             fi
           } > dist/release/RELEASE_NOTES.md
           gh release create "$TAG" "dist/release/bot-blade-debug-v${VERSION}.apk" dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/RELEASE_NOTES.md --prerelease
-      - name: Write workflow summary
-        shell: bash
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## Android build summary
-          - Debug APK built: yes
-          - Unsigned release APK built: yes
-          - App version name: ${{ steps.meta.outputs.app_version_name }}
-          - App version code: ${{ steps.meta.outputs.app_version_code }}
-          - Release event: ${{ steps.version.outputs.release_event }}
-          EOF
