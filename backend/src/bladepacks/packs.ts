@@ -112,7 +112,7 @@ export const BLADE_PACKS: BladePack[] = [
     runtime: { type: "workflow" },
     detectors: [
       { kind: "jsonShape", file: "workflow.json", keys: ["nodes", "connections"], weight: 60 },
-      { kind: "sourceImport", pattern: "\\\"type\\\"\\s*:\\s*\\\"n8n-nodes-base\\\\.", weight: 20 },
+      { kind: "sourceImport", pattern: "\"type\"\\s*:\\s*\"n8n-nodes-base\\.", weight: 20 },
       { kind: "sourceImport", pattern: "credentials", weight: 10 },
       { kind: "sourceImport", pattern: "trigger", weight: 10 }
     ],

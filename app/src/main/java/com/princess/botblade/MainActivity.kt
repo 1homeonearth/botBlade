@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.IBinder
 import androidx.appcompat.app.AppCompatActivity
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private val Context.dataStore by preferencesDataStore("onboarding")
+private val onboardingCompleteKey = booleanPreferencesKey("onboarding_complete")
 
 class MainActivity : AppCompatActivity() {
     private var bound = false
@@ -51,13 +53,21 @@ class MainActivity : AppCompatActivity() {
             else -> false
         } }
         lifecycleScope.launch {
-            val done = dataStore.data.first()[booleanPreferencesKey("onboarding_complete")] == true
+            val done = dataStore.data.first()[onboardingCompleteKey] == true
             if (!done) { bottomNavigation.visibility = android.view.View.GONE; showFragment(OnboardingFragment()) }
             else if (savedInstanceState == null) bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
         window.decorView.post { StartupDiagnostics.mark("first_render") }
     }
     fun finishOnboarding() {
+        if (isFinishing || isDestroyed) return
+        lifecycleScope.launch {
+            applicationContext.dataStore.edit { prefs -> prefs[onboardingCompleteKey] = true }
+            showDashboardAfterOnboarding()
+        }
+    }
+
+    private fun showDashboardAfterOnboarding() {
         if (isFinishing || isDestroyed) return
         val action = {
             val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)

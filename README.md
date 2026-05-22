@@ -10,7 +10,7 @@
   <a href="../../releases/latest"><img alt="Download APK" src="https://img.shields.io/badge/Android-Download%20CI%20APK-2ea44f" /></a>
 </p>
 
-BotBlade is a mobile-first Android app plus local backend for creating, editing, building, and operating Discord bot projects.
+BotBlade is a mobile-first Android app plus local backend for importing, creating, editing, building, and operating bot and automation projects.
 
 > Debug APK releases are published automatically after successful merges to `main`. Versioning starts at `0.001` and increments by thousandths.
 
@@ -19,8 +19,14 @@ BotBlade is a mobile-first Android app plus local backend for creating, editing,
 - Build and manage projects from Android: Dashboard, Projects, Editor, Deployments, and Settings.
 - Connect to a local backend API with token-based protected routes.
 - Generate TypeScript Discord bot projects and edit files directly in-app.
+- Scan imported workspaces with Blade Packs for Discord.js, Telegraf, Slack Bolt, generic Node, generic Python, n8n workflow JSON, and Botpress-style projects.
+- Use native Git groundwork powered by JGit for repository-aware project workflows.
 - Run project validation, local builds, runtime start/stop/restart, and deployment actions.
 - Store projects, encrypted secrets, build/deploy job history, and audit logs in SQLite.
+
+## Integration direction
+
+BotBlade favors lightweight adapters, templates, detectors, and importers over copying large upstream projects into the app. Planned/reference integrations include Squircle CE or Sora-style native editing, JGit, xterm.js, Activepieces, Bun, Eruda, Node-RED, Huginn, Microsoft Bot Framework, Fossify File Manager, VS Code-style command/extension concepts, n8n workflow import, Botpress bot-as-code projects, and first-class Discord/Telegram/Slack bot packs.
 
 ## Download and verify (end users)
 
@@ -63,6 +69,7 @@ curl http://localhost:8000/api/health
 - Android packaging/signing: [docs/android-release.md](docs/android-release.md)
 - Local development: [docs/local-development.md](docs/local-development.md)
 - API overview: [docs/api.md](docs/api.md)
+- Import and Blade Pack architecture: [docs/design/import-and-blade-pack-architecture.md](docs/design/import-and-blade-pack-architecture.md)
 
 ## Status
 

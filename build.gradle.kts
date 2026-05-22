@@ -4,6 +4,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
 }
 
+subprojects {
+    plugins.withId("com.android.application") {
+        dependencies.add("implementation", "org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r")
+    }
+}
+
 allprojects {
     tasks.register("resolveAllDependencies") {
         group = "dependency"
