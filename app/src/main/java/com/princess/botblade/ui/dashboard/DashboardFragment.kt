@@ -29,6 +29,7 @@ import androidx.lifecycle.lifecycleScope
 import com.princess.botblade.data.store.ActiveProjectStore
 import com.princess.botblade.MainActivity
 import com.princess.botblade.ui.theme.BotBladeTheme
+import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.ComposeView
 
@@ -42,7 +43,7 @@ class DashboardFragment : Fragment() {
         activeProjectStore = ActiveProjectStore(requireContext())
         return ComposeView(requireContext()).apply {
             setContent {
-                BotBladeTheme { DashboardScreen(viewModel, started) { (activity as? MainActivity)?.openLogsScreen() } }
+                BotBladeTheme(useDynamicColor = isDynamicColorEnabled(requireContext())) { DashboardScreen(viewModel, started) { (activity as? MainActivity)?.openLogsScreen() } }
             }
         }
     }

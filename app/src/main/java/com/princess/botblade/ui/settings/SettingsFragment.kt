@@ -36,6 +36,7 @@ import com.princess.botblade.data.repository.SecretRepository
 import com.princess.botblade.backend.EnginePreferences
 import com.princess.botblade.data.repository.TokenRepository
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
