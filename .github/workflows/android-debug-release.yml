@@ -1,0 +1,114 @@
+name: BotBlade Debug Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-debug-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish debug APK release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git fetch --depth=250 --tags "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+      - name: Resolve next debug version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_tag="$(git tag -l 'v0.[0-9][0-9][0-9]' | sort -V | tail -n 1)"
+          if [[ -z "$latest_tag" ]]; then
+            seq=1
+          else
+            numeric="${latest_tag#v0.}"
+            seq=$((10#$numeric + 1))
+          fi
+          version="0.$(printf '%03d' "$seq")"
+          tag="v${version}"
+          echo "seq=$seq" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+      - name: Validate repository preconditions
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -f app/build.gradle.kts ] || { echo '::error::Missing app/build.gradle.kts.'; exit 1; }
+          [ -d app/src/main ] || { echo '::error::Missing Android source directory app/src/main.'; exit 1; }
+          [ -f gradlew ] || { echo '::error::Missing Gradle wrapper.'; exit 1; }
+          chmod +x ./gradlew
+      - name: Verify Java and Android home
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          if [[ -z "${ANDROID_HOME:-}" ]]; then
+            echo '::error::ANDROID_HOME is not set on this runner.'
+            exit 1
+          fi
+      - name: Build debug APK
+        shell: bash
+        env:
+          VERSION_SEQ: ${{ steps.version.outputs.seq }}
+        run: ./gradlew :app:assembleDebug -PVERSION_SEQ="$VERSION_SEQ" --no-daemon --stacktrace
+      - name: Stage release assets and notes
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/release
+          source_apk=app/build/outputs/apk/prod/debug/app-prod-debug.apk
+          [ -f "$source_apk" ] || { echo "::error::Missing debug APK: $source_apk"; exit 1; }
+          cp "$source_apk" dist/release/bot-blade-debug.apk
+          (cd dist/release && sha256sum bot-blade-debug.apk > SHA256SUMS.txt)
+          {
+            echo "## BotBlade ${VERSION} Debug"
+            echo
+            echo "Debug APK generated automatically after merge to main."
+            echo
+            echo "### Changes"
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..HEAD"
+            else
+              git log --pretty=format:'- %s (%h)' -n 50
+            fi
+          } > dist/release/RELEASE_NOTES.md
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/release/bot-blade-debug.apk dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" dist/release/bot-blade-debug.apk dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/RELEASE_NOTES.md --prerelease
+          fi
+      - name: Write workflow summary
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Debug release summary
+          - Version: ${{ steps.version.outputs.version }}
+          - Tag: ${{ steps.version.outputs.tag }}
+          - APK: bot-blade-debug.apk
+          EOF

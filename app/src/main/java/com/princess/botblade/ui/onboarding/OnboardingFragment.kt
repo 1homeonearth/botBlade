@@ -40,6 +40,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import java.util.concurrent.atomic.AtomicBoolean
 import com.princess.botblade.MainActivity
 import com.princess.botblade.ui.theme.BotBladeTheme
 import kotlinx.coroutines.launch
@@ -47,6 +48,7 @@ import kotlinx.coroutines.launch
 private val Context.dataStore by preferencesDataStore("onboarding")
 
 class OnboardingFragment : Fragment() {
+    private val finishLatch = AtomicBoolean(false)
     override fun onCreateView(
         inflater: android.view.LayoutInflater,
         container: android.view.ViewGroup?,
@@ -56,10 +58,23 @@ class OnboardingFragment : Fragment() {
     }
 
     private fun finishOnboardingFlow() {
-        val appContext = context?.applicationContext ?: return
-        viewLifecycleOwner.lifecycleScope.launch {
-            appContext.dataStore.edit { prefs -> prefs[booleanPreferencesKey("onboarding_complete")] = true }
-            (activity as? MainActivity)?.finishOnboarding()
+        if (!finishLatch.compareAndSet(false, true)) return
+        val host = activity as? MainActivity ?: run {
+            finishLatch.set(false)
+            return
+        }
+        val appContext = requireContext().applicationContext
+        host.lifecycleScope.launch {
+            try {
+                appContext.dataStore.edit { prefs ->
+                    prefs[booleanPreferencesKey("onboarding_complete")] = true
+                }
+                if (isAdded) {
+                    host.finishOnboarding()
+                }
+            } catch (e: Exception) {
+                finishLatch.set(false)
+            }
         }
     }
 }

@@ -1,75 +1,72 @@
-# Repository Agent Guide
+# Agent Workflow Notes
 
-Finish the requested task completely when possible.
+## ISSUES.md usage
+- Always review `ISSUES.md` before starting new work.
+- If there are unresolved issues, attempt resolution first and log each attempt with:
+  - UTC timestamp, command(s) run, observed output/errors, status (Complete or Incomplete)
+- If a repeated issue occurs, add the new entry directly below the most recent entry
+  in that issue chain.
+- When an issue is confirmed resolved by rerunning relevant checks, remove the
+  resolved issue chain from `ISSUES.md`.
 
-At session start, read LEFTOVERS.md if present. Attempt every actionable leftover before starting new work. Delete completed leftovers after verification. Delete LEFTOVERS.md when empty.
+## LEFTOVERS.md usage
+- Review `LEFTOVERS.md` (if present) before new work.
+- Complete listed tasks before starting new prompt work.
+- If work cannot be completed in one session, update/create `LEFTOVERS.md`
+  with concrete continuation steps.
 
-Use LEFTOVERS.md only for unfinished handoff work. Keep it short: blocker, relevant files, exact next action.
+---
 
-After editing, run the smallest useful check available.
+# Agent Instructions
 
-## Instruction precedence and scope
-- Root `AGENTS.md` applies repository-wide.
-- A nested `AGENTS.md` overrides root instructions for files in that subdirectory tree.
-- If `AGENTS.override.md` exists at a directory level, treat it as the active instruction file for that level instead of `AGENTS.md`.
-- Example: `app/mobile/AGENTS.md` overrides root guidance only for `app/mobile/**`.
+## ISSUES.md workflow
+- Keep a root-level `ISSUES.md` for troubleshooting history.
+- Before starting new work, review `ISSUES.md` and `LEFTOVERS.md` at the repo root.
+- Resolve incomplete issues before beginning new work when practical. Record each
+  resolution attempt with UTC timestamp, context, logs or key errors, versions, status.
+- Group repeat occurrences under the most recent matching issue chain.
+- When resolved, mark complete and prune obsolete raw error logs.
+- If work cannot be completed, write clear continuation steps in `LEFTOVERS.md`.
 
-## Repository expectations
-- Keep instructions concise and action-oriented; avoid duplicating code-level details available in source files.
-- Prefer targeted edits and preserve existing project conventions.
-- Use existing tooling/package managers already used by the repo.
+## Required GitHub Actions secrets for Android release signing
+Configure these repository secrets for signed release APK output:
+- `KEYSTORE_BASE64`: Base64-encoded Android signing keystore.
+- `KEYSTORE_PASSWORD`: Keystore password.
+- `KEY_ALIAS`: Alias name of the signing key entry.
 
-## Common build/test/lint checks
-- Android SDK preflight: `./scripts/android-sdk-preflight.sh`
-- Android debug assemble: `gradle :app:assembleDebug`
-- Android unit tests (flavor-specific): `gradle :app:testLocalDevDebugUnitTest`
-- Backend build: `npm run build`
+If any of these secrets are missing, the signing step is skipped automatically
+and release uploads fall back to the unsigned APK.
 
-## Android release signing secrets
-For required GitHub Actions signing secrets and setup notes, see `docs/ci/android-signing.md`.
-
-
-## CI health gate
-- Before opening any PR, check the current status of `.github/workflows/android.yml`
-  on the target branch. If it is failing, do not open new PRs for unrelated work.
-  The only PR permitted when the workflow is red is one that directly fixes the
-  failing workflow.
-- Do not merge any PR to main while the android.yml workflow is in a failure state
-  on main, regardless of whether the PR itself touches the workflow file.
-- After merging any PR that modifies .github/workflows/android.yml, verify the
-  next workflow run succeeds before opening or merging further PRs.
-- If workflow status cannot be queried because runtime auth is missing, mark the gate as
-  **not verifiable (token unavailable)** and follow `docs/project/gh-cli-auth.md`
-  (Token-less CI verification fallback playbook). Do **not** classify this as CI failing.
-
-
-## Release-facing docs maintenance
-- On each release (or at minimum every 5 releases), review and refresh user-facing release docs: `README.md`, `INSTALL.md`, and `docs/releases.md`.
-- Remove stale/manual release links in README and rely on the repository main page + latest-release automation paths.
-- Keep release notes concise: end-user changes, developer changes, known limitations.
-
-## Codex local check policy
-- In Codex/offline environments, avoid `./gradlew` checks that require wrapper downloads.
-- Prefer smallest offline-capable checks first (for example: `gradle` if available locally, targeted `npm`/script checks, and static file validation).
-- Do not change GitHub workflow validation behavior just to satisfy local Codex constraints.
+---
 
 ## botBlade security design manual
-- Before modifying any of the following areas, read `docs/design/botblade-security-manual/README.md` and relevant linked sections:
-  - repo import
-  - archive extraction
-  - manifests
-  - build plans
-  - runtime profiles
-  - terminal sessions
-  - external app integrations
-  - secrets
-  - sandboxing
-  - upstream dependencies
-  - Rust crates
-  - deployment security
-  - native modules/plugins
-- Keep the manual updated whenever behavior in those areas changes.
-- Add tests for security gates, archive handling, terminal handling, path resolution, secret redaction, external intents, and upstream dependency changes when applicable.
-- Do not vendor upstream code without an `upstreams.yml` entry, license review, attribution, and tests.
-- Prefer Rust for security-critical validation.
-- Preserve existing Discord behavior while universal workload support evolves.
+
+**MANDATORY READ**: Before any work involving repository import, archive extraction,
+manifests, build plans, runtime profiles, terminal sessions, external app integrations,
+secrets, sandboxing, upstream dependencies, Rust crates, deployment security, or
+module/plugin systems, read:
+
+  docs/design/botblade-security-manual/README.md
+
+## Environment-scoped verification policy
+
+### Codex sandbox / cloud agent execution
+- Avoid `./gradlew` and `gradle` verification when the environment lacks network access,
+  Android SDK packages, or wrapper/bootstrap support.
+- Use `actionlint .github/workflows/android.yml` for workflow file verification.
+- Use static file inspection (`read`, `grep`, `rg`) for Kotlin error triage when Gradle
+  execution is unavailable.
+- Treat GitHub Actions CI as the source of truth for APK compilation in restricted agent
+  environments.
+
+### GitHub Actions / local developer runner
+- Run the smallest relevant check available for the change.
+- Android SDK preflight: `./scripts/android-sdk-preflight.sh`
+- Android debug assemble: `gradle :app:assembleDebug`
+- Android unit tests: `gradle :app:testLocalDevDebugUnitTest`
+- Backend build: `npm run build`
+
+## APK compile failure triage protocol
+1. Run `actionlint .github/workflows/android.yml` and confirm exit 0.
+2. Read the first failing Gradle task from the CI log.
+3. Check if the failure is dependency resolution; if so, identify the infra or mirror issue before changing app code.

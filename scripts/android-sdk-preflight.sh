@@ -1,62 +1,78 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-required_platform="platforms/android-35"
-required_build_tools="build-tools/35.0.0"
+PASS=0; FAIL=0
+log()  { echo "[preflight] $*"; }
+warn() { echo "[preflight][warn] $*" >&2; }
+fail() { echo "[preflight][FAIL] $*" >&2; FAIL=$((FAIL+1)); }
+pass() { log "OK: $*"; PASS=$((PASS+1)); }
 
-fail() {
-  cat >&2 <<MESSAGE
-Android SDK preflight failed: $1
+check_android_home() {
+  if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
+    ANDROID_HOME="$ANDROID_SDK_ROOT"
+    export ANDROID_HOME
+  fi
 
-Install the required Android SDK packages, then rerun this check:
-  ./scripts/android-sdk-bootstrap.sh
+  if [[ -z "${ANDROID_HOME:-}" ]]; then
+    fail "ANDROID_HOME is not set"
+    return
+  fi
 
-Or install manually with:
-  sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+  if [[ ! -d "$ANDROID_HOME" ]]; then
+    fail "ANDROID_HOME does not point to an existing directory: $ANDROID_HOME"
+    return
+  fi
 
-Set ANDROID_HOME to your Android SDK root, for example:
-  export ANDROID_HOME=/path/to/android-sdk
+  pass "ANDROID_HOME=$ANDROID_HOME"
 
-Optional local setup may use an untracked local.properties file containing:
-  sdk.dir=/path/to/android-sdk
-
-If direct Google downloads are blocked, run the bootstrap script with ANDROID_CMDLINE_TOOLS_URL pointing at an approved mirror.
-
-See docs/android-sdk-setup.md for the full bootstrap guide.
-MESSAGE
-  exit 1
+  local required_components=(
+    "platforms/android-35"
+    "build-tools/35.0.0"
+    "platform-tools"
+  )
+  local component
+  for component in "${required_components[@]}"; do
+    if [[ -d "$ANDROID_HOME/$component" ]]; then
+      pass "Android SDK component present: $component"
+    else
+      fail "Missing Android SDK component: $ANDROID_HOME/$component"
+    fi
+  done
 }
 
-if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
-  ANDROID_HOME="$ANDROID_SDK_ROOT"
-fi
-
-if [[ -z "${ANDROID_HOME:-}" && -f local.properties ]]; then
-  sdk_dir_line=$(sed -n 's/^sdk\.dir=//p' local.properties | tail -n 1)
-  if [[ -n "$sdk_dir_line" ]]; then
-    ANDROID_HOME="$sdk_dir_line"
+check_repo_access() {
+  if [[ "${ANDROID_PREFLIGHT_CHECK_NETWORK:-0}" != "1" ]]; then
+    warn "Skipping Maven network probe; set ANDROID_PREFLIGHT_CHECK_NETWORK=1 for connectivity diagnostics."
+    return 0
   fi
-fi
 
-if [[ -z "${ANDROID_HOME:-}" ]]; then
-  fail 'ANDROID_HOME is not set and no sdk.dir was found in local.properties.'
-fi
+  local url="${ANDROID_PREFLIGHT_MAVEN_URL:-https://dl.google.com/dl/android/maven2/}"
+  local http_code
+  http_code=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || echo "000")
+  case "$http_code" in
+    200|301|302|404)
+      pass "Maven repo reachable (HTTP $http_code)"
+      ;;
+    000)
+      warn "Maven repo unreachable (network/proxy/DNS failure). Builds may still work with cached dependencies or mirrors."
+      ;;
+    403)
+      warn "Maven repo returned HTTP 403. Check proxy/auth policy if dependency resolution later fails."
+      ;;
+    *)
+      warn "Maven repo returned HTTP $http_code. Investigate if builds fail."
+      ;;
+  esac
+}
 
-if [[ ! -d "$ANDROID_HOME" ]]; then
-  fail "ANDROID_HOME does not point to an existing directory: $ANDROID_HOME"
-fi
+main() {
+  check_android_home
+  check_repo_access
+  if [[ $FAIL -gt 0 ]]; then
+    echo "[preflight] $FAIL check(s) failed. Fix before building." >&2
+    exit 1
+  fi
+  log "All required preflight checks passed."
+}
 
-missing=()
-if [[ ! -d "$ANDROID_HOME/$required_platform" ]]; then
-  missing+=("\$ANDROID_HOME/$required_platform")
-fi
-
-if [[ ! -d "$ANDROID_HOME/$required_build_tools" ]]; then
-  missing+=("\$ANDROID_HOME/$required_build_tools")
-fi
-
-if (( ${#missing[@]} > 0 )); then
-  fail "missing required SDK directory/directories: ${missing[*]}"
-fi
-
-echo "Android SDK preflight passed for $ANDROID_HOME"
+main "$@"
