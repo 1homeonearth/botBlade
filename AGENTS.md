@@ -48,6 +48,32 @@ module/plugin systems, read:
 
   docs/design/botblade-security-manual/README.md
 
+## Integration direction
+
+BotBlade should grow through small, reviewable adapters rather than pasted upstream
+applications. Prefer Blade Packs, templates, importers, detectors, and narrow service
+facades over vendoring large projects into the APK or backend.
+
+Required ecosystem references for import/editor/runtime planning:
+- JGit: Android-native Git clone/status/diff/commit/pull/push foundation. Keep write
+  operations behind explicit user actions and token-audit plumbing.
+- Squircle CE / Sora-style editor components: preferred native editor direction before
+  Monaco or other WebView-first editors.
+- xterm.js: future terminal/log console surface, not the first editor layer.
+- Activepieces: modern workflow/integration-piece architecture reference.
+- Bun: optional experimental runtime lane; keep Node 22 as the primary JavaScript runtime.
+- Eruda: optional WebView debugging overlay for later browser-backed tooling.
+- Node-RED and Huginn: legacy workflow/agent compatibility references only.
+- Microsoft Bot Framework: later enterprise-oriented Blade Pack/template target.
+- Fossify File Manager: Android file-management UX reference.
+- VS Code-style command palette, task definitions, and extension-manifest concepts:
+  inspiration for BotBlade command and Blade Pack UX.
+
+License posture:
+- Treat n8n as workflow JSON import/reference-first because of its license model.
+- Verify every upstream license before adding dependencies or copying code.
+- Keep direct dependencies limited to narrow, justified components.
+
 ## Environment-scoped verification policy
 
 ### Codex sandbox / cloud agent execution
