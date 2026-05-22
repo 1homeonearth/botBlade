@@ -18,12 +18,10 @@ jobs:
     steps:
       - name: Checkout repository
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git init .
-          git fetch --depth=250 --tags "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
+          git fetch --depth=250 --tags "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}"
           git checkout --force FETCH_HEAD
       - name: Resolve next debug version
         id: version
@@ -76,8 +74,8 @@ jobs:
           mkdir -p dist/release
           source_apk=app/build/outputs/apk/prod/debug/app-prod-debug.apk
           [ -f "$source_apk" ] || { echo "::error::Missing debug APK: $source_apk"; exit 1; }
-          cp "$source_apk" dist/release/bot-blade-debug.apk
-          (cd dist/release && sha256sum bot-blade-debug.apk > SHA256SUMS.txt)
+          cp "$source_apk" "dist/release/bot-blade-debug-v${VERSION}.apk"
+          (cd dist/release && sha256sum "bot-blade-debug-v${VERSION}.apk" > SHA256SUMS.txt)
           {
             echo "## BotBlade ${VERSION} Debug"
             echo
@@ -98,10 +96,11 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          apk_file="dist/release/bot-blade-debug-v${VERSION}.apk"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/release/bot-blade-debug.apk dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG" "$apk_file" dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$TAG" dist/release/bot-blade-debug.apk dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/RELEASE_NOTES.md --prerelease
+            gh release create "$TAG" "$apk_file" dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/RELEASE_NOTES.md --prerelease
           fi
       - name: Write workflow summary
         shell: bash
@@ -110,5 +109,5 @@ jobs:
           ## Debug release summary
           - Version: ${{ steps.version.outputs.version }}
           - Tag: ${{ steps.version.outputs.tag }}
-          - APK: bot-blade-debug.apk
+          - APK: bot-blade-debug-v${{ steps.version.outputs.version }}.apk
           EOF
