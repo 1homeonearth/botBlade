@@ -81,6 +81,20 @@ type ScanContext = {
 };
 
 async function buildContext(workspacePath: string): Promise<ScanContext> {
+  const workspaceExists = await pathExists(workspacePath);
+  if (!workspaceExists) {
+    return {
+      root: workspacePath,
+      files: new Set<string>(),
+      directories: new Set<string>(),
+      packageJson: null,
+      packageDeps: new Set<string>(),
+      packageScripts: new Set<string>(),
+      envText: "",
+      sourceText: "",
+      workflowJson: null
+    };
+  }
   const files = new Set<string>();
   const directories = new Set<string>();
   await walk(workspacePath, workspacePath, files, directories);
@@ -134,4 +148,13 @@ async function readJsonIfExists(file: string): Promise<Record<string, unknown> |
 
 async function readTextIfExists(file: string): Promise<string> {
   try { return await fs.readFile(file, "utf8"); } catch { return ""; }
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }

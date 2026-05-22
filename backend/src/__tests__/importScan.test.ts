@@ -39,3 +39,9 @@ test("dependency prefix does not trigger exact package detector", async () => {
   const result = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "prefix"));
   assert.equal(result.recommendedPackId, "unknown");
 });
+
+test("missing workspace path returns unknown instead of throwing", async () => {
+  const result = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "does-not-exist"));
+  assert.equal(result.recommendedPackId, "unknown");
+  assert.equal(result.matches.length, 0);
+});
