@@ -7,7 +7,7 @@
 <p align="center">
   <a href="../../actions/workflows/android.yml"><img alt="Android CI" src="../../actions/workflows/android.yml/badge.svg" /></a>
   <a href="../../releases/latest"><img alt="Latest Release" src="https://img.shields.io/github/v/release/1homeonearth/botBlade?display_name=release" /></a>
-  <a href="../../releases/latest/download/bot-blade-debug.apk"><img alt="Download APK" src="https://img.shields.io/badge/Android-Download%20Debug%20APK-2ea44f" /></a>
+  <a href="../../releases/latest"><img alt="Download APK" src="https://img.shields.io/badge/Android-Download%20CI%20APK-2ea44f" /></a>
 </p>
 
 BotBlade is a mobile-first Android app plus local backend for creating, editing, building, and operating Discord bot projects.
@@ -25,7 +25,7 @@ BotBlade is a mobile-first Android app plus local backend for creating, editing,
 ## Download and verify (end users)
 
 1. Open the latest release: [Latest Release](../../releases/latest)
-2. Download `bot-blade-debug.apk`
+2. Download the latest `botBlade-ci-v*.apk` asset from the release page.
 3. Verify checksum:
 
 ```bash

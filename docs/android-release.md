@@ -11,6 +11,23 @@ The app has one flavor dimension, `environment`:
 | `localDev*` | `http://10.0.2.2:8000` | Emulator/local backend development. The application id is suffixed with `.localdev`; debug also adds `.debug`. |
 | `prod*` | `https://api.royalscepter.app` by default | Production/staging-style release packaging. Override with `-PPROD_API_BASE_URL=https://...` when cutting a package for another hosted backend. |
 
+## Multi-channel packaging/signing strategy
+
+To avoid uninstall-before-install conflicts and signature collisions, BotBlade now uses explicit install channels by package id:
+
+- **Local developer channel**: `prodDebug` / `localDevDebug` (`.debug` suffix)
+- **CI distributable channel**: `prodCi` (`.ci` suffix)
+- **Store/release channel**: `prodRelease` (no suffix)
+
+Because each channel installs as a different package name, users can keep local debug, CI APK, and release APK side-by-side without overwrite or signature conflict.
+
+Recommended rules:
+
+1. Use CI artifacts (`prodCi`) for external testing.
+2. Use local debug builds only for local development.
+3. Use `prodRelease` only for signed release-track installs.
+4. Do not distribute locally-built debug APKs to testers who already use CI APKs.
+
 The Settings screen can still save a validated backend URL override in app `SharedPreferences`; do not enter credentials, query strings, fragments, or tokens in that field.
 
 Useful commands:
@@ -18,6 +35,7 @@ Useful commands:
 ```bash
 gradle :app:assembleLocalDevDebug
 gradle :app:assembleProdRelease
+gradle :app:assembleProdCi
 gradle :app:bundleProdRelease
 ```
 

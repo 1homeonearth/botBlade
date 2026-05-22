@@ -16,9 +16,9 @@ The first debug release is `v0.001`. Each later debug release increments by one 
 
 The workflow finds the latest `v0.xxx` tag, increments it, builds the APK with the matching `VERSION_SEQ`, and publishes the next prerelease.
 
-## Debug release assets
+## CI release assets
 
-- `bot-blade-debug.apk`
+- `botBlade-ci-v<version>.apk`
 - `SHA256SUMS.txt`
 
 The release page body contains the changelog. No separate `CHANGELOG.md`, `release.json`, or `INSTALL.md` asset is published.

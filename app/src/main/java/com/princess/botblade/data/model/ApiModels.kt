@@ -253,3 +253,17 @@ data class GitHubWorkflowResponse(
     val path: String,
     val content: String,
 )
+
+data class ScanDetectionMatch(
+    val id: String,
+    val name: String,
+    val score: Int,
+    val confidence: String,
+    val requiredSecrets: List<String> = emptyList(),
+)
+
+data class ProjectScanResponse(
+    val recommendedPackId: String,
+    val matches: List<ScanDetectionMatch> = emptyList(),
+    val warnings: List<String> = emptyList(),
+)

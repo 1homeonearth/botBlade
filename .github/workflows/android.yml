@@ -70,25 +70,25 @@ jobs:
           fi
           echo "app_version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "app_version_code=$version_code" >> "$GITHUB_OUTPUT"
-      - name: Build debug APK
+      - name: Build CI APK
         shell: bash
         env:
           VERSION_SEQ: ${{ steps.version.outputs.seq }}
           VERSION_CODE: ${{ steps.version.outputs.version_code }}
-        run: ./gradlew :app:assembleProdDebug -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
+        run: ./gradlew :app:assembleProdCi -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
       - name: Verify APK output
         shell: bash
         run: |
           set -euo pipefail
-          debug_apk=app/build/outputs/apk/prod/debug/app-prod-debug.apk
-          [[ -f "$debug_apk" ]] || { echo "::error::Missing debug APK: $debug_apk"; exit 1; }
-          sha256sum "$debug_apk"
+          ci_apk=app/build/outputs/apk/prod/ci/app-prod-ci.apk
+          [[ -f "$ci_apk" ]] || { echo "::error::Missing CI APK: $ci_apk"; exit 1; }
+          sha256sum "$ci_apk"
       - name: Write workflow summary
         shell: bash
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## Android build summary
-          - Debug APK built: yes
+          - CI APK built: yes
           - App version name: ${{ steps.meta.outputs.app_version_name }}
           - App version code: ${{ steps.meta.outputs.app_version_code }}
           EOF
@@ -127,12 +127,12 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$latest_tag" >> "$GITHUB_OUTPUT"
-      - name: Build release debug APK
+      - name: Build release CI APK
         shell: bash
         env:
           VERSION_SEQ: ${{ steps.release_version.outputs.seq }}
           VERSION_CODE: ${{ steps.release_version.outputs.version_code }}
-        run: ./gradlew :app:assembleProdDebug -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
+        run: ./gradlew :app:assembleProdCi -PVERSION_SEQ="$VERSION_SEQ" -PVERSION_CODE="$VERSION_CODE" --no-daemon --stacktrace
       - name: Publish debug release
         shell: bash
         env:
@@ -143,8 +143,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/release
-          cp app/build/outputs/apk/prod/debug/app-prod-debug.apk "dist/release/bot-blade-debug-v${VERSION}.apk"
-          (cd dist/release && sha256sum "bot-blade-debug-v${VERSION}.apk" > SHA256SUMS.txt)
+          cp app/build/outputs/apk/prod/ci/app-prod-ci.apk "dist/release/botBlade-ci-v${VERSION}.apk"
+          (cd dist/release && sha256sum "botBlade-ci-v${VERSION}.apk" > SHA256SUMS.txt)
           {
             echo "## BotBlade ${VERSION} Debug"
             echo
@@ -155,4 +155,4 @@ jobs:
               git log --pretty=format:'- %s (%h)' -n 50
             fi
           } > dist/release/RELEASE_NOTES.md
-          gh release create "$TAG" "dist/release/bot-blade-debug-v${VERSION}.apk" dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION Debug" --notes-file dist/release/RELEASE_NOTES.md --prerelease
+          gh release create "$TAG" "dist/release/botBlade-ci-v${VERSION}.apk" dist/release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "BotBlade $VERSION CI" --notes-file dist/release/RELEASE_NOTES.md --prerelease
