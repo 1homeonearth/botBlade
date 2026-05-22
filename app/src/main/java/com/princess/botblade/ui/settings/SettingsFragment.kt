@@ -9,12 +9,12 @@ import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.switchmaterial.SwitchMaterial
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -69,16 +69,6 @@ class SettingsFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_settings, container, false)
 
-    override fun onResume() {
-        super.onResume()
-        requireActivity().window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-    }
-
-    override fun onPause() {
-        requireActivity().window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        super.onPause()
-    }
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         tokenRepository = TokenRepository(requireContext())
@@ -121,6 +111,13 @@ class SettingsFragment : Fragment() {
         copyWorkflowHelpButton.setOnClickListener { copyWorkflowInstructions() }
         pushGitHubButton.setOnClickListener { pushGitHub() }
         apkDownloadsText.text = getString(R.string.apk_download_links, "princessraven/botBlade")
+        val dynamicColorSwitch = view.findViewById<SwitchMaterial>(R.id.dynamic_color_switch)
+        val prefs = requireContext().getSharedPreferences("botblade_prefs", Context.MODE_PRIVATE)
+        dynamicColorSwitch.isChecked = prefs.getBoolean("use_dynamic_color", false)
+        dynamicColorSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("use_dynamic_color", checked).apply()
+            requireActivity().recreate()
+        }
         setupTokenSection(view)
         setupAutoStart(view)
         loadSecrets()
