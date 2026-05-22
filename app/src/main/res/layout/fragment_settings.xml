@@ -53,6 +53,15 @@
             android:text="@string/backend_settings_title"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
+        
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/dynamic_color_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Use Material You colors (dynamic)" />
+
+
         <TextView
             android:id="@+id/api_settings_status"
             android:layout_width="match_parent"

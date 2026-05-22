@@ -24,6 +24,7 @@ import androidx.fragment.app.Fragment
 import com.princess.botblade.MainActivity
 import com.princess.botblade.data.repository.LocalProjectRepository
 import com.princess.botblade.ui.theme.BotBladeTheme
+import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import java.text.DateFormat
 import androidx.compose.foundation.layout.Row
 
@@ -32,7 +33,7 @@ class ProjectsFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); localProjectRepository = LocalProjectRepository(requireContext()) }
     override fun onCreateView(inflater: android.view.LayoutInflater, container: android.view.ViewGroup?, savedInstanceState: Bundle?) = ComposeView(requireContext()).apply {
-        setContent { BotBladeTheme { ProjectsScreen(::openProject) } }
+        setContent { BotBladeTheme(useDynamicColor = isDynamicColorEnabled(requireContext())) { ProjectsScreen(::openProject) } }
     }
 
     private fun openProject(project: LocalProjectRepository.LocalProjectSummary) {
