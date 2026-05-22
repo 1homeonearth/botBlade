@@ -1,47 +1,35 @@
 # BotBlade Releases
 
-This project publishes Android artifacts from GitHub Actions.
+This project publishes Android debug APKs from GitHub Actions.
 
 ## Channels
 
-- **Pull requests:** run CI build checks and verify debug + unsigned release APK outputs.
-- **`main` branch pushes:** publish a new debug APK prerelease.
-- **Manual dispatch:** can run the debug release workflow from GitHub Actions when needed.
+- Branch pushes run the Android build check.
+- Merges to `main` publish a new debug prerelease.
+- Manual dispatch can run the debug release workflow from GitHub Actions.
 
 ## Debug release versioning
 
-Debug releases use the tag format `v0.xxx` and start at `v0.001`.
+Debug releases use tags like `v0.001`, `v0.002`, and `v0.003`.
 
-Each successful debug release increments by one thousandth:
+The first debug release is `v0.001`. Each later debug release increments by one thousandth.
 
-- `v0.001`
-- `v0.002`
-- `v0.003`
+The workflow finds the latest `v0.xxx` tag, increments it, builds the APK with the matching `VERSION_SEQ`, and publishes the next prerelease.
 
-The workflow finds the latest existing `v0.xxx` tag, increments it, builds the APK with the matching `VERSION_SEQ`, and publishes the next prerelease.
+## Debug release assets
 
-## Standard debug release assets
+- `bot-blade-debug.apk`
+- `SHA256SUMS.txt`
 
-- `bot-blade-debug.apk` — stable download name for the newest debug APK.
-- `bot-blade-VERSION-debug.apk` — versioned debug APK filename.
-- `SHA256SUMS.txt` — checksums for APK assets.
-- `CHANGELOG.md` — per-release changelog generated from commits since the previous `v0.xxx` tag.
-- `release.json` — machine-readable release metadata.
-- `INSTALL.md` — install note for the debug APK.
+The release page body contains the changelog. No separate `CHANGELOG.md`, `release.json`, or `INSTALL.md` asset is published.
 
-## Release notes policy
+## Release notes
 
-Each debug release includes its own `CHANGELOG.md` covering commits since the previous debug tag. The GitHub release body also uses that changelog.
-
-After major release-flow changes, sync release-facing docs when relevant:
-
-- `README.md`
-- `INSTALL.md`
-- `docs/releases.md`
+Each debug release body lists commits since the previous debug tag.
 
 ## If release fails
 
 1. Open the failed workflow run.
-2. Inspect failing job logs and asset staging output.
-3. Correct version, build, or GitHub release issues.
-4. Re-run the debug release workflow from GitHub Actions.
+2. Inspect failing job logs.
+3. Fix the build or release issue.
+4. Re-run the debug release workflow.
