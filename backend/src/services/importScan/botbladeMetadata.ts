@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 import { BLADE_PACKS } from "../../bladepacks/packs.js";
 import type { ScanDetectionResult } from "./detector.js";
 
@@ -33,7 +34,8 @@ export async function writeBotbladeMetadata(workspacePath: string, detection: Sc
     panels: selectedPack?.panels ?? ["projectMap", "editor", "logs", "secrets", "git", "health"],
     healthSignals: { lastBuildPassed: null, lastTestsPassed: null, lastRuntimeHealthy: null, lastCrashAt: null, gitClean: null, dependencyState: "unknown" }
   };
-  const target = `${workspacePath}/botblade.json`;
+  await fs.mkdir(workspacePath, { recursive: true });
+  const target = path.join(workspacePath, "botblade.json");
   await fs.writeFile(target, JSON.stringify(metadata, null, 2) + "\n", "utf8");
   return target;
 }
