@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 
 class AppUpgradeChecker(
@@ -14,31 +15,35 @@ class AppUpgradeChecker(
 ) {
     suspend fun checkLatestRelease(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/1homeonearth/botBlade/releases/latest")
+            .url("https://api.github.com/repos/1homeonearth/botBlade/releases")
             .header("Accept", "application/vnd.github+json")
             .build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@withContext null
-            val json = JSONObject(response.body?.string().orEmpty())
-            val tag = json.optString("tag_name")
-            val pageUrl = json.optString("html_url")
-            val assets = json.optJSONArray("assets")
-            var assetUrl: String? = null
-            var assetName: String? = null
-            if (assets != null) {
-                for (index in 0 until assets.length()) {
-                    val asset = assets.optJSONObject(index) ?: continue
-                    val name = asset.optString("name")
-                    if (name.endsWith(".apk")) {
-                        assetName = name
-                        assetUrl = asset.optString("browser_download_url")
-                        break
-                    }
+            if (!response.isSuccessful) {
+                throw IllegalStateException("GitHub release check failed with HTTP ${response.code}.")
+            }
+
+            val releases = JSONArray(response.body?.string().orEmpty())
+            for (index in 0 until releases.length()) {
+                val release = releases.optJSONObject(index) ?: continue
+                if (release.optBoolean("draft", false)) continue
+
+                val tag = release.optString("tag_name")
+                val pageUrl = release.optString("html_url")
+                val asset = firstApkAsset(release) ?: continue
+
+                if (versionRank(tag) > versionRank(BuildConfig.VERSION_NAME)) {
+                    return@withContext AppUpgradeInfo(
+                        tagName = tag,
+                        pageUrl = pageUrl,
+                        assetUrl = asset.optString("browser_download_url"),
+                        assetName = asset.optString("name"),
+                    )
                 }
             }
-            if (versionRank(tag) <= versionRank(BuildConfig.VERSION_NAME)) return@withContext null
-            AppUpgradeInfo(tagName = tag, pageUrl = pageUrl, assetUrl = assetUrl, assetName = assetName)
+
+            null
         }
     }
 
@@ -60,6 +65,15 @@ class AppUpgradeChecker(
 
     private val prefs by lazy {
         context.applicationContext.getSharedPreferences("botblade_upgrade_prefs", Context.MODE_PRIVATE)
+    }
+
+    private fun firstApkAsset(release: JSONObject): JSONObject? {
+        val assets = release.optJSONArray("assets") ?: return null
+        for (index in 0 until assets.length()) {
+            val asset = assets.optJSONObject(index) ?: continue
+            if (asset.optString("name").endsWith(".apk")) return asset
+        }
+        return null
     }
 
     private fun versionRank(value: String): Int {
