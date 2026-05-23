@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/botblade_black">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -13,20 +14,34 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_title"
+            android:textColor="@color/botblade_baby_blue"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
-        
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="The mobile forge control room: identity, backend, GitHub, secrets, imports, runtime, releases, diagnostics, and future Blade Pack lanes."
+            android:textColor="@color/botblade_on_surface_muted" />
+
+        <com.princess.botblade.ui.settings.FeatureDeckView
+            android:id="@+id/settings_feature_deck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="Bot Token"
+            android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <TextView
             android:id="@+id/bot_token_masked"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/botblade_on_surface"
             android:text="Not set" />
 
         <Button android:id="@+id/change_bot_token_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Change" />
@@ -36,14 +51,16 @@
             android:id="@+id/auto_start_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/botblade_on_surface"
             android:text="Start bot automatically on device boot." />
-        <TextView android:id="@+id/auto_start_disclaimer" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Your bot will start when this device powers on, as long as the app is installed." android:visibility="gone" />
+        <TextView android:id="@+id/auto_start_disclaimer" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/botblade_on_surface_muted" android:text="Your bot will start when this device powers on, as long as the app is installed." android:visibility="gone" />
 
         <TextView
             android:id="@+id/secrets_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:textColor="@color/botblade_on_surface_muted"
             android:text="@string/secrets_loading" />
 
         <TextView
@@ -51,22 +68,23 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="@string/backend_settings_title"
+            android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
-        
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/dynamic_color_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:textColor="@color/botblade_on_surface"
             android:text="Use Material You colors (dynamic)" />
-
 
         <TextView
             android:id="@+id/api_settings_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:textColor="@color/botblade_on_surface_muted"
             android:text="@string/backend_url_default_status" />
 
         <EditText
@@ -74,6 +92,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/backend_url_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textUri|textNoSuggestions" />
 
         <Button
@@ -99,6 +119,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="@string/github_settings_title"
+            android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <TextView
@@ -106,6 +127,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:textColor="@color/botblade_on_surface_muted"
             android:text="@string/github_loading" />
 
         <EditText
@@ -113,6 +135,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/github_token_ref_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textNoSuggestions" />
 
         <Button
@@ -126,6 +150,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/github_owner_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textNoSuggestions" />
 
         <EditText
@@ -133,6 +159,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/github_repo_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textNoSuggestions" />
 
         <EditText
@@ -140,6 +168,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/github_branch_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textNoSuggestions" />
 
         <Button
@@ -165,6 +195,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:textColor="@color/botblade_on_surface_muted"
             android:text="@string/github_workflow_help" />
 
         <Button
@@ -180,6 +211,7 @@
             android:layout_marginTop="12dp"
             android:autoLink="web"
             android:linksClickable="true"
+            android:textColor="@color/botblade_baby_blue"
             android:text="@string/apk_download_links" />
 
         <TextView
@@ -187,6 +219,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/create_secret"
+            android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <EditText
@@ -194,6 +227,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/secret_name_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textCapCharacters|textNoSuggestions" />
 
         <EditText
@@ -201,6 +236,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/secret_type_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textNoSuggestions" />
 
         <EditText
@@ -208,6 +245,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/secret_project_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textNoSuggestions" />
 
         <EditText
@@ -215,6 +254,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/secret_value_hint"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted"
             android:inputType="textPassword|textNoSuggestions" />
 
         <Button
@@ -229,6 +270,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/secrets_title"
+            android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <LinearLayout
