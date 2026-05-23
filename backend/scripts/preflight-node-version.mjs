@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // BEGIN NEWBIE GUIDE HEADER
 // This file is part of BotBlade. The goal of this header is to help brand-new developers
 // understand what this file is responsible for before reading implementation details.
