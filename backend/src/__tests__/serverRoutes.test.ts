@@ -15,10 +15,8 @@ type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean } = {}) {
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
   const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${randomUUID()}` };
-  if (!options.unauthenticated) {
-    if (options.sessionToken) headers.cookie = `botBladeSession=${encodeURIComponent(options.sessionToken)}`;
-    else headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
-  }
+  if (options.sessionToken) headers.cookie = `botBladeSession=${encodeURIComponent(options.sessionToken)}`;
+  if (!options.unauthenticated && !options.sessionToken) headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
   const req = {
     method,
     url,
@@ -57,6 +55,13 @@ test("protected routes reject unauthenticated requests", async () => {
   assert.equal(response.body.error.code, "AUTHENTICATION_REQUIRED");
 });
 
+
+
+test("malformed session cookie fails closed with 401 instead of server error", async () => {
+  const response = await request("GET", "/api/projects", undefined, { unauthenticated: true, sessionToken: "%" });
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.error.code, "AUTHENTICATION_REQUIRED");
+});
 test("project routes reject actors without project authorization", async () => {
   const created = await request("POST", "/api/projects", { name: "Authorization Denied" });
   const response = await request("GET", `/api/projects/${created.body.id}`, undefined, { token: "scoped-token" });

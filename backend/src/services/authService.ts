@@ -75,7 +75,12 @@ function readSessionToken(req: IncomingMessage): string | undefined {
   if (typeof cookieHeader !== "string") return undefined;
   for (const cookie of cookieHeader.split(";")) {
     const [name, ...valueParts] = cookie.trim().split("=");
-    if (name === "botBladeSession") return decodeURIComponent(valueParts.join("=")).trim();
+    if (name !== "botBladeSession") continue;
+    try {
+      return decodeURIComponent(valueParts.join("=")).trim();
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }
