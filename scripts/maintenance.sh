@@ -13,7 +13,10 @@ warm_gradle_cache_without_wrapper() {
   if [[ ! -x ./gradlew ]]; then
     if [[ "${BOTBLADE_FIX_GRADLEW_PERMS:-0}" == "1" ]]; then
       log "gradlew is not executable; applying chmod because BOTBLADE_FIX_GRADLEW_PERMS=1"
-      chmod +x ./gradlew
+      if ! chmod +x ./gradlew; then
+        warn "Failed to chmod ./gradlew; skipping dependency pre-fetch."
+        return 0
+      fi
     else
       warn "gradlew is not executable. Set BOTBLADE_FIX_GRADLEW_PERMS=1 to allow chmod; skipping dependency pre-fetch."
       return 0
