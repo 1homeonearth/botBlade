@@ -35,7 +35,7 @@ class AppUpgradePanelView @JvmOverloads constructor(
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
         addView(TextView(context).apply {
-            text = "BotBlade can check GitHub releases and open the newest APK. Android still asks before installing sideloaded updates."
+            text = "BotBlade checks GitHub releases and opens the newest APK. Android still asks before installing sideloaded updates."
             setTextColor(resources.getColor(R.color.botblade_on_surface_muted, context.theme))
             textSize = 14f
             setPadding(0, 6.dp, 0, 4.dp)
@@ -74,12 +74,13 @@ class AppUpgradePanelView @JvmOverloads constructor(
         owner.lifecycleScope.launch {
             runCatching { checker.checkLatestRelease() }
                 .onSuccess { info ->
-                    checker.markChecked()
                     latest = info
                     if (info == null) {
+                        checker.markChecked()
                         statusText.text = "BotBlade is current for this release channel."
                         openReleaseButton.isEnabled = false
                     } else {
+                        checker.markChecked()
                         statusText.text = "Update available: ${info.tagName}${info.assetName?.let { " • $it" } ?: ""}"
                         openReleaseButton.isEnabled = true
                     }
