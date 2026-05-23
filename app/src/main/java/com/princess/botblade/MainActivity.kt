@@ -11,9 +11,12 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.backend.BotEngineBindingState
 import com.princess.botblade.backend.BotEngineService
 import com.princess.botblade.data.api.ApiConfig
+import com.princess.botblade.data.repository.LocalProjectRepository
+import com.princess.botblade.data.store.ActiveProjectStore
 import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorFragment
+import com.princess.botblade.ui.logs.LogsFragment
 import com.princess.botblade.ui.projects.ProjectsFragment
 import com.princess.botblade.ui.settings.SettingsFragment
 
@@ -78,6 +81,22 @@ class MainActivity : AppCompatActivity() {
     private fun showFragment(fragment: Fragment) {
         val tx = supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment)
         if (supportFragmentManager.isStateSaved) tx.commitAllowingStateLoss() else tx.commit()
+    }
+
+    fun showEditorForProject(projectName: String) {
+        val projectId = try {
+            LocalProjectRepository(this).listProjects().firstOrNull { it.name == projectName }?.id
+        } catch (_: Exception) {
+            null
+        }
+        if (projectId != null) {
+            ActiveProjectStore(this).setActiveProjectId(projectId)
+        }
+        findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
+    }
+
+    fun openLogsScreen() {
+        showFragment(LogsFragment())
     }
 
     override fun onStart() {
