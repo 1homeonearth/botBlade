@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (savedInstanceState == null) {
-            bottomNavigation.selectedItemId = R.id.navigation_projects
+            bottomNavigation.selectedItemId = R.id.navigation_dashboard
         }
     }
 
@@ -87,7 +87,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showStartupFallback(error: Throwable) {
-        val message = "BotBlade recovered from a startup screen crash.\n\n${error::class.java.simpleName}: ${error.message ?: "Unknown error"}\n\nOpen Projects or Settings after updating."
+        val message = "BotBlade recovered from a startup screen crash.\n\n${error::class.java.simpleName}: ${error.message ?: "Unknown error"}\n\nOpen Dashboard, Projects, or Settings after updating."
         if (findViewById<ViewGroup?>(R.id.fragment_container) == null) {
             val fallback = TextView(this).apply {
                 text = message
