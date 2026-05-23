@@ -4,11 +4,11 @@
     <string name="projects_nav_title">Projects</string>
     <string name="editor_nav_title">Editor</string>
     <string name="settings_nav_title">Settings</string>
-    <string name="deployments_nav_title">Deployments</string>
+    <string name="deployments_nav_title">Ops Deck</string>
     <string name="dashboard_title">Bot Dashboard</string>
     <string name="projects_title">Projects</string>
     <string name="code_editor_title">Editor</string>
-    <string name="deployments_title">Deployments</string>
+    <string name="deployments_title">Ops Deck</string>
     <string name="settings_title">Settings</string>
     <string name="bot_status_unknown">Bot Status: Unknown</string>
     <string name="bot_status_value">Bot Status: %1$s</string>
@@ -94,8 +94,13 @@ Scan this project to show required secret setup.</string>
     <string name="stop_runtime">Stop</string>
     <string name="restart_runtime">Restart</string>
     <string name="view_logs">View Logs</string>
-    <string name="runtime_terminal_title">Runtime terminal</string>
-    <string name="open_deployments_for_logs">Open Deployments to view runtime and deployment logs.</string>
+    <string name="runtime_terminal_title">Container Terminal</string>
+    <string name="ops_deck_intro">Build history, deployment targets, release actions, runtime logs, and a container-scoped terminal for the active bot system.</string>
+    <string name="ops_terminal_scope">Terminal scope: selected project container only. Host shell access stays out of BotBlade.</string>
+    <string name="ops_terminal_placeholder">$ botblade attach --container active-project
+readonly logs online
+writable shell pending backend session gate</string>
+    <string name="open_deployments_for_logs">Open Ops Deck to view runtime, terminal, and deployment logs.</string>
     <string name="dashboard_legacy_status_loaded">Status loaded from legacy /api/bot-status/.</string>
     <string name="dashboard_project_status_loaded">Status loaded from project runtime endpoint.</string>
     <string name="deployment_target_name_hint">Target name (for example Local Process)</string>
