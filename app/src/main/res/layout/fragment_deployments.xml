@@ -128,17 +128,25 @@
             android:text="@string/ops_terminal_scope"
             android:textColor="@color/botblade_on_surface_muted" />
 
-        <TextView
-            android:id="@+id/build_logs_text"
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="260dp"
             android:layout_marginTop="10dp"
             android:background="@color/botblade_ink"
-            android:fontFamily="monospace"
-            android:padding="12dp"
-            android:scrollbars="vertical"
-            android:text="@string/ops_terminal_placeholder"
-            android:textColor="@color/botblade_on_surface"
-            android:textIsSelectable="true" />
+            android:fillViewport="true"
+            android:nestedScrollingEnabled="true"
+            android:scrollbars="vertical">
+
+            <TextView
+                android:id="@+id/build_logs_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:minHeight="260dp"
+                android:padding="12dp"
+                android:text="@string/ops_terminal_placeholder"
+                android:textColor="@color/botblade_on_surface"
+                android:textIsSelectable="true" />
+        </androidx.core.widget.NestedScrollView>
     </LinearLayout>
 </ScrollView>
