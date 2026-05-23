@@ -1,0 +1,167 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  repo-sanity:
+    name: Repository sanity checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Validate shell helper syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/android-sdk-preflight.sh
+          bash -n scripts/setup.sh
+          bash -n scripts/maintenance.sh
+      - name: Write sanity summary
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Repository sanity checks
+          - Shell helper syntax passed.
+          - Android SDK preflight script parsed successfully.
+          EOF
+
+  backend-tests:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Verify Node version
+        working-directory: backend
+        run: npm run preflight:node
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+      - name: Write backend summary
+        if: always()
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Backend checks
+          - Node version preflight
+          - TypeScript build
+          - Node test suite
+          EOF
+
+  android-debug-build:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+      - name: Run Android SDK preflight
+        shell: bash
+        run: ./scripts/android-sdk-preflight.sh
+      - name: Assemble debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Write Android build summary
+        if: always()
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Android debug build
+          - Android SDK packages installed or verified.
+          - `:app:assembleDebug` executed.
+          EOF
+
+  android-unit-tests:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+      - name: Run Android SDK preflight
+        shell: bash
+        run: ./scripts/android-sdk-preflight.sh
+      - name: Run Android unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:testLocalDevDebugUnitTest --no-daemon --stacktrace
+      - name: Upload Android unit test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-unit-test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Write Android test summary
+        if: always()
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Android unit tests
+          - `:app:testLocalDevDebugUnitTest` executed.
+          - Test reports are attached as the `android-unit-test-reports` artifact when present.
+          EOF
+
+  pr-checks-summary:
+    name: PR checks summary
+    runs-on: ubuntu-latest
+    needs: [repo-sanity, backend-tests, android-debug-build, android-unit-tests]
+    if: always()
+    steps:
+      - name: Summarize PR checks
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## PR Checks Summary
+          | Check | Result |
+          | --- | --- |
+          | Repository sanity checks | ${{ needs.repo-sanity.result }} |
+          | Backend build and tests | ${{ needs.backend-tests.result }} |
+          | Android debug build | ${{ needs.android-debug-build.result }} |
+          | Android unit tests | ${{ needs.android-unit-tests.result }} |
+          EOF
+
+          if [[ "${{ needs.repo-sanity.result }}" != 'success' || \
+                "${{ needs.backend-tests.result }}" != 'success' || \
+                "${{ needs.android-debug-build.result }}" != 'success' || \
+                "${{ needs.android-unit-tests.result }}" != 'success' ]]; then
+            exit 1
+          fi
