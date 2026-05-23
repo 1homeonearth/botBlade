@@ -21,6 +21,5 @@
     <color name="botblade_gold">@color/botblade_baby_blue</color>
     <color name="botblade_surface">@color/botblade_black</color>
     <color name="botblade_surface_variant">@color/botblade_panel</color>
-    <color name="bottom_nav_item_color">@color/botblade_baby_blue</color>
     <color name="ic_launcher_background">#000000</color>
 </resources>
