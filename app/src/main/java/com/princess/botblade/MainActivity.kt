@@ -5,6 +5,9 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -40,47 +43,63 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        StartupDiagnostics.mark("main_activity_on_create_start")
-        ApiConfig.initialize(this)
-        setContentView(R.layout.activity_main)
+        runCatching {
+            StartupDiagnostics.mark("main_activity_on_create_start")
+            ApiConfig.initialize(this)
+            setContentView(R.layout.activity_main)
+            setupBottomNavigation(savedInstanceState)
+            window.decorView.post { StartupDiagnostics.mark("first_render") }
+        }.onFailure { error ->
+            showStartupFallback(error)
+        }
+    }
 
+    private fun setupBottomNavigation(savedInstanceState: Bundle?) {
         val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.navigation_dashboard -> {
-                    showFragment(DashboardFragment())
-                    true
-                }
-                R.id.navigation_projects -> {
-                    showFragment(ProjectsFragment())
-                    true
-                }
-                R.id.navigation_editor -> {
-                    showFragment(CodeEditorFragment())
-                    true
-                }
-                R.id.navigation_deployments -> {
-                    showFragment(DeploymentsFragment())
-                    true
-                }
-                R.id.navigation_settings -> {
-                    showFragment(SettingsFragment())
-                    true
-                }
+                R.id.navigation_dashboard -> showFragmentSafely { DashboardFragment() }
+                R.id.navigation_projects -> showFragmentSafely { ProjectsFragment() }
+                R.id.navigation_editor -> showFragmentSafely { CodeEditorFragment() }
+                R.id.navigation_deployments -> showFragmentSafely { DeploymentsFragment() }
+                R.id.navigation_settings -> showFragmentSafely { SettingsFragment() }
                 else -> false
             }
         }
 
         if (savedInstanceState == null) {
-            bottomNavigation.selectedItemId = R.id.navigation_dashboard
+            bottomNavigation.selectedItemId = R.id.navigation_projects
         }
-
-        window.decorView.post { StartupDiagnostics.mark("first_render") }
     }
+
+    private fun showFragmentSafely(factory: () -> Fragment): Boolean =
+        runCatching {
+            showFragment(factory())
+            true
+        }.getOrElse { error ->
+            showStartupFallback(error)
+            true
+        }
 
     private fun showFragment(fragment: Fragment) {
         val tx = supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment)
         if (supportFragmentManager.isStateSaved) tx.commitAllowingStateLoss() else tx.commit()
+    }
+
+    private fun showStartupFallback(error: Throwable) {
+        val message = "BotBlade recovered from a startup screen crash.\n\n${error::class.java.simpleName}: ${error.message ?: "Unknown error"}\n\nOpen Projects or Settings after updating."
+        if (findViewById<ViewGroup?>(R.id.fragment_container) == null) {
+            val fallback = TextView(this).apply {
+                text = message
+                gravity = Gravity.CENTER
+                setPadding(32, 32, 32, 32)
+            }
+            setContentView(fallback)
+            return
+        }
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, StartupFallbackFragment.newInstance(message))
+            .commitAllowingStateLoss()
     }
 
     fun showEditorForProject(projectName: String) {
@@ -96,18 +115,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openLogsScreen() {
-        showFragment(LogsFragment())
+        showFragmentSafely { LogsFragment() }
     }
 
     override fun onStart() {
         super.onStart()
-        bindService(Intent(this, BotEngineService::class.java), connection, BIND_AUTO_CREATE)
+        runCatching {
+            bindService(Intent(this, BotEngineService::class.java), connection, BIND_AUTO_CREATE)
+        }
     }
 
     override fun onStop() {
         super.onStop()
         if (bound) {
-            unbindService(connection)
+            runCatching { unbindService(connection) }
             bound = false
             binder = null
             BotEngineBindingState.serviceRunning.value = null
