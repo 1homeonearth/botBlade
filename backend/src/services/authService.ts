@@ -62,15 +62,15 @@ export function assertExecutionAccess(actor: AuthenticatedActor, resource: strin
 }
 
 function readBearerToken(req: IncomingMessage): string | undefined {
-  const header = req.headers.authorization;
-  if (typeof header !== "string") return undefined;
+  const header = firstHeaderValue(req.headers.authorization);
+  if (!header) return undefined;
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim();
 }
 
 function readSessionToken(req: IncomingMessage): string | undefined {
-  const explicitHeader = req.headers["x-session-token"];
-  if (typeof explicitHeader === "string" && explicitHeader.trim()) return explicitHeader.trim();
+  const explicitHeader = firstHeaderValue(req.headers["x-session-token"]);
+  if (explicitHeader?.trim()) return explicitHeader.trim();
   const cookieHeader = req.headers.cookie;
   if (typeof cookieHeader !== "string") return undefined;
   for (const cookie of cookieHeader.split(";")) {
@@ -85,6 +85,12 @@ function readSessionToken(req: IncomingMessage): string | undefined {
   return undefined;
 }
 
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.find((entry) => typeof entry === "string" && entry.trim().length > 0);
+  return undefined;
+}
 function configuredCredentials(): AuthCredential[] {
   const credentials = [...parseJsonCredentials(process.env.BOTBLADE_AUTH_TOKENS, "bearer"), ...parseJsonCredentials(process.env.BOTBLADE_SESSION_TOKENS, "session")];
   ensureUniqueTokenIds(credentials);
