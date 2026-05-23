@@ -4,16 +4,6 @@ set -euo pipefail
 log()  { echo "[setup] $*"; }
 warn() { echo "[setup][warn] $*" >&2; }
 
-warm_gradle_cache_without_wrapper() {
-  if [[ ! -f ./gradlew ]]; then
-    warn "gradlew not found. Skipping dependency pre-fetch."
-    return 0
-  fi
-  chmod +x ./gradlew
-  log "Pre-fetching Gradle dependencies (network available during setup)"
-  ./gradlew --no-daemon --version >/dev/null
-  ./gradlew --no-daemon resolveAllDependencies
-  log "Gradle dependency pre-fetch complete"
-}
+source "$(dirname "${BASH_SOURCE[0]}")/lib/gradle-cache-warm.sh"
 
-warm_gradle_cache_without_wrapper
+warm_gradle_cache_without_wrapper setup
