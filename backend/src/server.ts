@@ -16,6 +16,8 @@ import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
 import { scanAndGenerateBotbladeMetadata } from "./services/importScan/index.js";
+import { ForgeSyncService, parseForgeImportInput } from "./services/forgeSyncService.js";
+import { classifyProjectWorkspace } from "./services/projectClassifier.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
 const persistence = createPersistence();
@@ -33,6 +35,7 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
   return summary && value !== undefined ? { id: summary.id, name: summary.name, value } : undefined;
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
+const forgeSyncService = new ForgeSyncService(fileService);
 const host = "127.0.0.1";
 const port = 7432;
 
@@ -269,6 +272,45 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const workspacePath = fileService.workspace(projectId);
       const result = await scanAndGenerateBotbladeMetadata(workspacePath, { kind: "generated-project", url: project.github?.repo ? `https://github.com/${project.github.owner}/${project.github.repo}` : undefined });
       return writeJson(res, 200, result);
+    }
+  }
+
+
+  const forgeMatch = path.match(/^\/api\/projects\/([^/]+)\/forge-sync(?:\/(import|status|health|classify))?$/);
+  if (forgeMatch) {
+    const [, projectId, action] = forgeMatch;
+    assertProjectAccess(actor, projectId);
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (method === "POST" && action === "import") {
+      assertExecutionAccess(actor, "forge sync import");
+      const input = parseForgeImportInput(await readJson(req));
+      const result = await forgeSyncService.importFromUrl(projectId, input.url, input.branch);
+      const audit = auditService.record({ action: "forge.import", actorId: actor.id, projectId, resourceType: "forge_sync", resourceId: result.operationId, metadata: { branch: result.branch, head: result.head, warningCount: result.warnings.length }, requestId });
+      return writeJson(res, 200, { ...result, auditEventId: audit.id });
+    }
+    if (method === "GET" && action === "status") {
+      const result = await forgeSyncService.status(projectId);
+      auditService.record({ action: "forge.status", actorId: actor.id, projectId, resourceType: "forge_sync", resourceId: projectId, metadata: { branch: result.branch, head: result.head, dirty: result.dirty }, requestId });
+      return writeJson(res, 200, result);
+    }
+    if (method === "GET" && action === "classify") {
+      const summary = await classifyProjectWorkspace(fileService.workspace(projectId));
+      auditService.record({ action: "project.classify", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: { framework: summary.framework, packageManager: summary.packageManager }, requestId });
+      return writeJson(res, 200, summary);
+    }
+    if (method === "GET" && action === "health") {
+      const git = await forgeSyncService.status(projectId).catch(() => null);
+      const summary = await classifyProjectWorkspace(fileService.workspace(projectId));
+      const builds = buildService.list(projectId);
+      const latestBuild = builds[0] ?? null;
+      const secretsHealthy = Boolean(project.discord.tokenSecretRef ? secretStore.has(project.discord.tokenSecretRef) : false);
+      return writeJson(res, 200, {
+        forgeSync: git ? { branch: git.branch, dirty: git.dirty, ahead: git.ahead, behind: git.behind } : null,
+        dependencyStatus: { packageManager: summary.packageManager, framework: summary.framework },
+        buildStatus: latestBuild ? { status: latestBuild.status, buildId: latestBuild.buildId, updatedAt: latestBuild.finishedAt ?? latestBuild.startedAt } : null,
+        secretsStatus: { configured: secretsHealthy },
+      });
     }
   }
 

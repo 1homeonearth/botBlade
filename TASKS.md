@@ -118,3 +118,26 @@ Future agents must obtain these inputs before implementation if not already know
 4. Execute **P8** before merge/release.
 5. Maintain **P9** continuously for unfinished work.
 6. Re-check **P10** whenever a blocker appears due to missing inputs.
+
+## Reference-informed feature bundles tracker
+
+### Forge Sync bundle
+- [ ] M1: URL import scaffold and API routes.
+- [ ] M2: Stage/unstage/commit/branch/sync endpoints.
+- [ ] M3: Diff/history/conflict surfaces.
+- [ ] M4: Guardrail hardening + cancellation controls.
+
+### Utility Shell bundle
+- [ ] M1: Local-first settings and permission explanation audit.
+- [ ] M2: File manager task flows for workspace operations.
+- [ ] M3: Backup/restore flow wiring.
+
+### Bot Editor bundle
+- [ ] M1: File tree + open/save + project classifier wiring.
+- [ ] M2: Multi-tab, command palette, bot map panel.
+- [ ] M3: Diagnostics + repair actions and log panel integration.
+
+### Import Catalog bundle
+- [ ] M1: Git URL import flow.
+- [ ] M2: ZIP/local-folder import scaffolds.
+- [ ] M3: Repair queue and generated docs output.

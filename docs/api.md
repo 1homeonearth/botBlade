@@ -290,3 +290,18 @@ Future. Currently returns `GITHUB_PUSH_NOT_IMPLEMENTED`.
 ### `POST /api/projects/:projectId/github/create-workflow`
 
 Returns a GitHub Actions workflow file path and content.
+
+## Forge Sync (BotBlade-native Git forge slice)
+
+### `POST /api/projects/:projectId/forge-sync/import`
+Body: `{ "url": "https://..." | "ssh://..." | "git@...", "branch": "optional" }`.
+Clones a repository into the project workspace and returns import metadata plus `auditEventId`.
+
+### `GET /api/projects/:projectId/forge-sync/status`
+Returns branch/HEAD/dirty/ahead/behind/last-commit summary.
+
+### `GET /api/projects/:projectId/forge-sync/classify`
+Returns package/classifier summary derived from `package.json` and lockfiles.
+
+### `GET /api/projects/:projectId/forge-sync/health`
+Returns a project health summary with Forge Sync status, dependency summary, latest build status, and secrets readiness.

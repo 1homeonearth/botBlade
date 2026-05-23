@@ -21,7 +21,10 @@ export type AuditAction =
   | "runtime.stop"
   | "runtime.restart"
   | "github.push"
-  | "discord.commands.register";
+  | "discord.commands.register"
+  | "forge.import"
+  | "forge.status"
+  | "project.classify";
 
 export interface AuditEvent {
   id: string;

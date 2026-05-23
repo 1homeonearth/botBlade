@@ -234,3 +234,19 @@ test("invalid request URL returns 400", async () => {
   assert.equal(response.statusCode, 400);
   assert.equal(response.body.error.code, "INVALID_REQUEST_URL");
 });
+
+
+test("forge-sync classify and health endpoints return summaries", async () => {
+  const created = await request("POST", "/api/projects", { name: "Forge Health" });
+  const projectId = created.body.id;
+  await request("PUT", `/api/projects/${projectId}/files/package.json`, { content: JSON.stringify({ dependencies: { "discord.js": "^14" }, scripts: { start: "node index.js" } }) });
+
+  const classify = await request("GET", `/api/projects/${projectId}/forge-sync/classify`);
+  assert.equal(classify.statusCode, 200);
+  assert.equal(classify.body.framework, "discord.js");
+
+  const health = await request("GET", `/api/projects/${projectId}/forge-sync/health`);
+  assert.equal(health.statusCode, 200);
+  assert.equal(health.body.dependencyStatus.framework, "discord.js");
+  assert.equal(typeof health.body.secretsStatus.configured, "boolean");
+});
