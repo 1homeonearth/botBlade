@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
             null
         }
         if (projectId != null) {
-            ActiveProjectStore(this).setActiveProjectId(projectId)
+            ActiveProjectStore(this).setActiveProject(projectId, projectName)
         }
         findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
     }
