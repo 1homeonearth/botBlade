@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/botblade_black">
@@ -10,24 +11,36 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/settings_title"
-            android:textColor="@color/botblade_baby_blue"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium" />
+            app:cardBackgroundColor="@color/botblade_panel_raised"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/botblade_hot_pink"
+            app:strokeWidth="1dp">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="The mobile forge control room: identity, backend, GitHub, secrets, imports, runtime, releases, diagnostics, and future Blade Pack lanes."
-            android:textColor="@color/botblade_on_surface_muted" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
 
-        <com.princess.botblade.ui.settings.FeatureDeckView
-            android:id="@+id/settings_feature_deck"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Workstation Settings"
+                    android:textColor="@color/botblade_baby_blue"
+                    android:textAppearance="?attr/textAppearanceHeadlineMedium" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Project support center for backend connection, updates, GitHub, Vault, runtime defaults, diagnostics, and release readiness."
+                    android:textColor="@color/botblade_on_surface_muted" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <com.princess.botblade.releases.AppUpgradePanelView
             android:id="@+id/app_upgrade_panel"
@@ -37,52 +50,10 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Bot Token"
+            android:layout_marginTop="22dp"
+            android:text="Backend connection"
             android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-        <TextView
-            android:id="@+id/bot_token_masked"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/botblade_on_surface"
-            android:text="Not set" />
-
-        <Button android:id="@+id/change_bot_token_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Change" />
-        <Button android:id="@+id/clear_bot_token_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Clear" />
-
-        <Switch
-            android:id="@+id/auto_start_switch"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/botblade_on_surface"
-            android:text="Start bot automatically on device boot." />
-        <TextView android:id="@+id/auto_start_disclaimer" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/botblade_on_surface_muted" android:text="Your bot will start when this device powers on, as long as the app is installed." android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/secrets_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textColor="@color/botblade_on_surface_muted"
-            android:text="@string/secrets_loading" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/backend_settings_title"
-            android:textColor="@color/botblade_hot_pink"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-        <com.google.android.material.switchmaterial.SwitchMaterial
-            android:id="@+id/dynamic_color_switch"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textColor="@color/botblade_on_surface"
-            android:text="Use Material You colors (dynamic)" />
 
         <TextView
             android:id="@+id/api_settings_status"
@@ -112,6 +83,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/test_backend_connection" />
+
         <Button
             android:id="@+id/share_startup_diagnostics_button"
             android:layout_width="match_parent"
@@ -122,8 +94,58 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/github_settings_title"
+            android:layout_marginTop="22dp"
+            android:text="Runtime defaults"
+            android:textColor="@color/botblade_hot_pink"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:id="@+id/bot_token_masked"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/botblade_on_surface"
+            android:text="Bot token: Not set" />
+
+        <Button
+            android:id="@+id/change_bot_token_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Change legacy bot token" />
+
+        <Button
+            android:id="@+id/clear_bot_token_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Clear legacy bot token" />
+
+        <Switch
+            android:id="@+id/auto_start_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/botblade_on_surface"
+            android:text="Start active bot automatically on device boot." />
+
+        <TextView
+            android:id="@+id/auto_start_disclaimer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/botblade_on_surface_muted"
+            android:text="Autostart applies to the active project runtime after the backend and secrets are configured."
+            android:visibility="gone" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/dynamic_color_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/botblade_on_surface"
+            android:text="Use Material You colors (preview only; BotBlade dark readability stays enforced)" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="GitHub + release rail"
             android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
@@ -222,10 +244,18 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/create_secret"
+            android:layout_marginTop="22dp"
+            android:text="Vault: project secrets"
             android:textColor="@color/botblade_hot_pink"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:id="@+id/secrets_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/botblade_on_surface_muted"
+            android:text="@string/secrets_loading" />
 
         <EditText
             android:id="@+id/secret_name_input"
@@ -269,14 +299,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/save_secret" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/secrets_title"
-            android:textColor="@color/botblade_hot_pink"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <LinearLayout
             android:id="@+id/secrets_list_container"
