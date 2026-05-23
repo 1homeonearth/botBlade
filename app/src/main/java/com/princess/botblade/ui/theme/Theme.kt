@@ -1,47 +1,48 @@
 package com.princess.botblade.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
-private val SeedPurple = Color(0xFF8F5BFF)
-private val GoldPrimary = Color(0xFFFFD166)
+private val BotBladeBlack = Color(0xFF05060A)
+private val BotBladeInk = Color(0xFF090B12)
+private val BotBladePanel = Color(0xFF101522)
+private val BotBladeRaised = Color(0xFF151D2E)
+private val BotBladeBabyBlue = Color(0xFF8FD8FF)
+private val BotBladeHotPink = Color(0xFFFF3EA5)
+private val BotBladeOnSurface = Color(0xFFEEF7FF)
+private val BotBladeMuted = Color(0xFFAAB8CC)
+private val BotBladeDanger = Color(0xFFFF6B8A)
 
-private val LightColors = lightColorScheme(
-    primary = SeedPurple,
-    secondary = GoldPrimary,
-    tertiary = Color(0xFF5F5A78),
-    surface = Color(0xFFF6F2FF),
-    surfaceVariant = Color(0xFFE8E0F8),
-)
-
-private val DarkColors = darkColorScheme(
-    primary = SeedPurple,
-    secondary = GoldPrimary,
-    tertiary = Color(0xFFCCC2FF),
-    surface = Color(0xFF0D0A17),
-    surfaceVariant = Color(0xFF2A2438),
+private val BotBladeColors = darkColorScheme(
+    primary = BotBladeBabyBlue,
+    onPrimary = BotBladeBlack,
+    primaryContainer = BotBladeRaised,
+    onPrimaryContainer = BotBladeOnSurface,
+    secondary = BotBladeHotPink,
+    onSecondary = BotBladeBlack,
+    secondaryContainer = BotBladePanel,
+    onSecondaryContainer = BotBladeOnSurface,
+    tertiary = Color(0xFFB89CFF),
+    onTertiary = BotBladeBlack,
+    background = BotBladeBlack,
+    onBackground = BotBladeOnSurface,
+    surface = BotBladeBlack,
+    onSurface = BotBladeOnSurface,
+    surfaceVariant = BotBladePanel,
+    onSurfaceVariant = BotBladeMuted,
+    inverseSurface = BotBladeOnSurface,
+    inverseOnSurface = BotBladeBlack,
+    error = BotBladeDanger,
+    onError = BotBladeBlack,
 )
 
 @Composable
 fun BotBladeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     useDynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val colorScheme = when {
-        useDynamicColor && darkTheme -> dynamicDarkColorScheme(context)
-        useDynamicColor && !darkTheme -> dynamicLightColorScheme(context)
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, content = content)
+    MaterialTheme(colorScheme = BotBladeColors, typography = AppTypography, content = content)
 }
