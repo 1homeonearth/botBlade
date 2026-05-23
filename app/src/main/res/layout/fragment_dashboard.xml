@@ -17,6 +17,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <com.princess.botblade.ui.dashboard.BotWorkstationDeckView
+            android:id="@+id/bot_workstation_deck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <TextView
             android:id="@+id/active_project_text"
             android:layout_width="match_parent"
