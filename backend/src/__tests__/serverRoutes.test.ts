@@ -12,13 +12,14 @@ const { createRequestListener } = await import("../server.js");
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 
-async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean } = {}) {
+async function request(method: Method, url: string, body?: unknown, options: { token?: string; sessionToken?: string; unauthenticated?: boolean; authorizationHeader?: string | string[]; sessionHeader?: string | string[]; rawCookieHeader?: string } = {}) {
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
-  const headers: Record<string, string> = { host: "localhost", "x-request-id": `req_test_${randomUUID()}` };
-  if (!options.unauthenticated) {
-    if (options.sessionToken) headers.cookie = `botBladeSession=${encodeURIComponent(options.sessionToken)}`;
-    else headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
-  }
+  const headers: Record<string, string | string[]> = { host: "localhost", "x-request-id": `req_test_${randomUUID()}` };
+  if (options.sessionToken) headers.cookie = `botBladeSession=${encodeURIComponent(options.sessionToken)}`;
+  if (options.rawCookieHeader) headers.cookie = options.rawCookieHeader;
+  if (options.sessionHeader) reqHeader(headers, "x-session-token", options.sessionHeader);
+  if (options.authorizationHeader) reqHeader(headers, "authorization", options.authorizationHeader);
+  else if (!options.unauthenticated && !options.sessionToken && !options.sessionHeader) headers.authorization = `Bearer ${options.token ?? "admin-token"}`;
   const req = {
     method,
     url,
@@ -34,6 +35,11 @@ async function request(method: Method, url: string, body?: unknown, options: { t
   };
   await createRequestListener()(req as never, res as never);
   return { statusCode: res.statusCode, body: res.payload ? JSON.parse(res.payload) : null, headers: res.headers };
+}
+
+
+function reqHeader(headers: Record<string, string | string[]>, name: string, value: string | string[]): void {
+  headers[name] = value;
 }
 
 test("health route returns ok", async () => {
@@ -57,6 +63,24 @@ test("protected routes reject unauthenticated requests", async () => {
   assert.equal(response.body.error.code, "AUTHENTICATION_REQUIRED");
 });
 
+
+
+test("malformed session cookie fails closed with 401 instead of server error", async () => {
+  const response = await request("GET", "/api/projects", undefined, { unauthenticated: true, rawCookieHeader: "botBladeSession=%" });
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.error.code, "AUTHENTICATION_REQUIRED");
+});
+
+
+test("authorization header array accepts a valid bearer token", async () => {
+  const response = await request("GET", "/api/projects", undefined, { authorizationHeader: ["Bearer admin-token"] });
+  assert.equal(response.statusCode, 200);
+});
+
+test("x-session-token header array accepts a valid session token", async () => {
+  const response = await request("GET", "/api/projects", undefined, { unauthenticated: true, sessionHeader: ["session-token"] });
+  assert.equal(response.statusCode, 200);
+});
 test("project routes reject actors without project authorization", async () => {
   const created = await request("POST", "/api/projects", { name: "Authorization Denied" });
   const response = await request("GET", `/api/projects/${created.body.id}`, undefined, { token: "scoped-token" });
