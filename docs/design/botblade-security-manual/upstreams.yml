@@ -9,3 +9,66 @@ upstreams:
     notes: >
       Whole app is GPLv3. Do not vendor. Integration via Android intents only.
       Requires explicit command preview. No secrets passed by default.
+
+  - id: jgit
+    name: JGit
+    sourceRepo: eclipse-jgit/jgit
+    sourceUrl: https://github.com/eclipse-jgit/jgit
+    license: EDL-1.0 AND BSD-3-Clause
+    usageType: direct_dependency_candidate
+    notes: >
+      Candidate for local Git clone, status, branch, commit, fetch, pull, and push
+      support. Verify Android/Gradle compatibility before adding dependency coordinates.
+      Keep credentials behind BotBlade secret references and redact remote URLs that
+      contain credentials.
+
+  - id: fossify-org
+    name: Fossify organization
+    sourceRepo: FossifyOrg
+    sourceUrl: https://github.com/FossifyOrg
+    license: GPL-3.0-family
+    usageType: reference_only
+    notes: >
+      Use for product research only. Do not copy, translate, rewrite, vendor, or embed
+      source code, resources, layouts, strings, icons, or assets.
+
+  - id: fossify-file-manager
+    name: Fossify File Manager
+    sourceRepo: FossifyOrg/File-Manager
+    sourceUrl: https://github.com/FossifyOrg/File-Manager
+    license: GPL-3.0-family
+    usageType: reference_only
+    notes: >
+      Reference for privacy-first local file ergonomics only. BotBlade file surfaces
+      must be original Kotlin/Compose implementation.
+
+  - id: fossify-gallery
+    name: Fossify Gallery
+    sourceRepo: FossifyOrg/Gallery
+    sourceUrl: https://github.com/FossifyOrg/Gallery
+    license: GPL-3.0-family
+    usageType: reference_only
+    notes: >
+      Reference for local asset/media preview ergonomics only. Do not copy GPL code,
+      assets, strings, resources, or layouts.
+
+  - id: acode
+    name: Acode
+    sourceRepo: Acode-Foundation/Acode
+    sourceUrl: https://github.com/Acode-Foundation/Acode
+    license: MIT
+    usageType: original_implementation_preferred
+    notes: >
+      Candidate inspiration for mobile editor workbench features. Prefer native
+      Kotlin/Compose implementation. Any direct reuse requires MIT attribution and
+      file-level provenance comments.
+
+  - id: acode-plugin-docs
+    name: Acode plugin documentation
+    sourceRepo: Acode documentation
+    sourceUrl: https://docs.acode.app
+    license: documentation_reference
+    usageType: reference_only
+    notes: >
+      Reference for plugin capability design. BotBlade editor extensions must pass
+      through security policy gates and must not execute untrusted plugin code during import.
