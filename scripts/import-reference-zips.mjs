@@ -74,7 +74,7 @@ for (const repo of repos) {
   }
 
   mkdirSync(targetPath, { recursive: true });
-  const copy = spawnSync("cp", ["-a", `${rootPath}/.", targetPath], { stdio: "inherit" });
+  const copy = spawnSync("cp", ["-a", `${rootPath}/.`, targetPath], { stdio: "inherit" });
   if (copy.status !== 0) {
     throw new Error(`Failed to copy ${repo.root} to ${repo.target}`);
   }
