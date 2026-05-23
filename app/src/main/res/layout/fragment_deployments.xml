@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/botblade_black">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -9,40 +11,72 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/deployments_title"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium" />
+            app:cardBackgroundColor="@color/botblade_panel_raised"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/botblade_hot_pink"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/deployments_title"
+                    android:textAppearance="?attr/textAppearanceHeadlineMedium"
+                    android:textColor="@color/botblade_baby_blue" />
+
+                <TextView
+                    android:id="@+id/deployments_active_project"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/active_project_none"
+                    android:textColor="@color/botblade_on_surface" />
+
+                <TextView
+                    android:id="@+id/deployments_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/ops_deck_intro"
+                    android:textColor="@color/botblade_on_surface_muted" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/deployments_active_project"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/active_project_none" />
-
-        <TextView
-            android:id="@+id/deployments_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/deployments_empty_message" />
+            android:layout_marginTop="22dp"
+            android:text="Deployments + targets"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_hot_pink" />
 
         <EditText
             android:id="@+id/deployment_target_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:hint="@string/deployment_target_name_hint"
-            android:inputType="text" />
+            android:inputType="text"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted" />
 
         <EditText
             android:id="@+id/deployment_target_type"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/deployment_target_type_hint"
-            android:inputType="text" />
+            android:inputType="text"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted" />
 
         <Button
             android:id="@+id/create_target_button"
@@ -69,7 +103,7 @@
             android:id="@+id/create_deployment_button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:text="@string/start_build" />
 
         <LinearLayout
@@ -82,16 +116,29 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/build_logs"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
+            android:layout_marginTop="22dp"
+            android:text="@string/runtime_terminal_title"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_hot_pink" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/ops_terminal_scope"
+            android:textColor="@color/botblade_on_surface_muted" />
 
         <TextView
             android:id="@+id/build_logs_text"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_height="260dp"
+            android:layout_marginTop="10dp"
+            android:background="@color/botblade_ink"
             android:fontFamily="monospace"
-            android:text="@string/build_logs_empty" />
+            android:padding="12dp"
+            android:scrollbars="vertical"
+            android:text="@string/ops_terminal_placeholder"
+            android:textColor="@color/botblade_on_surface"
+            android:textIsSelectable="true" />
     </LinearLayout>
 </ScrollView>
