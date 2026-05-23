@@ -1,0 +1,91 @@
+package com.princess.botblade.releases
+
+import android.content.Context
+import com.princess.botblade.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
+
+class AppUpgradeChecker(
+    private val context: Context,
+    private val client: OkHttpClient = OkHttpClient(),
+) {
+    suspend fun checkLatestRelease(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("https://api.github.com/repos/1homeonearth/botBlade/releases")
+            .header("Accept", "application/vnd.github+json")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IllegalStateException("GitHub release check failed with HTTP ${response.code}.")
+            }
+
+            val releases = JSONArray(response.body?.string().orEmpty())
+            for (index in 0 until releases.length()) {
+                val release = releases.optJSONObject(index) ?: continue
+                if (release.optBoolean("draft", false)) continue
+
+                val tag = release.optString("tag_name")
+                val pageUrl = release.optString("html_url")
+                val asset = firstApkAsset(release) ?: continue
+
+                if (versionRank(tag) > versionRank(BuildConfig.VERSION_NAME)) {
+                    return@withContext AppUpgradeInfo(
+                        tagName = tag,
+                        pageUrl = pageUrl,
+                        assetUrl = asset.optString("browser_download_url"),
+                        assetName = asset.optString("name"),
+                    )
+                }
+            }
+
+            null
+        }
+    }
+
+    fun autoCheckEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_CHECK, true)
+
+    fun setAutoCheckEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_CHECK, enabled).apply()
+    }
+
+    fun shouldCheckNow(): Boolean {
+        if (!autoCheckEnabled()) return false
+        val lastCheckedAt = prefs.getLong(KEY_LAST_CHECKED_AT, 0L)
+        return System.currentTimeMillis() - lastCheckedAt > CHECK_INTERVAL_MS
+    }
+
+    fun markChecked() {
+        prefs.edit().putLong(KEY_LAST_CHECKED_AT, System.currentTimeMillis()).apply()
+    }
+
+    private val prefs by lazy {
+        context.applicationContext.getSharedPreferences("botblade_upgrade_prefs", Context.MODE_PRIVATE)
+    }
+
+    private fun firstApkAsset(release: JSONObject): JSONObject? {
+        val assets = release.optJSONArray("assets") ?: return null
+        for (index in 0 until assets.length()) {
+            val asset = assets.optJSONObject(index) ?: continue
+            if (asset.optString("name").endsWith(".apk")) return asset
+        }
+        return null
+    }
+
+    private fun versionRank(value: String): Int {
+        val match = Regex("(\\d+)\\.(\\d+)").find(value) ?: return 0
+        val major = match.groupValues[1].toIntOrNull() ?: 0
+        val minor = match.groupValues[2].toIntOrNull() ?: 0
+        return major * 100000 + minor
+    }
+
+    private companion object {
+        const val KEY_AUTO_CHECK = "auto_check_enabled"
+        const val KEY_LAST_CHECKED_AT = "last_checked_at"
+        const val CHECK_INTERVAL_MS = 12L * 60L * 60L * 1000L
+    }
+}

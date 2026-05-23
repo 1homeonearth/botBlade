@@ -1,21 +1,46 @@
 <resources>
     <style name="Theme.BotBlade" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/botblade_purple</item>
-        <item name="colorPrimaryVariant">@color/botblade_purple_dark</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorSecondary">@color/botblade_gold</item>
-        <item name="colorSurface">@color/botblade_surface</item>
+        <item name="colorPrimary">@color/botblade_baby_blue</item>
+        <item name="colorPrimaryVariant">@color/botblade_baby_blue_deep</item>
+        <item name="colorOnPrimary">@color/botblade_on_accent</item>
+        <item name="colorSecondary">@color/botblade_hot_pink</item>
+        <item name="colorSecondaryVariant">@color/botblade_hot_pink_deep</item>
+        <item name="colorOnSecondary">@color/botblade_on_accent</item>
+        <item name="colorSurface">@color/botblade_black</item>
         <item name="colorOnSurface">@color/botblade_on_surface</item>
-        <item name="android:colorBackground">@color/botblade_surface</item>
+        <item name="android:colorBackground">@color/botblade_black</item>
         <item name="android:textColorPrimary">@color/botblade_on_surface</item>
-        <item name="android:textColorSecondary">@color/botblade_on_surface</item>
+        <item name="android:textColorSecondary">@color/botblade_on_surface_muted</item>
         <item name="materialCardViewStyle">@style/Widget.BotBlade.MaterialCardView</item>
-        <item name="android:statusBarColor">@color/botblade_purple_dark</item>
-        <item name="android:navigationBarColor">@color/botblade_surface</item>
+        <item name="android:statusBarColor">@color/botblade_black</item>
+        <item name="android:navigationBarColor">@color/botblade_black</item>
         <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="buttonStyle">@style/Widget.BotBlade.Button</item>
+        <item name="materialButtonStyle">@style/Widget.BotBlade.Button</item>
+        <item name="textInputStyle">@style/Widget.BotBlade.TextInput</item>
     </style>
 
     <style name="Widget.BotBlade.MaterialCardView" parent="Widget.MaterialComponents.CardView">
-        <item name="cardBackgroundColor">@color/botblade_surface_variant</item>
+        <item name="cardBackgroundColor">@color/botblade_panel</item>
+        <item name="strokeColor">@color/botblade_panel_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+
+    <style name="Widget.BotBlade.Button" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/botblade_baby_blue</item>
+        <item name="android:textColor">@color/botblade_on_accent</item>
+        <item name="cornerRadius">18dp</item>
+    </style>
+
+    <style name="Widget.BotBlade.OutlinedButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="strokeColor">@color/botblade_hot_pink</item>
+        <item name="android:textColor">@color/botblade_baby_blue</item>
+        <item name="cornerRadius">18dp</item>
+    </style>
+
+    <style name="Widget.BotBlade.TextInput" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/botblade_baby_blue</item>
+        <item name="hintTextColor">@color/botblade_on_surface_muted</item>
     </style>
 </resources>

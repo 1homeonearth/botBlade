@@ -1,10 +1,25 @@
 <resources>
-    <color name="botblade_purple">#5E35B1</color>
-    <color name="botblade_purple_dark">#4527A0</color>
-    <color name="botblade_gold">#D4AF37</color>
-    <color name="botblade_surface">#FFFBFE</color>
-    <color name="bottom_nav_item_color">#5E35B1</color>
-    <color name="botblade_surface_variant">#EEE7F9</color>
-    <color name="botblade_on_surface">#111016</color>
+    <color name="botblade_black">#05060A</color>
+    <color name="botblade_ink">#090B12</color>
+    <color name="botblade_panel">#101522</color>
+    <color name="botblade_panel_raised">#151D2E</color>
+    <color name="botblade_panel_stroke">#2F405F</color>
+    <color name="botblade_baby_blue">#8FD8FF</color>
+    <color name="botblade_baby_blue_deep">#39BFFF</color>
+    <color name="botblade_hot_pink">#FF3EA5</color>
+    <color name="botblade_hot_pink_deep">#E9007F</color>
+    <color name="botblade_neon_lavender">#B89CFF</color>
+    <color name="botblade_success">#7CFFB2</color>
+    <color name="botblade_warning">#FFD166</color>
+    <color name="botblade_danger">#FF6B8A</color>
+    <color name="botblade_on_surface">#EEF7FF</color>
+    <color name="botblade_on_surface_muted">#AAB8CC</color>
+    <color name="botblade_on_accent">#05060A</color>
+
+    <color name="botblade_purple">@color/botblade_hot_pink</color>
+    <color name="botblade_purple_dark">@color/botblade_black</color>
+    <color name="botblade_gold">@color/botblade_baby_blue</color>
+    <color name="botblade_surface">@color/botblade_black</color>
+    <color name="botblade_surface_variant">@color/botblade_panel</color>
     <color name="ic_launcher_background">#000000</color>
 </resources>
