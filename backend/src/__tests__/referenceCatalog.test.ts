@@ -13,11 +13,13 @@ test("referenceCatalog contains BotBlade-ready seed entries", () => {
   assert.ok(referenceCatalog.some((entry) => entry.id === "framework-discord-js"));
 });
 
-test("referenceCatalog finds entries by exact package hint", () => {
+test("referenceCatalog finds platform and framework entries by exact package hint", () => {
   const matches = findReferenceCatalogEntriesByPackage("discord.js");
+  const ids = matches.map((entry) => entry.id);
 
-  assert.equal(matches.length, 1);
-  assert.equal(matches[0]?.id, "framework-discord-js");
+  assert.equal(matches.length, 2);
+  assert.ok(ids.includes("platform-discord"));
+  assert.ok(ids.includes("framework-discord-js"));
 });
 
 test("referenceCatalog finds entries by detector hint text", () => {
