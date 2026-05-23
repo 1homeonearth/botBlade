@@ -29,6 +29,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <com.princess.botblade.releases.AppUpgradePanelView
+            android:id="@+id/app_upgrade_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
