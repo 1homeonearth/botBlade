@@ -31,7 +31,7 @@ class AppUpgradeChecker(
 
                 val tag = release.optString("tag_name")
                 val pageUrl = release.optString("html_url")
-                val asset = firstApkAsset(release) ?: continue
+                val asset = firstInstallableApkAsset(release) ?: continue
 
                 if (versionRank(tag) > versionRank(BuildConfig.VERSION_NAME)) {
                     return@withContext AppUpgradeInfo(
@@ -67,13 +67,25 @@ class AppUpgradeChecker(
         context.applicationContext.getSharedPreferences("botblade_upgrade_prefs", Context.MODE_PRIVATE)
     }
 
-    private fun firstApkAsset(release: JSONObject): JSONObject? {
+    private fun firstInstallableApkAsset(release: JSONObject): JSONObject? {
         val assets = release.optJSONArray("assets") ?: return null
         for (index in 0 until assets.length()) {
             val asset = assets.optJSONObject(index) ?: continue
-            if (asset.optString("name").endsWith(".apk")) return asset
+            val name = asset.optString("name")
+            if (name.endsWith(".apk") && assetMatchesCurrentChannel(name)) return asset
         }
         return null
+    }
+
+    private fun assetMatchesCurrentChannel(assetName: String): Boolean {
+        val packageName = BuildConfig.APPLICATION_ID
+        val name = assetName.lowercase()
+        return when {
+            packageName.endsWith(".ci") -> name.contains("-ci-") || name.contains("-ci.")
+            packageName.endsWith(".debug") -> name.contains("-debug-") || name.contains("-debug.")
+            packageName.contains(".localdev") -> name.contains("local-dev") || name.contains("localdev")
+            else -> !name.contains("-ci-") && !name.contains("-ci.") && !name.contains("-debug-") && !name.contains("-debug.") && !name.contains("local-dev") && !name.contains("localdev")
+        }
     }
 
     private fun versionRank(value: String): Int {
