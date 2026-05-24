@@ -3,6 +3,7 @@ package com.princess.botblade.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.princess.botblade.backend.BotEngineBindingState
+import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.data.api.ApiResult
 import com.princess.botblade.data.model.RuntimeStatusResponse
 import com.princess.botblade.data.repository.DashboardRepository
@@ -60,7 +61,7 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
 
     fun connectLogs() {
         if (ws != null) return
-        ws = client.newWebSocket(Request.Builder().url("ws://127.0.0.1:7432/logs").build(), object : WebSocketListener() {
+        ws = client.newWebSocket(Request.Builder().url(logSocketUrl()).build(), object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 _logs.value = (_logs.value + text).takeLast(200)
             }
@@ -69,4 +70,13 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
     }
 
     fun disconnectLogs() { ws?.close(1000, "pause"); ws = null }
+
+    private fun logSocketUrl(): String {
+        val base = ApiConfig.baseUrl
+        return when {
+            base.startsWith("https://", ignoreCase = true) -> "wss://${base.removePrefix("https://")}/logs"
+            base.startsWith("http://", ignoreCase = true) -> "ws://${base.removePrefix("http://")}/logs"
+            else -> "ws://127.0.0.1:7432/logs"
+        }
+    }
 }
