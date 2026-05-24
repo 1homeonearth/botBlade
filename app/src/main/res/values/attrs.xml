@@ -1,0 +1,6 @@
+<resources>
+    <declare-styleable name="WorkstationCardView">
+        <attr name="accentColor" format="color" />
+        <attr name="accentWidth" format="dimension" />
+    </declare-styleable>
+</resources>
