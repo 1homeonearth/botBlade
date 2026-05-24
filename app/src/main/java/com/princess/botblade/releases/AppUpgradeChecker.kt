@@ -28,6 +28,7 @@ class AppUpgradeChecker(
             for (index in 0 until releases.length()) {
                 val release = releases.optJSONObject(index) ?: continue
                 if (release.optBoolean("draft", false)) continue
+                if (!releaseMatchesCurrentChannel(release)) continue
 
                 val tag = release.optString("tag_name")
                 val pageUrl = release.optString("html_url")
@@ -94,10 +95,29 @@ class AppUpgradeChecker(
     }
 
     private fun versionRank(value: String): Int {
-        val match = Regex("(\\d+)\\.(\\d+)").find(value) ?: return 0
-        val major = match.groupValues[1].toIntOrNull() ?: 0
-        val minor = match.groupValues[2].toIntOrNull() ?: 0
+        val normalized = value.trim().removePrefix("v")
+        val parts = normalized.split(".")
+        if (parts.size < 2) return 0
+
+        val major = parts[0].toIntOrNull() ?: return 0
+        val minorDigits = buildString {
+            for (ch in parts[1]) {
+                if (ch.isDigit()) append(ch) else break
+            }
+        }
+        val minor = minorDigits.toIntOrNull() ?: 0
         return major * 100000 + minor
+    }
+
+    private fun releaseMatchesCurrentChannel(release: JSONObject): Boolean {
+        val packageName = BuildConfig.APPLICATION_ID
+        val isPrerelease = release.optBoolean("prerelease", false)
+        return when {
+            packageName.endsWith(".ci") -> true
+            packageName.endsWith(".debug") -> isPrerelease
+            packageName.contains(".localdev") -> isPrerelease
+            else -> !isPrerelease
+        }
     }
 
     private companion object {
