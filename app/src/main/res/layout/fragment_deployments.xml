@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.princess.botblade.ui.common.WorkstationScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/botblade_black">
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -11,100 +10,127 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <com.google.android.material.card.MaterialCardView
+        <com.princess.botblade.ui.common.WorkstationCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/botblade_panel_raised"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/botblade_hot_pink"
-            app:strokeWidth="1dp">
+            app:accentColor="@color/botblade_hot_pink">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:padding="24dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/deployments_title"
-                    android:textAppearance="?attr/textAppearanceHeadlineMedium"
-                    android:textColor="@color/botblade_baby_blue" />
-
-                <TextView
-                    android:id="@+id/deployments_active_project"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/active_project_none"
-                    android:textColor="@color/botblade_on_surface" />
+                    android:text="Operations"
+                    android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                    android:textColor="@color/botblade_baby_blue"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/deployments_status"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="@string/ops_deck_intro"
+                    android:text="Build history, deployment targets, runtime logs, and a container-scoped terminal for the active bot."
                     android:textColor="@color/botblade_on_surface_muted" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        </com.princess.botblade.ui.common.WorkstationCardView>
 
-        <TextView
+        <com.princess.botblade.ui.common.WorkstationCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:text="Deployments + targets"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="@color/botblade_hot_pink" />
+            android:layout_marginTop="28dp"
+            app:accentColor="@color/botblade_baby_blue">
 
-        <EditText
-            android:id="@+id/deployment_target_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="@string/deployment_target_name_hint"
-            android:inputType="text"
-            android:textColor="@color/botblade_on_surface"
-            android:textColorHint="@color/botblade_on_surface_muted" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
 
-        <EditText
-            android:id="@+id/deployment_target_type"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/deployment_target_type_hint"
-            android:inputType="text"
-            android:textColor="@color/botblade_on_surface"
-            android:textColorHint="@color/botblade_on_surface_muted" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Deployments + targets"
+                    android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                    android:textColor="@color/botblade_baby_blue"
+                    android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/create_target_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/create_deployment_target" />
+                <TextView
+                    android:id="@+id/deployments_active_project"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="local_process ready • local_docker ready • GitHub workflow preview • remote runner staged"
+                    android:textColor="@color/botblade_on_surface_muted" />
 
-        <Button
-            android:id="@+id/deploy_latest_build_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/deploy_latest_build" />
+                <EditText
+                    android:id="@+id/deployment_target_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/deployment_target_name_hint"
+                    android:inputType="text"
+                    android:textColor="@color/botblade_on_surface"
+                    android:textColorHint="@color/botblade_on_surface_muted" />
 
-        <Button
-            android:id="@+id/refresh_deployments_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/refresh_status" />
+                <EditText
+                    android:id="@+id/deployment_target_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/deployment_target_type_hint"
+                    android:inputType="text"
+                    android:textColor="@color/botblade_on_surface"
+                    android:textColorHint="@color/botblade_on_surface_muted" />
 
-        <Button
-            android:id="@+id/create_deployment_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/start_build" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/create_target_button"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/create_deployment_target" />
+
+                    <Button
+                        android:id="@+id/deploy_latest_build_button"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/deploy_latest_build" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/refresh_deployments_button"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/refresh_status" />
+
+                    <Button
+                        android:id="@+id/create_deployment_button"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/start_build" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.princess.botblade.ui.common.WorkstationCardView>
 
         <LinearLayout
             android:id="@+id/build_list_container"
@@ -113,32 +139,55 @@
             android:layout_marginTop="16dp"
             android:orientation="vertical" />
 
-        <TextView
+        <com.princess.botblade.ui.common.WorkstationCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:text="@string/runtime_terminal_title"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="@color/botblade_hot_pink" />
+            android:layout_marginTop="28dp"
+            app:accentColor="@color/botblade_baby_blue">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/ops_terminal_scope"
-            android:textColor="@color/botblade_on_surface_muted" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
 
-        <TextView
-            android:id="@+id/build_logs_text"
-            android:layout_width="match_parent"
-            android:layout_height="260dp"
-            android:layout_marginTop="10dp"
-            android:background="@color/botblade_ink"
-            android:fontFamily="monospace"
-            android:padding="12dp"
-            android:scrollbars="vertical"
-            android:text="@string/ops_terminal_placeholder"
-            android:textColor="@color/botblade_on_surface"
-            android:textIsSelectable="true" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/runtime_terminal_title"
+                    android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                    android:textColor="@color/botblade_baby_blue"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/ops_terminal_scope"
+                    android:textColor="@color/botblade_on_surface_muted"
+                    android:textStyle="bold" />
+
+                <androidx.core.widget.NestedScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="260dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@color/botblade_ink"
+                    android:fillViewport="true"
+                    android:nestedScrollingEnabled="true"
+                    android:scrollbars="vertical">
+
+                    <TextView
+                        android:id="@+id/build_logs_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:minHeight="260dp"
+                        android:padding="12dp"
+                        android:text="@string/ops_terminal_placeholder"
+                        android:textColor="@color/botblade_on_surface"
+                        android:textIsSelectable="true" />
+                </androidx.core.widget.NestedScrollView>
+            </LinearLayout>
+        </com.princess.botblade.ui.common.WorkstationCardView>
     </LinearLayout>
-</ScrollView>
+</com.princess.botblade.ui.common.WorkstationScrollView>
