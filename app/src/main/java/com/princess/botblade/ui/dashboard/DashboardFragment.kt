@@ -51,7 +51,7 @@ class DashboardFragment : Fragment() {
                     DashboardScreen(
                         vm = viewModel,
                         started = started,
-                        onCreateProject = { navigateTo(R.id.navigation_projects) },
+                        onCreateProject = ::openAddProjectFlow,
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenOps = { navigateTo(R.id.navigation_deployments) },
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
@@ -87,8 +87,22 @@ class DashboardFragment : Fragment() {
         activeProjectId = activeProjectStore.getActiveProjectId()
     }
 
+    private fun openAddProjectFlow() {
+        requireContext()
+            .getSharedPreferences(WORKSTATION_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_OPEN_ADD_PROJECT, true)
+            .apply()
+        navigateTo(R.id.navigation_projects)
+    }
+
     private fun navigateTo(itemId: Int) {
         activity?.findViewById<BottomNavigationView>(R.id.bottom_navigation)?.selectedItemId = itemId
+    }
+
+    private companion object {
+        const val WORKSTATION_PREFS = "botblade_workstation_flow"
+        const val KEY_OPEN_ADD_PROJECT = "open_add_project"
     }
 }
 
