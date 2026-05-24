@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -196,7 +197,7 @@ private fun DashboardScreen(
 }
 
 @Composable
-private fun WorkstationCard(accent: Color, content: @Composable Column.() -> Unit) {
+private fun WorkstationCard(accent: Color, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         color = Panel,
         shape = RoundedCornerShape(22.dp),
