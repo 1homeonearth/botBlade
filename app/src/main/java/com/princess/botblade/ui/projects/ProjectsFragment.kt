@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -92,6 +93,7 @@ class ProjectsFragment : Fragment() {
         var showGitModal by remember { mutableStateOf(false) }
         var gitRepoUrl by remember { mutableStateOf("") }
         var gitBranch by remember { mutableStateOf("") }
+        var pendingFolderLane by rememberSaveable { mutableStateOf(SourceLane.OPEN_FOLDER.name) }
         val scope = rememberCoroutineScope()
         val validName = name.isNotBlank() && name.matches(Regex("^[a-zA-Z0-9 _-]+$"))
         val available = projects.none { it.name.equals(name.trim(), ignoreCase = true) }
@@ -142,7 +144,7 @@ class ProjectsFragment : Fragment() {
 
         val zipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::runZipImport)
         val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-            runFolderAction(uri, selected.lane)
+            runFolderAction(uri, SourceLane.valueOf(pendingFolderLane))
         }
 
         LaunchedEffect(Unit) {
@@ -249,7 +251,10 @@ class ProjectsFragment : Fragment() {
                                         SourceLane.STARTER_TEMPLATE -> step = 2
                                         SourceLane.IMPORT_GIT -> showGitModal = true
                                         SourceLane.IMPORT_ZIP -> zipPicker.launch(arrayOf("application/zip", "application/octet-stream"))
-                                        SourceLane.OPEN_FOLDER, SourceLane.REPAIR_EXISTING -> folderPicker.launch(null)
+                                        SourceLane.OPEN_FOLDER, SourceLane.REPAIR_EXISTING -> {
+                                            pendingFolderLane = selected.lane.name
+                                            folderPicker.launch(null)
+                                        }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
