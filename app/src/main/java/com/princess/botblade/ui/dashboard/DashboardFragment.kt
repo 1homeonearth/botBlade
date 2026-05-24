@@ -56,6 +56,7 @@ class DashboardFragment : Fragment() {
                         onCreateProject = ::openAddProjectFlow,
                         onOpenProjects = { navigateTo(R.id.navigation_projects) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
+                        onOpenBuild = { navigateTo(R.id.navigation_deployments) },
                         onOpenOps = { navigateTo(R.id.navigation_deployments) },
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
@@ -116,6 +117,7 @@ private fun DashboardScreen(
     onCreateProject: () -> Unit,
     onOpenProjects: () -> Unit,
     onOpenEditor: () -> Unit,
+    onOpenBuild: () -> Unit,
     onOpenOps: () -> Unit,
     onOpenSettings: () -> Unit,
     onLogs: () -> Unit,
@@ -173,7 +175,7 @@ private fun DashboardScreen(
 
         item {
             FlowLane("Build & Run", "Build from Editor, then control runtime and inspect logs.", HotPink) {
-                Button(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("Build") }
+                Button(onClick = onOpenBuild, modifier = Modifier.weight(1f)) { Text("Builds") }
                 OutlinedButton(onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f)) { Text("Run") }
             }
         }
