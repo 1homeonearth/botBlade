@@ -126,6 +126,14 @@ class ProjectsFragment : Fragment() {
                         ProjectCard(
                             project = project,
                             onOpen = onOpen,
+                            onStatusClick = { selectedProject ->
+                                banner = "${selectedProject.name} status · ${selectedProject.status}. Runtime/build details are available in Ops Deck."
+                            },
+                            onForgeReadyClick = { selectedProject ->
+                                banner = "Starting Blade Pack scan for ${selectedProject.name}. Opening Forge Editor scan surface."
+                                onOpen(selectedProject)
+                            },
+                            onOpenClick = onOpen,
                             onMenu = { menuProject = project },
                         )
                     }
@@ -267,6 +275,9 @@ class ProjectsFragment : Fragment() {
     @Composable private fun ProjectCard(
         project: LocalProjectRepository.LocalProjectSummary,
         onOpen: (LocalProjectRepository.LocalProjectSummary) -> Unit,
+        onStatusClick: (LocalProjectRepository.LocalProjectSummary) -> Unit,
+        onForgeReadyClick: (LocalProjectRepository.LocalProjectSummary) -> Unit,
+        onOpenClick: (LocalProjectRepository.LocalProjectSummary) -> Unit,
         onMenu: () -> Unit,
     ) {
         Card(
@@ -286,9 +297,9 @@ class ProjectsFragment : Fragment() {
                     TextButton(onClick = onMenu) { Text("⋯", color = HotPink) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = {}, label = { Text(project.status) })
-                    AssistChip(onClick = {}, label = { Text("Forge-ready") })
-                    AssistChip(onClick = {}, label = { Text("Open") })
+                    AssistChip(onClick = { onStatusClick(project) }, label = { Text(project.status) })
+                    AssistChip(onClick = { onForgeReadyClick(project) }, label = { Text("Forge-ready") })
+                    AssistChip(onClick = { onOpenClick(project) }, label = { Text("Open") })
                 }
                 Text("Tap to open editor. Long press or tap ⋯ for project actions.", color = Muted)
             }
