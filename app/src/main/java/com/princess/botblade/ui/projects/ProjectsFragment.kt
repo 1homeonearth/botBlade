@@ -3,8 +3,9 @@ package com.princess.botblade.ui.projects
 import android.content.Context
 import android.os.Bundle
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -30,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +41,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
@@ -69,7 +74,7 @@ class ProjectsFragment : Fragment() {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
     @Composable
     private fun ProjectsScreen(onOpen: (LocalProjectRepository.LocalProjectSummary) -> Unit) {
         var showWizard by remember { mutableStateOf(false) }
@@ -77,6 +82,7 @@ class ProjectsFragment : Fragment() {
         var name by remember { mutableStateOf("") }
         var selected by remember { mutableStateOf(Sources.first()) }
         var projects by remember { mutableStateOf(repo.listProjects()) }
+        var menuProject by remember { mutableStateOf<LocalProjectRepository.LocalProjectSummary?>(null) }
         var banner by remember { mutableStateOf("Import, create, repair, and open bot workspaces from one forge floor.") }
         val validName = name.isNotBlank() && name.matches(Regex("^[a-zA-Z0-9 _-]+$"))
         val available = projects.none { it.name.equals(name.trim(), ignoreCase = true) }
@@ -116,8 +122,46 @@ class ProjectsFragment : Fragment() {
                 if (projects.isEmpty()) {
                     item { EmptyState(::openWizard) }
                 } else {
-                    items(projects, key = { it.id }) { project -> ProjectCard(project, onOpen) }
+                    items(projects, key = { it.id }) { project ->
+                        ProjectCard(
+                            project = project,
+                            onOpen = onOpen,
+                            onMenu = { menuProject = project },
+                        )
+                    }
                 }
+            }
+        }
+
+        menuProject?.let { project ->
+            DropdownMenu(expanded = true, onDismissRequest = { menuProject = null }) {
+                DropdownMenuItem(
+                    text = { Text("Open in Forge Editor") },
+                    onClick = {
+                        menuProject = null
+                        onOpen(project)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Quick rename") },
+                    onClick = {
+                        val renamed = repo.renameProject(project.id, nextRenamedName(project.name, projects))
+                        if (renamed) {
+                            projects = repo.listProjects()
+                            banner = "Renamed ${project.name}."
+                        }
+                        menuProject = null
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        repo.deleteProject(project.id)
+                        projects = repo.listProjects()
+                        banner = "Deleted ${project.name}."
+                        menuProject = null
+                    },
+                )
             }
         }
 
@@ -220,16 +264,33 @@ class ProjectsFragment : Fragment() {
         }
     }
 
-    @Composable private fun ProjectCard(project: LocalProjectRepository.LocalProjectSummary, onOpen: (LocalProjectRepository.LocalProjectSummary) -> Unit) {
-        Card(modifier = Modifier.fillMaxWidth().clickable { onOpen(project) }, colors = CardDefaults.cardColors(containerColor = Panel), border = BorderStroke(1.dp, Stroke), shape = RoundedCornerShape(20.dp)) {
+    @Composable private fun ProjectCard(
+        project: LocalProjectRepository.LocalProjectSummary,
+        onOpen: (LocalProjectRepository.LocalProjectSummary) -> Unit,
+        onMenu: () -> Unit,
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = { onOpen(project) }, onLongClick = onMenu),
+            colors = CardDefaults.cardColors(containerColor = Panel),
+            border = BorderStroke(1.dp, Stroke),
+            shape = RoundedCornerShape(20.dp),
+        ) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(project.name, color = BabyBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                Text("Last modified: ${DateFormat.getDateTimeInstance().format(project.lastModified)}", color = Muted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(project.name, color = BabyBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("Last modified: ${DateFormat.getDateTimeInstance().format(project.lastModified)}", color = Muted)
+                    }
+                    TextButton(onClick = onMenu) { Text("⋯", color = HotPink) }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistChip(onClick = {}, label = { Text(project.status) })
                     AssistChip(onClick = {}, label = { Text("Forge-ready") })
                     AssistChip(onClick = {}, label = { Text("Open") })
                 }
+                Text("Tap to open editor. Long press or tap ⋯ for project actions.", color = Muted)
             }
         }
     }
@@ -246,6 +307,17 @@ class ProjectsFragment : Fragment() {
     }
 
     @Composable private fun SectionTitle(text: String) { Text(text, color = HotPink, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+
+    private fun nextRenamedName(currentName: String, projects: List<LocalProjectRepository.LocalProjectSummary>): String {
+        val existing = projects.map { it.name.lowercase() }.toSet()
+        var index = 1
+        var candidate = "$currentName-renamed"
+        while (candidate.lowercase() in existing) {
+            index += 1
+            candidate = "$currentName-renamed-$index"
+        }
+        return candidate
+    }
 
     private data class Source(val title: String, val detail: String, val templateDir: String?)
 
