@@ -4,19 +4,36 @@ import android.content.Context
 import java.net.URI
 
 object ApiConfig {
+    private const val PREFS_NAME = "botblade_api"
+    private const val KEY_BASE_URL = "base_url"
+
+    @Volatile
+    private var configuredBaseUrl: String = normalizeUrl(BackendConfig.baseUrl)
+    @Volatile
+    private var appContext: Context? = null
+
     val DEFAULT_BASE_URL: String = normalizeUrl(BackendConfig.baseUrl)
     const val DEFAULT_BEARER_TOKEN = ""
     const val DEFAULT_SESSION_TOKEN = ""
 
     val baseUrl: String
-        get() = normalizeUrl(BackendConfig.baseUrl)
+        get() = configuredBaseUrl
 
     fun initialize(context: Context) {
-        context.applicationContext
+        appContext = context.applicationContext
+        val prefs = appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val stored = prefs.getString(KEY_BASE_URL, null)
+        configuredBaseUrl = stored?.let(::normalizeUrl) ?: normalizeUrl(BackendConfig.baseUrl)
     }
 
     fun saveBaseUrl(url: String): String {
-        return normalizeUrl(baseUrl)
+        val normalized = normalizeUrl(url)
+        configuredBaseUrl = normalized
+        appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString(KEY_BASE_URL, normalized)
+            ?.apply()
+        return normalized
     }
 
     fun validateBaseUrl(url: String): String? = runCatching {
