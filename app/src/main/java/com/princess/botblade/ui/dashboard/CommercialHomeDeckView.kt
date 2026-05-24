@@ -6,8 +6,8 @@ import android.util.AttributeSet
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.google.android.material.card.MaterialCardView
 import com.princess.botblade.R
+import com.princess.botblade.ui.common.WorkstationCardView
 
 class CommercialHomeDeckView @JvmOverloads constructor(
     context: Context,
@@ -20,89 +20,50 @@ class CommercialHomeDeckView @JvmOverloads constructor(
     }
 
     private fun render() {
-        addView(hero())
-        addView(sectionTitle("Primary flow"))
-        CommercialHomeDeck.primaryActions.forEach { addView(laneCard(it)) }
-        addView(sectionTitle("Workspace health"))
-        CommercialHomeDeck.workspaceHealth.forEach { addView(laneCard(it)) }
+        addView(activeWorkspaceCard())
     }
 
-    private fun hero(): MaterialCardView = MaterialCardView(context).apply {
-        setCardBackgroundColor(resources.getColor(R.color.botblade_panel_raised, context.theme))
-        strokeColor = resources.getColor(R.color.botblade_hot_pink, context.theme)
-        strokeWidth = 1.dp
-        radius = 24.dp.toFloat()
-        cardElevation = 0f
-        layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-
+    private fun activeWorkspaceCard(): WorkstationCardView = WorkstationCardView(context).apply {
+        layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = 28.dp
+        }
         val body = LinearLayout(context).apply {
             orientation = VERTICAL
-            setPadding(18.dp, 18.dp, 18.dp, 18.dp)
+            setPadding(24.dp, 22.dp, 24.dp, 22.dp)
         }
         body.addView(TextView(context).apply {
-            text = "BotBlade"
+            text = "Active workspace"
             setTextColor(resources.getColor(R.color.botblade_baby_blue, context.theme))
-            textSize = 30f
+            textSize = 26f
             typeface = Typeface.DEFAULT_BOLD
         })
         body.addView(TextView(context).apply {
-            text = "A mobile forge for importing, repairing, editing, running, deploying, and auditing bots."
-            setTextColor(resources.getColor(R.color.botblade_on_surface, context.theme))
-            textSize = 15f
+            text = "discord-moderator-pro • Discord.js • Node 22 • local Docker target"
+            setTextColor(resources.getColor(R.color.botblade_on_surface_muted, context.theme))
+            textSize = 16f
             setPadding(0, 8.dp, 0, 0)
         })
-        body.addView(TextView(context).apply {
-            text = "Commercial shell pattern: command center, active workspace, health strip, primary actions, diagnostics, and release rail."
-            setTextColor(resources.getColor(R.color.botblade_on_surface_muted, context.theme))
-            textSize = 13f
-            setPadding(0, 10.dp, 0, 0)
-        })
+        val chips = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            setPadding(0, 24.dp, 0, 0)
+        }
+        chips.addView(chip("Backend healthy", R.color.botblade_success))
+        chips.addView(chip("Secrets ready", R.color.botblade_baby_blue))
+        chips.addView(chip("Build passing", R.color.botblade_success))
+        body.addView(chips)
         addView(body)
     }
 
-    private fun sectionTitle(text: String): TextView = TextView(context).apply {
-        this.text = text
-        setTextColor(resources.getColor(R.color.botblade_hot_pink, context.theme))
-        textSize = 18f
+    private fun chip(label: String, colorRes: Int): TextView = TextView(context).apply {
+        text = label
+        setTextColor(resources.getColor(colorRes, context.theme))
+        textSize = 14f
         typeface = Typeface.DEFAULT_BOLD
-        layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = 18.dp
+        setBackgroundResource(R.drawable.botblade_chip_outline)
+        setPadding(14.dp, 8.dp, 14.dp, 8.dp)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            marginEnd = 8.dp
         }
-    }
-
-    private fun laneCard(lane: CommercialHomeLane): MaterialCardView = MaterialCardView(context).apply {
-        setCardBackgroundColor(resources.getColor(R.color.botblade_panel, context.theme))
-        strokeColor = resources.getColor(R.color.botblade_panel_stroke, context.theme)
-        strokeWidth = 1.dp
-        radius = 18.dp.toFloat()
-        cardElevation = 0f
-        layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = 10.dp
-        }
-        val body = LinearLayout(context).apply {
-            orientation = VERTICAL
-            setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-        }
-        body.addView(TextView(context).apply {
-            text = lane.title
-            setTextColor(resources.getColor(R.color.botblade_baby_blue, context.theme))
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
-        })
-        body.addView(TextView(context).apply {
-            text = lane.tag
-            setTextColor(resources.getColor(R.color.botblade_hot_pink, context.theme))
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 4.dp, 0, 0)
-        })
-        body.addView(TextView(context).apply {
-            text = lane.detail
-            setTextColor(resources.getColor(R.color.botblade_on_surface, context.theme))
-            textSize = 14f
-            setPadding(0, 6.dp, 0, 0)
-        })
-        addView(body)
     }
 
     private val Int.dp: Int
