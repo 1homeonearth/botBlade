@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -53,6 +54,7 @@ class DashboardFragment : Fragment() {
                         vm = viewModel,
                         started = started,
                         onCreateProject = ::openAddProjectFlow,
+                        onOpenProjects = { navigateTo(R.id.navigation_projects) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenOps = { navigateTo(R.id.navigation_deployments) },
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
@@ -112,6 +114,7 @@ private fun DashboardScreen(
     vm: DashboardViewModel,
     started: Long,
     onCreateProject: () -> Unit,
+    onOpenProjects: () -> Unit,
     onOpenEditor: () -> Unit,
     onOpenOps: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -124,10 +127,7 @@ private fun DashboardScreen(
     val uptime = (SystemClock.elapsedRealtime() - started) / 1000
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BotBlack)
-            .padding(20.dp),
+        modifier = Modifier.fillMaxSize().background(BotBlack).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
@@ -135,7 +135,7 @@ private fun DashboardScreen(
                 Text("BotBlade", color = BabyBlue, fontWeight = FontWeight.Bold)
                 Text("Command Center", color = HotPink, fontWeight = FontWeight.Bold)
             }
-            Text("Point A → Z bot workstation", color = Muted, modifier = Modifier.padding(top = 8.dp))
+            Text("Build, run, and release bots from one Android workstation.", color = Muted, modifier = Modifier.padding(top = 8.dp))
         }
 
         item {
@@ -152,25 +152,36 @@ private fun DashboardScreen(
 
         item {
             WorkstationCard(accent = BabyBlue) {
-                Text("A-to-Z flow", color = BabyBlue, fontWeight = FontWeight.Bold)
-                Text("Create/import → scan → configure secrets → edit → build → run → inspect → deploy → release", color = Muted, modifier = Modifier.padding(top = 8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 18.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(onClick = onCreateProject, modifier = Modifier.weight(1f)) { Text("01 Create") }
-                        OutlinedButton(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("02 Scan") }
-                        OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("03 Vault") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("04 Edit") }
-                        OutlinedButton(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("05 Build") }
-                        OutlinedButton(onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f)) { Text("06 Run") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("07 Inspect") }
-                        OutlinedButton(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("08 Deploy") }
-                        OutlinedButton(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("09 Release") }
-                    }
-                }
+                Text("Working order", color = BabyBlue, fontWeight = FontWeight.Bold)
+                Text("Start with a project. Prepare it in Editor and Vault. Build and run it. Use Ops Deck to deploy and inspect release readiness.", color = Muted, modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+
+        item {
+            FlowLane("Start", "Create a starter bot, import work, or open an existing workspace.", HotPink) {
+                Button(onClick = onCreateProject, modifier = Modifier.weight(1f)) { Text("Create / Import") }
+                OutlinedButton(onClick = onOpenProjects, modifier = Modifier.weight(1f)) { Text("Projects") }
+            }
+        }
+
+        item {
+            FlowLane("Prepare", "Scan the project, edit files, and add required secrets.", BabyBlue) {
+                Button(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("Scan + Edit") }
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("Vault") }
+            }
+        }
+
+        item {
+            FlowLane("Build & Run", "Build from Editor, then control runtime and inspect logs.", HotPink) {
+                Button(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("Build") }
+                OutlinedButton(onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f)) { Text("Run") }
+            }
+        }
+
+        item {
+            FlowLane("Deploy", "Create targets, deploy the latest successful build, and inspect release readiness.", BabyBlue) {
+                Button(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("Ops Deck") }
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("Settings") }
             }
         }
 
@@ -186,12 +197,27 @@ private fun DashboardScreen(
             }
         }
 
-        item {
-            Text("Live logs", color = HotPink, fontWeight = FontWeight.Bold)
+        if (logs.isNotEmpty()) {
+            item { Text("Live logs", color = HotPink, fontWeight = FontWeight.Bold) }
+            items(logs.takeLast(25)) { line ->
+                Text(line, color = Success, modifier = Modifier.fillMaxWidth().background(Ink).padding(8.dp))
+            }
         }
+    }
+}
 
-        items(logs.takeLast(25)) { line ->
-            Text(line, color = Success, modifier = Modifier.fillMaxWidth().background(Ink).padding(8.dp))
+@Composable
+private fun FlowLane(
+    title: String,
+    detail: String,
+    accent: Color,
+    buttons: @Composable RowScope.() -> Unit,
+) {
+    WorkstationCard(accent = accent) {
+        Text(title, color = BabyBlue, fontWeight = FontWeight.Bold)
+        Text(detail, color = Muted, modifier = Modifier.padding(top = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+            buttons()
         }
     }
 }
@@ -201,9 +227,7 @@ private fun WorkstationCard(accent: Color, content: @Composable ColumnScope.() -
     Surface(
         color = Panel,
         shape = RoundedCornerShape(22.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Stroke, RoundedCornerShape(22.dp)),
+        modifier = Modifier.fillMaxWidth().border(1.dp, Stroke, RoundedCornerShape(22.dp)),
     ) {
         Row {
             Surface(color = accent, modifier = Modifier.fillMaxWidth(0.02f)) {}
