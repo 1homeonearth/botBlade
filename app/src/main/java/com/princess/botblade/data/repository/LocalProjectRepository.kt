@@ -1,6 +1,7 @@
 package com.princess.botblade.data.repository
 
 import android.content.Context
+import android.net.Uri
 import org.json.JSONObject
 import java.io.File
 
@@ -66,4 +67,13 @@ class LocalProjectRepository(private val context: Context) {
 
     fun deleteProject(projectId: String): Boolean =
         File(context.filesDir, "projects/$projectId").deleteRecursively()
+
+    fun importFromGit(repositoryUrl: String, branch: String?): String =
+        "Git import queued for $repositoryUrl${branch?.takeIf { it.isNotBlank() }?.let { " (branch $it)" } ?: ""}."
+
+    fun importFromZip(zipUri: Uri): String = "ZIP import queued for $zipUri."
+
+    fun registerWorkspaceFolder(folderUri: Uri): String = "Folder registration queued for $folderUri."
+
+    fun repairWorkspace(folderUri: Uri): String = "Workspace repair scan queued for $folderUri."
 }

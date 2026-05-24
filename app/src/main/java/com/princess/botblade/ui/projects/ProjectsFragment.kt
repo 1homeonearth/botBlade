@@ -1,7 +1,10 @@
 package com.princess.botblade.ui.projects
 
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -41,6 +44,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,6 +57,7 @@ import com.princess.botblade.data.repository.LocalProjectRepository
 import com.princess.botblade.ui.theme.BotBladeTheme
 import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import java.text.DateFormat
+import kotlinx.coroutines.launch
 
 class ProjectsFragment : Fragment() {
     private lateinit var repo: LocalProjectRepository
@@ -84,15 +89,60 @@ class ProjectsFragment : Fragment() {
         var projects by remember { mutableStateOf(repo.listProjects()) }
         var menuProject by remember { mutableStateOf<LocalProjectRepository.LocalProjectSummary?>(null) }
         var banner by remember { mutableStateOf("Import, create, repair, and open bot workspaces from one forge floor.") }
+        var showGitModal by remember { mutableStateOf(false) }
+        var gitRepoUrl by remember { mutableStateOf("") }
+        var gitBranch by remember { mutableStateOf("") }
+        val scope = rememberCoroutineScope()
         val validName = name.isNotBlank() && name.matches(Regex("^[a-zA-Z0-9 _-]+$"))
         val available = projects.none { it.name.equals(name.trim(), ignoreCase = true) }
-        val canCreate = validName && available && selected.templateDir != null
+        val canCreate = validName && available && selected.lane == SourceLane.STARTER_TEMPLATE && selected.templateDir != null
 
         fun openWizard() {
             showWizard = true
             step = 1
             name = ""
             selected = Sources.first()
+            gitRepoUrl = ""
+            gitBranch = ""
+        }
+
+        fun runZipImport(uri: Uri?) {
+            if (uri == null) {
+                banner = "ZIP import canceled."
+                return
+            }
+            showWizard = false
+            banner = "Import ZIP: sending archive URI to import adapter…"
+            scope.launch {
+                banner = repo.importFromZip(uri)
+                projects = repo.listProjects()
+            }
+        }
+
+        fun runFolderAction(uri: Uri?, lane: SourceLane) {
+            if (uri == null) {
+                banner = if (lane == SourceLane.OPEN_FOLDER) "Folder selection canceled." else "Repair workspace selection canceled."
+                return
+            }
+            showWizard = false
+            banner = when (lane) {
+                SourceLane.OPEN_FOLDER -> "Open Folder: registering workspace root…"
+                SourceLane.REPAIR_EXISTING -> "Repair Existing: running metadata scan/repair…"
+                else -> banner
+            }
+            scope.launch {
+                banner = when (lane) {
+                    SourceLane.OPEN_FOLDER -> repo.registerWorkspaceFolder(uri)
+                    SourceLane.REPAIR_EXISTING -> repo.repairWorkspace(uri)
+                    else -> banner
+                }
+                projects = repo.listProjects()
+            }
+        }
+
+        val zipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::runZipImport)
+        val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            runFolderAction(uri, selected.lane)
         }
 
         LaunchedEffect(Unit) {
@@ -177,7 +227,7 @@ class ProjectsFragment : Fragment() {
             ModalBottomSheet(onDismissRequest = { showWizard = false }, containerColor = Panel) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Add Project", color = BabyBlue, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Create from a starter now. Git, ZIP, folder, and repair lanes stay visible while their endpoints mature.", color = Muted)
+                    Text("Pick a source lane and continue through source-specific actions.", color = Muted)
                     when (step) {
                         1 -> {
                             Sources.forEach { source ->
@@ -193,8 +243,17 @@ class ProjectsFragment : Fragment() {
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
-                            Button(onClick = { step = 2 }, enabled = selected.templateDir != null, modifier = Modifier.fillMaxWidth()) { Text("Continue") }
-                            if (selected.templateDir == null) Text("${selected.title} is staged. Pick a starter template to create a project now.", color = Muted)
+                            Button(
+                                onClick = {
+                                    when (selected.lane) {
+                                        SourceLane.STARTER_TEMPLATE -> step = 2
+                                        SourceLane.IMPORT_GIT -> showGitModal = true
+                                        SourceLane.IMPORT_ZIP -> zipPicker.launch(arrayOf("application/zip", "application/octet-stream"))
+                                        SourceLane.OPEN_FOLDER, SourceLane.REPAIR_EXISTING -> folderPicker.launch(null)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Continue") }
                         }
                         2 -> {
                             OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Project name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -231,6 +290,44 @@ class ProjectsFragment : Fragment() {
                         }
                     }
                     Spacer(Modifier.height(18.dp))
+                }
+            }
+        }
+
+        if (showGitModal) {
+            ModalBottomSheet(onDismissRequest = { showGitModal = false }, containerColor = Panel) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Import from Git", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = gitRepoUrl,
+                        onValueChange = { gitRepoUrl = it },
+                        label = { Text("Repository URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = gitBranch,
+                        onValueChange = { gitBranch = it },
+                        label = { Text("Branch (optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { showGitModal = false }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                        Button(
+                            onClick = {
+                                banner = "Import from Git: sending repository request…"
+                                scope.launch {
+                                    banner = repo.importFromGit(gitRepoUrl.trim(), gitBranch.trim().ifBlank { null })
+                                    projects = repo.listProjects()
+                                    showGitModal = false
+                                    showWizard = false
+                                }
+                            },
+                            enabled = gitRepoUrl.trim().startsWith("http"),
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Import") }
+                    }
                 }
             }
         }
@@ -330,7 +427,9 @@ class ProjectsFragment : Fragment() {
         return candidate
     }
 
-    private data class Source(val title: String, val detail: String, val templateDir: String?)
+    private enum class SourceLane { STARTER_TEMPLATE, IMPORT_GIT, IMPORT_ZIP, OPEN_FOLDER, REPAIR_EXISTING }
+
+    private data class Source(val title: String, val detail: String, val lane: SourceLane, val templateDir: String?)
 
     private companion object {
         const val PREFS = "botblade_workstation_flow"
@@ -338,13 +437,13 @@ class ProjectsFragment : Fragment() {
         val BotBlack = Color(0xFF05060A); val Panel = Color(0xFF101522); val RaisedPanel = Color(0xFF151D2E); val Stroke = Color(0xFF2F405F)
         val BabyBlue = Color(0xFF8FD8FF); val HotPink = Color(0xFFFF3EA5); val OnSurface = Color(0xFFEEF7FF); val Muted = Color(0xFFAAB8CC)
         val Sources = listOf(
-            Source("Discord TypeScript Starter", "slash-command bot with generated TypeScript project files", "project_templates/simple_echo_bot"),
-            Source("Moderation Toolkit", "moderation-oriented starter ready for rules and actions", "project_templates/moderation_bot"),
-            Source("Blank Workspace", "clean bot workspace for custom imports and experiments", "project_templates/blank_project"),
-            Source("Import from Git", "clone and repair a repository through Forge Sync", null),
-            Source("Import ZIP", "unpack an archive, scan it, then repair missing project metadata", null),
-            Source("Open Folder", "select an Android workspace folder and turn it into a BotBlade project", null),
-            Source("Repair Existing", "scan loose files and generate missing BotBlade metadata", null),
+            Source("Discord TypeScript Starter", "slash-command bot with generated TypeScript project files", SourceLane.STARTER_TEMPLATE, "project_templates/simple_echo_bot"),
+            Source("Moderation Toolkit", "moderation-oriented starter ready for rules and actions", SourceLane.STARTER_TEMPLATE, "project_templates/moderation_bot"),
+            Source("Blank Workspace", "clean bot workspace for custom imports and experiments", SourceLane.STARTER_TEMPLATE, "project_templates/blank_project"),
+            Source("Import from Git", "clone and repair a repository through Forge Sync", SourceLane.IMPORT_GIT, null),
+            Source("Import ZIP", "unpack an archive, scan it, then repair missing project metadata", SourceLane.IMPORT_ZIP, null),
+            Source("Open Folder", "select an Android workspace folder and turn it into a BotBlade project", SourceLane.OPEN_FOLDER, null),
+            Source("Repair Existing", "scan loose files and generate missing BotBlade metadata", SourceLane.REPAIR_EXISTING, null),
         )
     }
 }
