@@ -1,16 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<com.princess.botblade.ui.common.WorkstationScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/botblade_black"
-    android:fillViewport="true">
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BotBlade"
+                android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                android:textColor="@color/botblade_baby_blue"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="28dp"
+                android:text="Command Center"
+                android:textAppearance="?attr/textAppearanceTitleLarge"
+                android:textColor="@color/botblade_hot_pink"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Point A → Z bot workstation"
+            android:textColor="@color/botblade_on_surface_muted" />
 
         <com.princess.botblade.ui.dashboard.CommercialHomeDeckView
             android:id="@+id/commercial_home_deck"
@@ -22,113 +49,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <TextView
-            android:id="@+id/active_project_text"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/active_project_none"
-            android:textColor="@color/botblade_on_surface_muted"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
+            android:layout_height="1dp"
+            android:orientation="vertical"
+            android:visibility="invisible">
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="@color/botblade_panel"
-            app:strokeColor="@color/botblade_panel_stroke"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:id="@+id/bot_status_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/bot_status_unknown"
-                    android:textColor="@color/botblade_hot_pink"
-                    android:textAppearance="?attr/textAppearanceTitleLarge" />
-
-                <TextView
-                    android:id="@+id/dashboard_message_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/dashboard_empty_message"
-                    android:textColor="@color/botblade_on_surface_muted"
-                    android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/refresh_status_button"
-                        style="@style/Widget.BotBlade.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/refresh_status" />
-
-                    <Button
-                        android:id="@+id/start_bot_button"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:layout_weight="1"
-                        android:text="@string/start_runtime" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/stop_bot_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/stop_runtime" />
-
-                <Button
-                    android:id="@+id/restart_bot_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/restart_runtime" />
-
-                <Button
-                    android:id="@+id/view_runtime_logs_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/view_logs" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/runtime_terminal_title"
-                    android:textColor="@color/botblade_baby_blue"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-                <TextView
-                    android:id="@+id/runtime_terminal_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="180dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@color/botblade_ink"
-                    android:padding="8dp"
-                    android:scrollbars="vertical"
-                    android:text=""
-                    android:textColor="@color/botblade_on_surface"
-                    android:textIsSelectable="true"
-                    android:typeface="monospace" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            <TextView android:id="@+id/active_project_text" android:layout_width="match_parent" android:layout_height="1dp" />
+            <TextView android:id="@+id/bot_status_text" android:layout_width="match_parent" android:layout_height="1dp" />
+            <TextView android:id="@+id/dashboard_message_text" android:layout_width="match_parent" android:layout_height="1dp" />
+            <Button android:id="@+id/refresh_status_button" android:layout_width="match_parent" android:layout_height="1dp" />
+            <Button android:id="@+id/start_bot_button" android:layout_width="match_parent" android:layout_height="1dp" />
+            <Button android:id="@+id/stop_bot_button" android:layout_width="match_parent" android:layout_height="1dp" />
+            <Button android:id="@+id/restart_bot_button" android:layout_width="match_parent" android:layout_height="1dp" />
+            <Button android:id="@+id/view_runtime_logs_button" android:layout_width="match_parent" android:layout_height="1dp" />
+            <TextView android:id="@+id/runtime_terminal_text" android:layout_width="match_parent" android:layout_height="1dp" />
+        </LinearLayout>
     </LinearLayout>
-</ScrollView>
+</com.princess.botblade.ui.common.WorkstationScrollView>
