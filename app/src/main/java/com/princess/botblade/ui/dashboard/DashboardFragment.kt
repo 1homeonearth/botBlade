@@ -53,8 +53,11 @@ class DashboardFragment : Fragment() {
                         vm = viewModel,
                         started = started,
                         onCreateProject = ::openAddProjectFlow,
+                        onScanProject = { requestEditorAction(KEY_RUN_SCAN) },
+                        onBuildProject = { requestEditorAction(KEY_START_BUILD) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenOps = { navigateTo(R.id.navigation_deployments) },
+                        onReleaseCheck = ::requestReleaseCheck,
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
                     )
@@ -97,6 +100,24 @@ class DashboardFragment : Fragment() {
         navigateTo(R.id.navigation_projects)
     }
 
+    private fun requestEditorAction(actionKey: String) {
+        requireContext()
+            .getSharedPreferences(WORKSTATION_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(actionKey, true)
+            .apply()
+        navigateTo(R.id.navigation_editor)
+    }
+
+    private fun requestReleaseCheck() {
+        requireContext()
+            .getSharedPreferences(WORKSTATION_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_SHOW_RELEASE_CHECK, true)
+            .apply()
+        navigateTo(R.id.navigation_deployments)
+    }
+
     private fun navigateTo(itemId: Int) {
         activity?.findViewById<BottomNavigationView>(R.id.bottom_navigation)?.selectedItemId = itemId
     }
@@ -104,6 +125,9 @@ class DashboardFragment : Fragment() {
     private companion object {
         const val WORKSTATION_PREFS = "botblade_workstation_flow"
         const val KEY_OPEN_ADD_PROJECT = "open_add_project"
+        const val KEY_RUN_SCAN = "run_project_scan"
+        const val KEY_START_BUILD = "start_project_build"
+        const val KEY_SHOW_RELEASE_CHECK = "show_release_check"
     }
 }
 
@@ -112,8 +136,11 @@ private fun DashboardScreen(
     vm: DashboardViewModel,
     started: Long,
     onCreateProject: () -> Unit,
+    onScanProject: () -> Unit,
+    onBuildProject: () -> Unit,
     onOpenEditor: () -> Unit,
     onOpenOps: () -> Unit,
+    onReleaseCheck: () -> Unit,
     onOpenSettings: () -> Unit,
     onLogs: () -> Unit,
 ) {
@@ -157,18 +184,18 @@ private fun DashboardScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 18.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         Button(onClick = onCreateProject, modifier = Modifier.weight(1f)) { Text("01 Create") }
-                        OutlinedButton(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("02 Scan") }
+                        OutlinedButton(onClick = onScanProject, modifier = Modifier.weight(1f)) { Text("02 Scan") }
                         OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("03 Vault") }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         OutlinedButton(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("04 Edit") }
-                        OutlinedButton(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("05 Build") }
+                        OutlinedButton(onClick = onBuildProject, modifier = Modifier.weight(1f)) { Text("05 Build") }
                         OutlinedButton(onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f)) { Text("06 Run") }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         OutlinedButton(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("07 Inspect") }
                         OutlinedButton(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("08 Deploy") }
-                        OutlinedButton(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("09 Release") }
+                        OutlinedButton(onClick = onReleaseCheck, modifier = Modifier.weight(1f)) { Text("09 Release") }
                     }
                 }
             }
