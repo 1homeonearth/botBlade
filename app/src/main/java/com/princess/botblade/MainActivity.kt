@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.navigation_dashboard -> showFragmentSafely { DashboardFragment() }
                 R.id.navigation_projects -> showFragmentSafely { ProjectsFragment() }
                 R.id.navigation_editor -> showFragmentSafely { CodeEditorFragment() }
-                R.id.navigation_deployments -> showFragmentSafely { DeploymentsFragment() }
+                R.id.navigation_deployments -> showFragmentSafely { DeploymentsFragment.newInstance() }
                 R.id.navigation_settings -> showFragmentSafely { SettingsFragment() }
                 else -> false
             }
@@ -114,6 +114,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
     }
 
+
+    fun openDeploymentsForProject(projectId: String?, projectName: String?) {
+        val args = DeploymentsFragment.buildArgs(projectId, projectName)
+        showFragmentSafely { DeploymentsFragment.newInstance(args) }
+    }
     fun openLogsScreen() {
         showFragmentSafely { LogsFragment() }
     }
