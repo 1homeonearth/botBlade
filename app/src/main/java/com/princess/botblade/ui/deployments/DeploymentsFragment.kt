@@ -17,6 +17,7 @@ import com.princess.botblade.data.model.BuildSummary
 import com.princess.botblade.data.model.DeploymentJobSummary
 import com.princess.botblade.data.model.DeploymentTargetSummary
 import com.princess.botblade.data.repository.BuildRepository
+import com.princess.botblade.data.repository.DashboardRepository
 import com.princess.botblade.data.repository.DeploymentRepository
 import com.princess.botblade.data.store.ActiveProjectStore
 import kotlinx.coroutines.launch
@@ -36,6 +37,7 @@ class DeploymentsFragment : Fragment() {
         }
     }
     private val buildRepository = BuildRepository()
+    private val dashboardRepository = DashboardRepository()
     private val deploymentRepository = DeploymentRepository()
     private var projectId: String? = null
     private var projectName: String? = null
@@ -74,15 +76,33 @@ class DeploymentsFragment : Fragment() {
         loadAll()
     }
 
+    override fun onResume() {
+        super.onResume()
+        loadAll()
+    }
+
     private fun loadAll() {
         if (projectId == null) {
             status.text = getString(R.string.select_project_first)
         }
         list.removeAllViews()
+        selectedTarget = null
+        latestSuccessfulBuild = null
+        updateDeployButton()
+        refreshRuntimeStatus()
         loadBuilds()
         loadTargets()
         loadDeployments()
         loadGitHubStatus()
+    }
+
+    private fun refreshRuntimeStatus() = lifecycleScope.launch {
+        val id = projectId ?: return@launch
+        when (val result = dashboardRepository.getBotStatus(id)) {
+            is ApiResult.Success -> status.text = "Runtime: ${result.data.status ?: "unknown"}. ${result.data.message.orEmpty()}"
+            is ApiResult.Error -> Unit
+            ApiResult.Loading -> Unit
+        }
     }
 
     private fun renderReleaseChecklist() {
@@ -122,8 +142,10 @@ class DeploymentsFragment : Fragment() {
             is ApiResult.Success -> {
                 latestSuccessfulBuild = result.data.firstOrNull { it.status == "succeeded" }
                 if (result.data.isEmpty()) {
+                    latestSuccessfulBuild = null
                     status.text = "No builds found. Create build to start deployment flow."
                     logs.text = "No builds available. Tap \"Create build\" to generate a deployable artifact."
+                    renderEmptyStateAction("No builds yet.", "Create build") { startBuild() }
                 }
                 updateDeployButton()
             }
@@ -136,11 +158,13 @@ class DeploymentsFragment : Fragment() {
         when (val result = deploymentRepository.listTargets()) {
             is ApiResult.Success -> {
                 targetsById = result.data.associateBy { it.id }
-                selectedTarget = result.data.firstOrNull()
+                selectedTarget = selectedTarget?.let { current -> result.data.firstOrNull { it.id == current.id } } ?: result.data.firstOrNull()
                 renderTargets(result.data)
                 if (result.data.isEmpty()) {
+                    selectedTarget = null
                     status.text = "No deployment targets found. Add target to continue."
                     logs.text = "No targets available. Tap \"Add target\" to configure a deployment destination."
+                    renderEmptyStateAction("No deployment targets yet.", "Add target") { createTarget() }
                 }
                 updateDeployButton()
             }
@@ -199,6 +223,15 @@ class DeploymentsFragment : Fragment() {
             }
             list.addView(row)
         }
+    }
+
+    private fun renderEmptyStateAction(message: String, actionLabel: String, action: () -> Unit) {
+        val row = Button(requireContext()).apply {
+            text = "$message\nTap \"$actionLabel\""
+            isAllCaps = false
+            setOnClickListener { action() }
+        }
+        list.addView(row)
     }
 
     private fun testTarget(target: DeploymentTargetSummary) = lifecycleScope.launch {

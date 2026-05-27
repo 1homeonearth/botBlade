@@ -57,7 +57,7 @@ class DashboardFragment : Fragment() {
                         onOpenProjects = { navigateTo(R.id.navigation_projects) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenBuild = { navigateTo(R.id.navigation_deployments) },
-                        onOpenOps = { openOpsForActiveProject() },
+                        onOpenOps = ::openOpsForProject,
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
                     )
@@ -92,10 +92,10 @@ class DashboardFragment : Fragment() {
     }
 
 
-    private fun openOpsForActiveProject() {
+    private fun openOpsForProject(projectId: String?) {
         val activity = activity as? MainActivity
         if (activity != null) {
-            activity.openDeploymentsForProject(activeProjectId, activeProjectStore.getActiveProjectName())
+            activity.openDeploymentsForProject(projectId, activeProjectStore.getActiveProjectName())
         } else {
             navigateTo(R.id.navigation_deployments)
         }
@@ -128,7 +128,7 @@ private fun DashboardScreen(
     onOpenProjects: () -> Unit,
     onOpenEditor: () -> Unit,
     onOpenBuild: () -> Unit,
-    onOpenOps: () -> Unit,
+    onOpenOps: (String?) -> Unit,
     onOpenSettings: () -> Unit,
     onLogs: () -> Unit,
 ) {
@@ -192,7 +192,7 @@ private fun DashboardScreen(
 
         item {
             FlowLane("Deploy", "Create targets, deploy the latest successful build, and inspect release readiness.", BabyBlue) {
-                Button(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("Ops Deck") }
+                Button(onClick = { onOpenOps(status?.projectId) }, modifier = Modifier.weight(1f)) { Text("Ops Deck") }
                 OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("Settings") }
             }
         }
