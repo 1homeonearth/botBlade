@@ -82,8 +82,7 @@ class DeploymentsFragment : Fragment() {
         }
         list.removeAllViews()
         loadBuilds()
-        loadTargets()
-        loadDeployments(refreshDetails = true)
+        loadTargetsThenDeployments()
         loadGitHubStatus()
     }
 
@@ -106,23 +105,25 @@ class DeploymentsFragment : Fragment() {
         }
     }
 
-    private fun loadTargets() = lifecycleScope.launch {
+    private fun loadTargetsThenDeployments() = lifecycleScope.launch {
         when (val result = deploymentRepository.listTargets()) {
-            is ApiResult.Success -> { targetsById = result.data.associateBy { it.id }; if (selectedTarget == null || targetsById[selectedTarget?.id] == null) selectedTarget = result.data.firstOrNull(); renderTargets(result.data); renderTargetEmptyState(result.data); updateDeployButton() }
+            is ApiResult.Success -> {
+                targetsById = result.data.associateBy { it.id }
+                if (selectedTarget == null || targetsById[selectedTarget?.id] == null) selectedTarget = result.data.firstOrNull()
+                renderTargets(result.data)
+                renderTargetEmptyState(result.data)
+                updateDeployButton()
+                loadDeployments()
+            }
             is ApiResult.Error -> status.text = "Target error: ${result.message}"
             ApiResult.Loading -> Unit
         }
     }
 
-    private fun loadDeployments(refreshDetails: Boolean = false) = lifecycleScope.launch {
+    private fun loadDeployments() = lifecycleScope.launch {
         val id = projectId ?: return@launch
         when (val result = deploymentRepository.listDeployments(id)) {
-            is ApiResult.Success -> {
-                renderDeployments(result.data)
-                if (refreshDetails) {
-                    result.data.firstOrNull()?.let { loadDeploymentDetails(it) }
-                }
-            }
+            is ApiResult.Success -> renderDeployments(result.data)
             is ApiResult.Error -> status.text = "Deployment error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -140,7 +141,7 @@ class DeploymentsFragment : Fragment() {
         val name = targetName.text.toString().ifBlank { "Local Process" }
         val type = targetType.text.toString().ifBlank { "local_process" }
         when (val result = deploymentRepository.createTarget(name, type)) {
-            is ApiResult.Success -> { status.text = "Created target ${result.data.name}."; loadTargets() }
+            is ApiResult.Success -> { status.text = "Created target ${result.data.name}."; loadAll() }
             is ApiResult.Error -> status.text = "Error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -183,8 +184,8 @@ class DeploymentsFragment : Fragment() {
             val row = Button(requireContext()).apply {
                 val target = targetsById[deployment.targetId]
                 val caps = target?.capabilities?.actions.orEmpty()
-                val restartSupport = if (caps["restart"] == true) "Restart supported" else "Restart unsupported"
-                val rollbackSupport = if (caps["rollback"] == true) "Rollback supported" else "Rollback unsupported"
+                val restartSupport = if (target == null) "Restart capability unknown" else if (caps["restart"] == true) "Restart supported" else "Restart unsupported"
+                val rollbackSupport = if (target == null) "Rollback capability unknown" else if (caps["rollback"] == true) "Rollback supported" else "Rollback unsupported"
                 text = "Deployment: ${deployment.deploymentId}\nStatus: ${deployment.status}\nBuild: ${deployment.buildId}\n$restartSupport · $rollbackSupport\nTap for logs/status"
                 isAllCaps = false
                 if (deployment.status == "failed") setTextColor(Color.RED)
@@ -212,8 +213,13 @@ class DeploymentsFragment : Fragment() {
             is ApiResult.Error -> "Error: ${logResult.message}"
             ApiResult.Loading -> "Logs loading…"
         }
-        logs.text = "$statusText\nActions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}\n\n$logText"
-        if (!canRestart || !canRollback) status.text = "Unsupported deployment actions are disabled by adapter capabilities."
+        val actionsText = if (target == null) {
+            "Actions: target capabilities unavailable"
+        } else {
+            "Actions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}"
+        }
+        logs.text = "$statusText\n$actionsText\n\n$logText"
+        if (target != null && (!canRestart || !canRollback)) status.text = "Unsupported deployment actions are disabled by adapter capabilities."
     }
 
     private fun restartDeployment(deployment: DeploymentJobSummary) = lifecycleScope.launch {
