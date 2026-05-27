@@ -25,6 +25,7 @@ class DeploymentsFragment : Fragment() {
     private val buildRepository = BuildRepository()
     private val deploymentRepository = DeploymentRepository()
     private var projectId: String? = null
+    private var projectName: String? = null
     private var latestSuccessfulBuild: BuildSummary? = null
     private var selectedTarget: DeploymentTargetSummary? = null
     private var targetsById: Map<String, DeploymentTargetSummary> = emptyMap()
@@ -42,18 +43,20 @@ class DeploymentsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val store = ActiveProjectStore(requireContext())
         projectId = store.getActiveProjectId()
+        projectName = store.getActiveProjectName()
         status = view.findViewById(R.id.deployments_status)
         list = view.findViewById(R.id.build_list_container)
         logs = view.findViewById(R.id.build_logs_text)
         targetName = view.findViewById(R.id.deployment_target_name)
         targetType = view.findViewById(R.id.deployment_target_type)
         deployButton = view.findViewById(R.id.deploy_latest_build_button)
-        view.findViewById<TextView>(R.id.deployments_active_project).text = if (projectId == null) getString(R.string.active_project_none) else getString(R.string.active_project_value, store.getActiveProjectName() ?: projectId)
+        view.findViewById<TextView>(R.id.deployments_active_project).text = if (projectId == null) getString(R.string.active_project_none) else getString(R.string.active_project_value, projectName ?: projectId)
 
         view.findViewById<Button>(R.id.create_deployment_button).setOnClickListener { startBuild() }
         view.findViewById<Button>(R.id.create_target_button).setOnClickListener { createTarget() }
         deployButton.setOnClickListener { deployLatest() }
         view.findViewById<Button>(R.id.refresh_deployments_button).setOnClickListener { loadAll() }
+        view.findViewById<Button>(R.id.release_check_button).setOnClickListener { renderReleaseChecklist() }
         updateDeployButton()
         loadAll()
     }
@@ -67,6 +70,27 @@ class DeploymentsFragment : Fragment() {
         loadTargets()
         loadDeployments()
         loadGitHubStatus()
+    }
+
+    private fun renderReleaseChecklist() {
+        logs.text = buildString {
+            appendLine("Release readiness")
+            appendLine("Project: ${projectName ?: projectId ?: "none"}")
+            appendLine("Active project: ${if (projectId != null) "yes" else "no"}")
+            appendLine("Successful build: ${latestSuccessfulBuild?.buildId ?: "needed"}")
+            appendLine("Deployment target: ${selectedTarget?.name ?: "needed"}")
+            appendLine("Secrets: verify in Settings / Vault")
+            appendLine("Logs: inspect this terminal pane after deploy")
+            appendLine()
+            appendLine("Ship order")
+            appendLine("1. Scan and edit in Editor.")
+            appendLine("2. Add missing secrets in Settings / Vault.")
+            appendLine("3. Start a build and wait for success.")
+            appendLine("4. Create or select a deployment target.")
+            appendLine("5. Deploy latest successful build.")
+            appendLine("6. Inspect logs and write rollback notes.")
+        }
+        status.text = if (projectId == null) getString(R.string.select_project_first) else "Release checklist generated."
     }
 
     private fun startBuild() = lifecycleScope.launch {
