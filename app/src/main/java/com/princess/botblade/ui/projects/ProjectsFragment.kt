@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -54,6 +55,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.princess.botblade.MainActivity
+import com.princess.botblade.data.api.ApiResult
+import com.princess.botblade.data.model.ProjectScanResponse
+import com.princess.botblade.data.repository.EditorRepository
 import com.princess.botblade.data.repository.LocalProjectRepository
 import com.princess.botblade.ui.theme.BotBladeTheme
 import com.princess.botblade.ui.theme.isDynamicColorEnabled
@@ -94,6 +98,9 @@ class ProjectsFragment : Fragment() {
         var gitRepoUrl by remember { mutableStateOf("") }
         var gitBranch by remember { mutableStateOf("") }
         var pendingFolderLane by rememberSaveable { mutableStateOf(SourceLane.OPEN_FOLDER.name) }
+        var createActions by remember { mutableStateOf<List<PostCreateAction>>(emptyList()) }
+        var onboardingSummary by remember { mutableStateOf<String?>(null) }
+        val editorRepo = remember { EditorRepository() }
         val scope = rememberCoroutineScope()
         val validName = name.isNotBlank() && name.matches(Regex("^[a-zA-Z0-9 _-]+$"))
         val available = projects.none { it.name.equals(name.trim(), ignoreCase = true) }
@@ -288,10 +295,27 @@ class ProjectsFragment : Fragment() {
                                 Button(
                                     onClick = {
                                         val projectRoot = repo.createProject(name.trim(), selected.templateDir ?: return@Button)
+                                        val projectId = projectRoot.name
                                         projects = repo.listProjects()
                                         showWizard = false
-                                        banner = "Created ${projectRoot.name} from ${selected.title}."
-                                        projects.firstOrNull { it.id == projectRoot.name }?.let(onOpen)
+                                        createActions = listOf(
+                                            PostCreateAction("Project created", "Created ${projectRoot.name} from ${selected.title}."),
+                                            PostCreateAction("Run scan now", "Initial project scan queued and auto-run attempted."),
+                                            PostCreateAction("Open secrets", "Open Secrets to complete optional checklist for tokens and API keys."),
+                                            PostCreateAction("Start build", "Start first build to validate template and runtime."),
+                                        )
+                                        onboardingSummary = null
+                                        banner = "Created ${projectRoot.name} from ${selected.title}. Running onboarding scan…"
+                                        projects.firstOrNull { it.id == projectId }?.let(onOpen)
+                                        scope.launch {
+                                            val scanResult = runCatching { editorRepo.scanProject(projectId) }.getOrNull()
+                                            onboardingSummary = scanResult.toScanSummary()
+                                            banner = when (scanResult) {
+                                                is ApiResult.Success -> "${projectRoot.name}: ${scanResult.value.matches.size} scan matches, recommended ${scanResult.value.recommendedPackId}."
+                                                is ApiResult.Error -> "${projectRoot.name}: scan endpoint unavailable (${scanResult.message})."
+                                                null -> "${projectRoot.name}: scan endpoint unavailable."
+                                            }
+                                        }
                                     },
                                     modifier = Modifier.weight(1f),
                                 ) { Text("Create + Open") }
@@ -301,6 +325,24 @@ class ProjectsFragment : Fragment() {
                     Spacer(Modifier.height(18.dp))
                 }
             }
+        }
+
+        if (createActions.isNotEmpty()) {
+            AlertDialog(
+                onDismissRequest = { createActions = emptyList() },
+                title = { Text("Post-create actions") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        createActions.forEach { action ->
+                            Text("• ${action.title}: ${action.detail}", color = OnSurface)
+                        }
+                        onboardingSummary?.let { Text(it, color = Muted) }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { createActions = emptyList() }) { Text("Done") }
+                },
+            )
         }
 
         if (showGitModal) {
@@ -418,7 +460,7 @@ class ProjectsFragment : Fragment() {
                 Text("Review forge order", color = BabyBlue, fontWeight = FontWeight.Bold)
                 Text("Name: $projectName", color = OnSurface)
                 Text("Source: ${source.title}", color = OnSurface)
-                Text("First action: create workspace, open Forge Editor, run Blade Pack scan.", color = Muted)
+                Text("First action: create workspace, open Forge Editor, trigger scan, then continue with secrets and build.", color = Muted)
             }
         }
     }
@@ -439,6 +481,18 @@ class ProjectsFragment : Fragment() {
     private enum class SourceLane { STARTER_TEMPLATE, IMPORT_GIT, IMPORT_ZIP, OPEN_FOLDER, REPAIR_EXISTING }
 
     private data class Source(val title: String, val detail: String, val lane: SourceLane, val templateDir: String?)
+
+
+    private data class PostCreateAction(val title: String, val detail: String)
+
+    private fun ApiResult<ProjectScanResponse>?.toScanSummary(): String = when (this) {
+        is ApiResult.Success -> {
+            val top = value.matches.firstOrNull()?.let { " Top match ${it.name} (${it.confidence})." } ?: ""
+            "Scan complete: ${value.matches.size} match(es), recommended pack ${value.recommendedPackId}.${top}"
+        }
+        is ApiResult.Error -> "Scan unavailable: ${message}"
+        null -> "Scan skipped: endpoint unavailable."
+    }
 
     private companion object {
         const val PREFS = "botblade_workstation_flow"
