@@ -48,6 +48,7 @@ class DeploymentsFragment : Fragment() {
     private lateinit var status: TextView
     private lateinit var list: LinearLayout
     private lateinit var logs: TextView
+    private var githubStatusLine: String = ""
     private lateinit var targetName: EditText
     private lateinit var targetType: EditText
     private lateinit var deployButton: Button
@@ -86,8 +87,13 @@ class DeploymentsFragment : Fragment() {
     }
 
     private fun loadAll() {
+        githubStatusLine = ""
         if (projectId == null) {
             status.text = getString(R.string.select_project_first)
+            list.removeAllViews()
+            updateDeployButton()
+            loadGitHubStatus()
+            return
         }
         loadBuilds()
         loadTargets()
@@ -131,7 +137,10 @@ class DeploymentsFragment : Fragment() {
         when (val result = buildRepository.listBuilds(id)) {
             is ApiResult.Success -> {
                 hasBuilds = result.data.isNotEmpty()
-                latestSuccessfulBuild = result.data.firstOrNull { it.status == "succeeded" }
+                latestSuccessfulBuild = result.data
+                    .asSequence()
+                    .filter { it.status == "succeeded" }
+                    .maxByOrNull { it.finishedAt ?: it.startedAt ?: "" }
                 if (!hasBuilds) {
                     status.text = "No builds found. Create build to start deployment flow."
                     logs.text = "No builds available. Tap \"Create build\" to generate a deployable artifact."
@@ -178,10 +187,13 @@ class DeploymentsFragment : Fragment() {
     }
 
     private fun loadGitHubStatus() = lifecycleScope.launch {
-        when (val result = deploymentRepository.getGitHubStatus()) {
-            is ApiResult.Success -> logs.text = "GitHub: ${if (result.data.connected) "connected" else "disconnected"}. ${result.data.message.orEmpty()}"
-            is ApiResult.Error -> logs.text = "GitHub status unavailable: ${result.message}"
-            ApiResult.Loading -> Unit
+        githubStatusLine = when (val result = deploymentRepository.getGitHubStatus()) {
+            is ApiResult.Success -> "GitHub: ${if (result.data.connected) "connected" else "disconnected"}. ${result.data.message.orEmpty()}"
+            is ApiResult.Error -> "GitHub status unavailable: ${result.message}"
+            ApiResult.Loading -> githubStatusLine
+        }
+        if (logs.text.isNullOrBlank()) {
+            logs.text = githubStatusLine
         }
     }
 
@@ -271,7 +283,8 @@ class DeploymentsFragment : Fragment() {
             is ApiResult.Error -> "Error: ${logResult.message}"
             ApiResult.Loading -> "Logs loading…"
         }
-        logs.text = "$statusText\nActions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}\n\n$logText"
+        val deploymentDetails = "$statusText\nActions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}\n\n$logText"
+        logs.text = if (githubStatusLine.isBlank()) deploymentDetails else "$githubStatusLine\n\n$deploymentDetails"
         if (!canRestart || !canRollback) status.text = "Unsupported deployment actions are disabled by adapter capabilities."
     }
 
