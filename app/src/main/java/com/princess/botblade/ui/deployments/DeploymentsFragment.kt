@@ -266,6 +266,16 @@ class DeploymentsFragment : Fragment() {
         recentDeployments.firstOrNull()?.let { loadDeploymentDetails(it) }
     }
 
+
+    private fun testTarget(target: DeploymentTargetSummary) = lifecycleScope.launch {
+        status.text = "Testing target ${target.name}…"
+        when (val result = deploymentRepository.testTarget(target.id)) {
+            is ApiResult.Success -> status.text = "Target ${target.name}: ${result.data.status} — ${result.data.message}"
+            is ApiResult.Error -> status.text = "Target test failed: ${result.message}"
+            ApiResult.Loading -> Unit
+        }
+    }
+
     private fun loadDeploymentDetails(deployment: DeploymentJobSummary) = lifecycleScope.launch {
         val id = projectId ?: return@launch
         val target = targetsById[deployment.targetId]
