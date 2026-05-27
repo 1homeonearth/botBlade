@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -57,7 +58,7 @@ class DashboardFragment : Fragment() {
                         onOpenProjects = { navigateTo(R.id.navigation_projects) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenBuild = { navigateTo(R.id.navigation_deployments) },
-                        onOpenOps = { navigateTo(R.id.navigation_deployments) },
+                        onOpenOps = { navigateTo(R.id.navigation_deployments, activeProjectId) },
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
                     )
@@ -100,13 +101,18 @@ class DashboardFragment : Fragment() {
         navigateTo(R.id.navigation_projects)
     }
 
-    private fun navigateTo(itemId: Int) {
+    private fun navigateTo(itemId: Int, projectId: String? = null) {
+        if (itemId == R.id.navigation_deployments) {
+            parentFragmentManager.setFragmentResult(DEPLOYMENTS_NAV_REQUEST_KEY, bundleOf(DEPLOYMENTS_PROJECT_ID_KEY to projectId))
+        }
         activity?.findViewById<BottomNavigationView>(R.id.bottom_navigation)?.selectedItemId = itemId
     }
 
-    private companion object {
+    companion object {
         const val WORKSTATION_PREFS = "botblade_workstation_flow"
         const val KEY_OPEN_ADD_PROJECT = "open_add_project"
+        const val DEPLOYMENTS_NAV_REQUEST_KEY = "dashboard_deployments_nav"
+        const val DEPLOYMENTS_PROJECT_ID_KEY = "dashboard_deployments_project_id"
     }
 }
 

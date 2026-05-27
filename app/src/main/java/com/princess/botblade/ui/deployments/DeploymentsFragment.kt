@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.setFragmentResultListener
 import androidx.lifecycle.lifecycleScope
 import com.princess.botblade.R
 import com.princess.botblade.data.api.ApiResult
@@ -19,6 +20,7 @@ import com.princess.botblade.data.model.DeploymentTargetSummary
 import com.princess.botblade.data.repository.BuildRepository
 import com.princess.botblade.data.repository.DeploymentRepository
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.dashboard.DashboardFragment
 import kotlinx.coroutines.launch
 
 class DeploymentsFragment : Fragment() {
@@ -34,13 +36,15 @@ class DeploymentsFragment : Fragment() {
     private lateinit var targetName: EditText
     private lateinit var targetType: EditText
     private lateinit var deployButton: Button
+    private lateinit var activeProjectView: TextView
+    private lateinit var store: ActiveProjectStore
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_deployments, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val store = ActiveProjectStore(requireContext())
+        store = ActiveProjectStore(requireContext())
         projectId = store.getActiveProjectId()
         status = view.findViewById(R.id.deployments_status)
         list = view.findViewById(R.id.build_list_container)
@@ -48,13 +52,27 @@ class DeploymentsFragment : Fragment() {
         targetName = view.findViewById(R.id.deployment_target_name)
         targetType = view.findViewById(R.id.deployment_target_type)
         deployButton = view.findViewById(R.id.deploy_latest_build_button)
-        view.findViewById<TextView>(R.id.deployments_active_project).text = if (projectId == null) getString(R.string.active_project_none) else getString(R.string.active_project_value, store.getActiveProjectName() ?: projectId)
+        activeProjectView = view.findViewById(R.id.deployments_active_project)
+        refreshActiveProjectText()
+
+        setFragmentResultListener(DashboardFragment.DEPLOYMENTS_NAV_REQUEST_KEY) { _, bundle ->
+            val incomingProjectId = bundle.getString(DashboardFragment.DEPLOYMENTS_PROJECT_ID_KEY)
+            if (!incomingProjectId.isNullOrBlank()) {
+                projectId = incomingProjectId
+                refreshActiveProjectText()
+                loadAll()
+            }
+        }
 
         view.findViewById<Button>(R.id.create_deployment_button).setOnClickListener { startBuild() }
         view.findViewById<Button>(R.id.create_target_button).setOnClickListener { createTarget() }
         deployButton.setOnClickListener { deployLatest() }
         view.findViewById<Button>(R.id.refresh_deployments_button).setOnClickListener { loadAll() }
         updateDeployButton()
+    }
+
+    override fun onResume() {
+        super.onResume()
         loadAll()
     }
 
@@ -65,7 +83,7 @@ class DeploymentsFragment : Fragment() {
         list.removeAllViews()
         loadBuilds()
         loadTargets()
-        loadDeployments()
+        loadDeployments(refreshDetails = true)
         loadGitHubStatus()
     }
 
@@ -82,7 +100,7 @@ class DeploymentsFragment : Fragment() {
     private fun loadBuilds() = lifecycleScope.launch {
         val id = projectId ?: return@launch
         when (val result = buildRepository.listBuilds(id)) {
-            is ApiResult.Success -> { latestSuccessfulBuild = result.data.firstOrNull { it.status == "succeeded" }; updateDeployButton() }
+            is ApiResult.Success -> { latestSuccessfulBuild = result.data.firstOrNull { it.status == "succeeded" }; renderBuildEmptyState(result.data); updateDeployButton() }
             is ApiResult.Error -> status.text = "Build error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -90,16 +108,21 @@ class DeploymentsFragment : Fragment() {
 
     private fun loadTargets() = lifecycleScope.launch {
         when (val result = deploymentRepository.listTargets()) {
-            is ApiResult.Success -> { targetsById = result.data.associateBy { it.id }; selectedTarget = result.data.firstOrNull(); renderTargets(result.data); updateDeployButton() }
+            is ApiResult.Success -> { targetsById = result.data.associateBy { it.id }; if (selectedTarget == null || targetsById[selectedTarget?.id] == null) selectedTarget = result.data.firstOrNull(); renderTargets(result.data); renderTargetEmptyState(result.data); updateDeployButton() }
             is ApiResult.Error -> status.text = "Target error: ${result.message}"
             ApiResult.Loading -> Unit
         }
     }
 
-    private fun loadDeployments() = lifecycleScope.launch {
+    private fun loadDeployments(refreshDetails: Boolean = false) = lifecycleScope.launch {
         val id = projectId ?: return@launch
         when (val result = deploymentRepository.listDeployments(id)) {
-            is ApiResult.Success -> renderDeployments(result.data)
+            is ApiResult.Success -> {
+                renderDeployments(result.data)
+                if (refreshDetails) {
+                    result.data.firstOrNull()?.let { loadDeploymentDetails(it) }
+                }
+            }
             is ApiResult.Error -> status.text = "Deployment error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -215,5 +238,29 @@ class DeploymentsFragment : Fragment() {
 
     private fun updateDeployButton() {
         deployButton.isEnabled = projectId != null && latestSuccessfulBuild != null && selectedTarget != null
+    }
+
+    private fun refreshActiveProjectText() {
+        activeProjectView.text = if (projectId == null) getString(R.string.active_project_none) else getString(R.string.active_project_value, store.getActiveProjectName() ?: projectId)
+    }
+
+    private fun renderBuildEmptyState(builds: List<BuildSummary>) {
+        if (builds.any { it.status == "succeeded" }) return
+        val row = Button(requireContext()).apply {
+            text = "No successful builds yet. Create build"
+            isAllCaps = false
+            setOnClickListener { startBuild() }
+        }
+        list.addView(row)
+    }
+
+    private fun renderTargetEmptyState(targets: List<DeploymentTargetSummary>) {
+        if (targets.isNotEmpty()) return
+        val row = Button(requireContext()).apply {
+            text = "No deployment targets yet. Add target"
+            isAllCaps = false
+            setOnClickListener { createTarget() }
+        }
+        list.addView(row)
     }
 }
