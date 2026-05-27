@@ -43,9 +43,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -108,16 +108,21 @@ class ProjectsFragment : Fragment() {
             gitBranch = ""
         }
 
+        fun openNewestProject() {
+            projects = repo.listProjects()
+            projects.firstOrNull()?.let(onOpen)
+        }
+
         fun runZipImport(uri: Uri?) {
             if (uri == null) {
                 banner = "ZIP import canceled."
                 return
             }
             showWizard = false
-            banner = "Import ZIP: sending archive URI to import adapter…"
+            banner = "Import ZIP: registering archive as a managed project…"
             scope.launch {
                 banner = repo.importFromZip(uri)
-                projects = repo.listProjects()
+                openNewestProject()
             }
         }
 
@@ -129,7 +134,7 @@ class ProjectsFragment : Fragment() {
             showWizard = false
             banner = when (lane) {
                 SourceLane.OPEN_FOLDER -> "Open Folder: registering workspace root…"
-                SourceLane.REPAIR_EXISTING -> "Repair Existing: running metadata scan/repair…"
+                SourceLane.REPAIR_EXISTING -> "Repair Existing: creating repair shell…"
                 else -> banner
             }
             scope.launch {
@@ -138,7 +143,7 @@ class ProjectsFragment : Fragment() {
                     SourceLane.REPAIR_EXISTING -> repo.repairWorkspace(uri)
                     else -> banner
                 }
-                projects = repo.listProjects()
+                openNewestProject()
             }
         }
 
@@ -282,12 +287,11 @@ class ProjectsFragment : Fragment() {
                                 OutlinedButton(onClick = { step = 2 }, modifier = Modifier.weight(1f)) { Text("Back") }
                                 Button(
                                     onClick = {
-                                        val created = name.trim()
-                                        repo.createProject(created, selected.templateDir ?: return@Button)
+                                        val projectRoot = repo.createProject(name.trim(), selected.templateDir ?: return@Button)
                                         projects = repo.listProjects()
                                         showWizard = false
-                                        banner = "Created $created from ${selected.title}."
-                                        projects.firstOrNull { it.name == created }?.let(onOpen)
+                                        banner = "Created ${projectRoot.name} from ${selected.title}."
+                                        projects.firstOrNull { it.id == projectRoot.name }?.let(onOpen)
                                     },
                                     modifier = Modifier.weight(1f),
                                 ) { Text("Create + Open") }
@@ -321,12 +325,12 @@ class ProjectsFragment : Fragment() {
                         OutlinedButton(onClick = { showGitModal = false }, modifier = Modifier.weight(1f)) { Text("Cancel") }
                         Button(
                             onClick = {
-                                banner = "Import from Git: sending repository request…"
+                                banner = "Import from Git: registering repository as a managed project…"
                                 scope.launch {
                                     banner = repo.importFromGit(gitRepoUrl.trim(), gitBranch.trim().ifBlank { null })
-                                    projects = repo.listProjects()
                                     showGitModal = false
                                     showWizard = false
+                                    openNewestProject()
                                 }
                             },
                             enabled = gitRepoUrl.trim().startsWith("http"),
@@ -353,9 +357,9 @@ class ProjectsFragment : Fragment() {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionTitle("Workstation flow")
             listOf(
-                "Create from starter templates now. Git, ZIP, folder, and repair imports are staged in this same flow.",
-                "Open the generated project in Forge Editor, then scan, configure secrets, build, and run.",
-                "Use Ops Deck for deployments, runtime logs, and container terminal once the bot is running.",
+                "Create starter templates, register Git/ZIP/folder sources, or create a repair shell.",
+                "Every source lane creates a managed BotBlade project and opens it in Forge Editor.",
+                "After opening, run Scan, add secrets, build, and deploy from the workstation flow.",
             ).forEach { line ->
                 Surface(color = Panel, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Stroke)) {
                     Text(line, color = OnSurface, modifier = Modifier.fillMaxWidth().padding(14.dp))
@@ -368,7 +372,7 @@ class ProjectsFragment : Fragment() {
         Card(colors = CardDefaults.cardColors(containerColor = Panel), border = BorderStroke(1.dp, Stroke)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("No bots in the forge yet", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Start with a Discord TypeScript bot, moderation toolkit, or blank workspace.", color = Muted)
+                Text("Start with a starter template, Git source, ZIP archive, folder registration, or repair shell.", color = Muted)
                 Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Create first project") }
             }
         }
@@ -444,11 +448,11 @@ class ProjectsFragment : Fragment() {
         val Sources = listOf(
             Source("Discord TypeScript Starter", "slash-command bot with generated TypeScript project files", SourceLane.STARTER_TEMPLATE, "project_templates/simple_echo_bot"),
             Source("Moderation Toolkit", "moderation-oriented starter ready for rules and actions", SourceLane.STARTER_TEMPLATE, "project_templates/moderation_bot"),
-            Source("Blank Workspace", "clean bot workspace for custom imports and experiments", SourceLane.STARTER_TEMPLATE, "project_templates/blank_project"),
-            Source("Import from Git", "clone and repair a repository through Forge Sync", SourceLane.IMPORT_GIT, null),
-            Source("Import ZIP", "unpack an archive, scan it, then repair missing project metadata", SourceLane.IMPORT_ZIP, null),
-            Source("Open Folder", "select an Android workspace folder and turn it into a BotBlade project", SourceLane.OPEN_FOLDER, null),
-            Source("Repair Existing", "scan loose files and generate missing BotBlade metadata", SourceLane.REPAIR_EXISTING, null),
+            Source("Blank Workspace", "clean bot workspace for custom experiments", SourceLane.STARTER_TEMPLATE, "project_templates/blank_project"),
+            Source("Import from Git", "register a Git repository as a BotBlade project", SourceLane.IMPORT_GIT, null),
+            Source("Import ZIP", "register a ZIP archive as a managed BotBlade project", SourceLane.IMPORT_ZIP, null),
+            Source("Open Folder", "register an Android workspace folder as a BotBlade project", SourceLane.OPEN_FOLDER, null),
+            Source("Repair Existing", "create metadata and repair notes for an existing workspace", SourceLane.REPAIR_EXISTING, null),
         )
     }
 }
