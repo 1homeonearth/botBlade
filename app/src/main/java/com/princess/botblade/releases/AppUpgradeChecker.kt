@@ -13,7 +13,7 @@ class AppUpgradeChecker(
     private val context: Context,
     private val client: OkHttpClient = OkHttpClient(),
 ) {
-    suspend fun checkLatestRelease(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
+    suspend fun latestReleaseForChannel(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("https://api.github.com/repos/1homeonearth/botBlade/releases")
             .header("Accept", "application/vnd.github+json")
@@ -30,23 +30,24 @@ class AppUpgradeChecker(
                 if (release.optBoolean("draft", false)) continue
                 if (!releaseMatchesCurrentChannel(release)) continue
 
-                val tag = release.optString("tag_name")
-                val pageUrl = release.optString("html_url")
                 val asset = firstInstallableApkAsset(release) ?: continue
-
-                if (versionRank(tag) > versionRank(BuildConfig.VERSION_NAME)) {
-                    return@withContext AppUpgradeInfo(
-                        tagName = tag,
-                        pageUrl = pageUrl,
-                        assetUrl = asset.optString("browser_download_url"),
-                        assetName = asset.optString("name"),
-                    )
-                }
+                return@withContext AppUpgradeInfo(
+                    tagName = release.optString("tag_name"),
+                    pageUrl = release.optString("html_url"),
+                    assetUrl = asset.optString("browser_download_url"),
+                    assetName = asset.optString("name"),
+                )
             }
 
             null
         }
     }
+
+    suspend fun checkLatestRelease(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
+        val latest = latestReleaseForChannel() ?: return@withContext null
+        if (versionRank(latest.tagName) > versionRank(BuildConfig.VERSION_NAME)) latest else null
+    }
+
 
     fun autoCheckEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_CHECK, true)
 
