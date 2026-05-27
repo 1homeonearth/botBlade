@@ -57,7 +57,7 @@ class DashboardFragment : Fragment() {
                         onOpenProjects = { navigateTo(R.id.navigation_projects) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenBuild = { navigateTo(R.id.navigation_deployments) },
-                        onOpenOps = { openOpsForActiveProject() },
+                        onOpenOps = { openOpsForProject(activeProjectId) },
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
                     )
@@ -92,10 +92,11 @@ class DashboardFragment : Fragment() {
     }
 
 
-    private fun openOpsForActiveProject() {
+    private fun openOpsForProject(selectedProjectId: String?) {
+        val resolvedProjectId = selectedProjectId ?: activeProjectId
         val activity = activity as? MainActivity
         if (activity != null) {
-            activity.openDeploymentsForProject(activeProjectId, activeProjectStore.getActiveProjectName())
+            activity.openDeploymentsForProject(resolvedProjectId, activeProjectStore.getActiveProjectName())
         } else {
             navigateTo(R.id.navigation_deployments)
         }

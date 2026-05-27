@@ -308,8 +308,9 @@ class ProjectsFragment : Fragment() {
                                             val scanResult = runCatching { editorRepo.scanProject(projectId) }.getOrNull()
                                             onboardingSummary = scanResult.toScanSummary()
                                             banner = when (scanResult) {
-                                                is ApiResult.Success -> "${projectRoot.name}: ${scanResult.value.matches.size} scan matches, recommended ${scanResult.value.recommendedPackId}."
+                                                is ApiResult.Success -> "${projectRoot.name}: ${scanResult.data.matches.size} scan matches, recommended ${scanResult.data.recommendedPackId}."
                                                 is ApiResult.Error -> "${projectRoot.name}: scan endpoint unavailable (${scanResult.message})."
+                                                ApiResult.Loading -> "${projectRoot.name}: scan in progress…"
                                                 null -> "${projectRoot.name}: scan endpoint unavailable."
                                             }
                                         }
@@ -484,10 +485,11 @@ class ProjectsFragment : Fragment() {
 
     private fun ApiResult<ProjectScanResponse>?.toScanSummary(): String = when (this) {
         is ApiResult.Success -> {
-            val top = value.matches.firstOrNull()?.let { " Top match ${it.name} (${it.confidence})." } ?: ""
-            "Scan complete: ${value.matches.size} match(es), recommended pack ${value.recommendedPackId}.${top}"
+            val top = data.matches.firstOrNull()?.let { " Top match ${it.name} (${it.confidence})." } ?: ""
+            "Scan complete: ${data.matches.size} match(es), recommended pack ${data.recommendedPackId}.${top}"
         }
         is ApiResult.Error -> "Scan unavailable: ${message}"
+        ApiResult.Loading -> "Scan in progress..."
         null -> "Scan skipped: endpoint unavailable."
     }
 
