@@ -22,6 +22,19 @@ import com.princess.botblade.data.store.ActiveProjectStore
 import kotlinx.coroutines.launch
 
 class DeploymentsFragment : Fragment() {
+    companion object {
+        private const val ARG_PROJECT_ID = "project_id"
+        private const val ARG_PROJECT_NAME = "project_name"
+
+        fun buildArgs(projectId: String?, projectName: String?): Bundle = Bundle().apply {
+            putString(ARG_PROJECT_ID, projectId)
+            putString(ARG_PROJECT_NAME, projectName)
+        }
+
+        fun newInstance(args: Bundle = Bundle()): DeploymentsFragment = DeploymentsFragment().apply {
+            arguments = args
+        }
+    }
     private val buildRepository = BuildRepository()
     private val deploymentRepository = DeploymentRepository()
     private var projectId: String? = null
@@ -42,8 +55,8 @@ class DeploymentsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val store = ActiveProjectStore(requireContext())
-        projectId = store.getActiveProjectId()
-        projectName = store.getActiveProjectName()
+        projectId = arguments?.getString(ARG_PROJECT_ID) ?: store.getActiveProjectId()
+        projectName = arguments?.getString(ARG_PROJECT_NAME) ?: store.getActiveProjectName()
         status = view.findViewById(R.id.deployments_status)
         list = view.findViewById(R.id.build_list_container)
         logs = view.findViewById(R.id.build_logs_text)
@@ -106,7 +119,14 @@ class DeploymentsFragment : Fragment() {
     private fun loadBuilds() = lifecycleScope.launch {
         val id = projectId ?: return@launch
         when (val result = buildRepository.listBuilds(id)) {
-            is ApiResult.Success -> { latestSuccessfulBuild = result.data.firstOrNull { it.status == "succeeded" }; updateDeployButton() }
+            is ApiResult.Success -> {
+                latestSuccessfulBuild = result.data.firstOrNull { it.status == "succeeded" }
+                if (result.data.isEmpty()) {
+                    status.text = "No builds found. Create build to start deployment flow."
+                    logs.text = "No builds available. Tap \"Create build\" to generate a deployable artifact."
+                }
+                updateDeployButton()
+            }
             is ApiResult.Error -> status.text = "Build error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -114,7 +134,16 @@ class DeploymentsFragment : Fragment() {
 
     private fun loadTargets() = lifecycleScope.launch {
         when (val result = deploymentRepository.listTargets()) {
-            is ApiResult.Success -> { targetsById = result.data.associateBy { it.id }; selectedTarget = result.data.firstOrNull(); renderTargets(result.data); updateDeployButton() }
+            is ApiResult.Success -> {
+                targetsById = result.data.associateBy { it.id }
+                selectedTarget = result.data.firstOrNull()
+                renderTargets(result.data)
+                if (result.data.isEmpty()) {
+                    status.text = "No deployment targets found. Add target to continue."
+                    logs.text = "No targets available. Tap \"Add target\" to configure a deployment destination."
+                }
+                updateDeployButton()
+            }
             is ApiResult.Error -> status.text = "Target error: ${result.message}"
             ApiResult.Loading -> Unit
         }
@@ -159,6 +188,7 @@ class DeploymentsFragment : Fragment() {
     }
 
     private fun renderTargets(targets: List<DeploymentTargetSummary>) {
+        if (targets.isEmpty()) return
         targets.forEach { target ->
             val row = Button(requireContext()).apply {
                 val unsupported = target.capabilities.actions.filterValues { supported -> !supported }.keys.sorted().joinToString(", ").ifBlank { "none" }
@@ -194,6 +224,7 @@ class DeploymentsFragment : Fragment() {
             list.addView(row)
         }
         status.text = "Loaded deployment data. Latest successful build: ${latestSuccessfulBuild?.buildId ?: "none"}."
+        deployments.firstOrNull()?.let { loadDeploymentDetails(it) }
     }
 
     private fun loadDeploymentDetails(deployment: DeploymentJobSummary) = lifecycleScope.launch {

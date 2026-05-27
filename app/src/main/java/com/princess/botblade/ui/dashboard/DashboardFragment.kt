@@ -57,7 +57,7 @@ class DashboardFragment : Fragment() {
                         onOpenProjects = { navigateTo(R.id.navigation_projects) },
                         onOpenEditor = { navigateTo(R.id.navigation_editor) },
                         onOpenBuild = { navigateTo(R.id.navigation_deployments) },
-                        onOpenOps = { navigateTo(R.id.navigation_deployments) },
+                        onOpenOps = { openOpsForActiveProject() },
                         onOpenSettings = { navigateTo(R.id.navigation_settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
                     )
@@ -89,6 +89,16 @@ class DashboardFragment : Fragment() {
 
     private fun updateActiveProject() {
         activeProjectId = activeProjectStore.getActiveProjectId()
+    }
+
+
+    private fun openOpsForActiveProject() {
+        val activity = activity as? MainActivity
+        if (activity != null) {
+            activity.openDeploymentsForProject(activeProjectId, activeProjectStore.getActiveProjectName())
+        } else {
+            navigateTo(R.id.navigation_deployments)
+        }
     }
 
     private fun openAddProjectFlow() {

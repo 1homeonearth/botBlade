@@ -26,6 +26,7 @@ import com.princess.botblade.ui.settings.SettingsFragment
 class MainActivity : AppCompatActivity() {
     private var bound = false
     private var binder: BotEngineService.LocalBinder? = null
+    private var pendingDeploymentsArgs: Bundle? = null
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -61,7 +62,11 @@ class MainActivity : AppCompatActivity() {
                 R.id.navigation_dashboard -> showFragmentSafely { DashboardFragment() }
                 R.id.navigation_projects -> showFragmentSafely { ProjectsFragment() }
                 R.id.navigation_editor -> showFragmentSafely { CodeEditorFragment() }
-                R.id.navigation_deployments -> showFragmentSafely { DeploymentsFragment() }
+                R.id.navigation_deployments -> showFragmentSafely {
+                    val args = pendingDeploymentsArgs
+                    pendingDeploymentsArgs = null
+                    DeploymentsFragment.newInstance(args ?: Bundle())
+                }
                 R.id.navigation_settings -> showFragmentSafely { SettingsFragment() }
                 else -> false
             }
@@ -114,6 +119,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
     }
 
+
+    fun openDeploymentsForProject(projectId: String?, projectName: String?) {
+        val args = DeploymentsFragment.buildArgs(projectId, projectName)
+        pendingDeploymentsArgs = args
+        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        if (bottomNavigation.selectedItemId == R.id.navigation_deployments) {
+            showFragmentSafely { DeploymentsFragment.newInstance(args) }
+            pendingDeploymentsArgs = null
+        } else {
+            bottomNavigation.selectedItemId = R.id.navigation_deployments
+        }
+    }
     fun openLogsScreen() {
         showFragmentSafely { LogsFragment() }
     }
