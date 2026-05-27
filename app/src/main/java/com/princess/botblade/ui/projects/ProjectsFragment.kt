@@ -108,9 +108,10 @@ class ProjectsFragment : Fragment() {
             gitBranch = ""
         }
 
-        fun openNewestProject() {
+        fun openCreatedProject(result: LocalProjectRepository.ProjectImportResult) {
             projects = repo.listProjects()
-            projects.firstOrNull()?.let(onOpen)
+            banner = result.message
+            onOpen(result.project)
         }
 
         fun runZipImport(uri: Uri?) {
@@ -120,10 +121,7 @@ class ProjectsFragment : Fragment() {
             }
             showWizard = false
             banner = "Import ZIP: registering archive as a managed project…"
-            scope.launch {
-                banner = repo.importFromZip(uri)
-                openNewestProject()
-            }
+            scope.launch { openCreatedProject(repo.importFromZip(uri)) }
         }
 
         fun runFolderAction(uri: Uri?, lane: SourceLane) {
@@ -138,12 +136,11 @@ class ProjectsFragment : Fragment() {
                 else -> banner
             }
             scope.launch {
-                banner = when (lane) {
-                    SourceLane.OPEN_FOLDER -> repo.registerWorkspaceFolder(uri)
-                    SourceLane.REPAIR_EXISTING -> repo.repairWorkspace(uri)
-                    else -> banner
+                when (lane) {
+                    SourceLane.OPEN_FOLDER -> openCreatedProject(repo.registerWorkspaceFolder(uri))
+                    SourceLane.REPAIR_EXISTING -> openCreatedProject(repo.repairWorkspace(uri))
+                    else -> Unit
                 }
-                openNewestProject()
             }
         }
 
@@ -327,10 +324,10 @@ class ProjectsFragment : Fragment() {
                             onClick = {
                                 banner = "Import from Git: registering repository as a managed project…"
                                 scope.launch {
-                                    banner = repo.importFromGit(gitRepoUrl.trim(), gitBranch.trim().ifBlank { null })
+                                    val result = repo.importFromGit(gitRepoUrl.trim(), gitBranch.trim().ifBlank { null })
                                     showGitModal = false
                                     showWizard = false
-                                    openNewestProject()
+                                    openCreatedProject(result)
                                 }
                             },
                             enabled = gitRepoUrl.trim().startsWith("http"),
