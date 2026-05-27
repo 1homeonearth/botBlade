@@ -129,6 +129,13 @@
                         android:layout_weight="1"
                         android:text="@string/start_build" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/release_check_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Release Checklist" />
             </LinearLayout>
         </com.princess.botblade.ui.common.WorkstationCardView>
 
