@@ -11,6 +11,7 @@ import android.widget.TextView
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.R
 import com.princess.botblade.data.api.ApiResult
 import com.princess.botblade.data.model.ProjectFileContent
@@ -70,8 +71,14 @@ class CodeEditorFragment : Fragment() {
         firstCheckButton.setOnClickListener { startBuild() }
         saveButton.setOnClickListener { saveSelectedFile() }
         revertButton.setOnClickListener { selectedFilePath?.let { loadFile(it) } }
+        missingSecretsCard.setOnClickListener { openVault() }
+        missingSecretsCard.isClickable = true
         editor.doAfterTextChanged { updateSelectionButtons() }
         loadFiles()
+    }
+
+    private fun openVault() {
+        activity?.findViewById<BottomNavigationView>(R.id.bottom_navigation)?.selectedItemId = R.id.navigation_settings
     }
 
     private fun scanProject() = lifecycleScope.launch {
@@ -80,7 +87,7 @@ class CodeEditorFragment : Fragment() {
         when (val result = repository.scanProject(id)) {
             is ApiResult.Success -> {
                 renderScanCards(result.data)
-                status.text = "Scan completed."
+                status.text = "Scan completed. Tap Missing secrets to open Vault."
             }
             is ApiResult.Error -> setError(result.message)
             ApiResult.Loading -> Unit
@@ -149,7 +156,7 @@ class CodeEditorFragment : Fragment() {
         }
         if (top == null) {
             detectedPackCard.text = "Detected pack\nUnknown project\nConfidence: weak\nRuntime: unknown"
-            missingSecretsCard.text = "Missing secrets\nNo required secrets detected."
+            missingSecretsCard.text = "Missing secrets\nNo required secrets detected.\nTap to open Vault."
             return
         }
         val runtimeLabel = when {
@@ -160,9 +167,9 @@ class CodeEditorFragment : Fragment() {
         detectedPackCard.text = "Detected pack\n${top.name}\nConfidence: ${top.confidence}, ${top.score}\nRuntime: $runtimeLabel"
         val missing = top.requiredSecrets
         missingSecretsCard.text = if (missing.isEmpty()) {
-            "Missing secrets\nNo required secrets detected."
+            "Missing secrets\nNo required secrets detected.\nTap to open Vault."
         } else {
-            "Missing secrets\n${missing.joinToString(", ")}\nNext action: Add secrets"
+            "Missing secrets\n${missing.joinToString(", ")}\nNext action: tap here to add secrets in Vault."
         }
     }
 
