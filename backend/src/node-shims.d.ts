@@ -21,6 +21,12 @@ declare class Buffer extends Uint8Array {
   toString(encoding?: string): string;
 }
 
+declare const process: {
+  env: Record<string, string | undefined>;
+  cwd(): string;
+  exitCode?: number;
+};
+
 
 declare const console: {
   info(message?: unknown, ...optionalParams: unknown[]): void;
@@ -42,6 +48,7 @@ declare module "node:assert/strict" {
   const assert: {
     equal(actual: unknown, expected: unknown, message?: string): void;
     ok(value: unknown, message?: string): void;
+    match(actual: string, expected: RegExp, message?: string): void;
     rejects(fn: () => Promise<unknown>, expected?: RegExp): Promise<void>;
   };
   export default assert;
@@ -63,7 +70,7 @@ declare module "node:os" {
 declare module "node:fs/promises" {
   export function mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
   export function writeFile(path: string, data: string, encoding?: string): Promise<void>;
-  export function readFile(path: string, encoding?: string): Promise<string>;
+  export function readFile(path: string, encoding: string): Promise<string>;
   export function readdir(path: string, options?: { withFileTypes?: boolean }): Promise<Dirent[]>;
   export function stat(path: string): Promise<{ size: number; mtime: Date; isFile(): boolean; isDirectory(): boolean }>;
   export function access(path: string): Promise<void>;
@@ -116,9 +123,3 @@ declare module "node:events" {
 
 declare function setTimeout(callback: () => void, ms: number): unknown;
 declare function clearTimeout(timeout: unknown): void;
-
-
-declare const process: {
-  env: Record<string, string | undefined>;
-  cwd(): string;
-};
