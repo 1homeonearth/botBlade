@@ -12,20 +12,20 @@ cd backend
 npm install
 npm run preflight:node
 npm run build
-PORT=8000 HOST=127.0.0.1 npm start
+PORT=8000 BIND_HOST=127.0.0.1 npm start
 ```
 
 
 Default listener behavior:
 
 - `PORT` defaults to `8000` when unset.
-- Host resolves from `BIND_HOST`, then `HOST`, and falls back to `127.0.0.1` for loopback-safe local use.
-- For LAN/device access, set `HOST=0.0.0.0` (or a specific LAN IP) explicitly.
+- Host resolves from `BIND_HOST` and falls back to `127.0.0.1` for loopback-safe local use. Ambient `HOST` is intentionally ignored to avoid accidental LAN exposure.
+- For LAN/device access, set `BIND_HOST=0.0.0.0` (or a specific LAN IP) explicitly.
 
 LAN example:
 
 ```bash
-PORT=8000 HOST=0.0.0.0 npm start
+PORT=8000 BIND_HOST=0.0.0.0 npm start
 ```
 Health check:
 
