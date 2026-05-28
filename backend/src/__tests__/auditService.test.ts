@@ -16,7 +16,7 @@ test("AuditService enforces max event retention and list limits", () => {
   assert.equal(service.list("project_a", { limit: 1 }).map((event) => event.requestId).join(","), "req_3");
 });
 
-test("AuditService redacts metadata before storage", () => {
+test("AuditService redacts token-shaped metadata before storage", () => {
   const service = new AuditService(undefined, { maxEvents: 5 });
   const event = service.record({
     action: "secret.create",
@@ -24,9 +24,9 @@ test("AuditService redacts metadata before storage", () => {
     resourceType: "secret",
     resourceId: "secret_a",
     requestId: "req_secret",
-    metadata: { token: "super-secret-token", nested: { password: "open-sesame" } },
+    metadata: { token: "ghp_abcdefghijklmnopqrstuvwxyz1234567890", nested: { token: "xoxb-abcdefghijklmnop" } },
   });
 
-  assert.equal(event.metadata.token, "[REDACTED]");
-  assert.equal(JSON.stringify(event.metadata.nested), JSON.stringify({ password: "[REDACTED]" }));
+  assert.equal(event.metadata.token, "[REDACTED_SECRET]");
+  assert.equal(JSON.stringify(event.metadata.nested), JSON.stringify({ token: "[REDACTED_SECRET]" }));
 });
