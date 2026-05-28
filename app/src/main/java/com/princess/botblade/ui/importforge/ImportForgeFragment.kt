@@ -1,5 +1,7 @@
 package com.princess.botblade.ui.importforge
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -34,12 +36,16 @@ class ImportForgeFragment : Fragment() {
     private val viewModel: ImportForgeViewModel by viewModels()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View = ComposeView(requireContext()).apply {
-        setContent { ImportForgeRoute(viewModel) }
+        setContent { ImportForgeRoute(viewModel, ::openUrl) }
+    }
+
+    private fun openUrl(url: String) {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 }
 
 @Composable
-private fun ImportForgeRoute(viewModel: ImportForgeViewModel) {
+private fun ImportForgeRoute(viewModel: ImportForgeViewModel, openUrl: (String) -> Unit) {
     fun materializedWorkspacePath(prefix: String, source: String): String {
         val suffix = source.trim().lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifBlank { "workspace" }
         return "$prefix/$suffix"
@@ -58,6 +64,16 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel) {
                 Button(onClick = { viewModel.startImport(sourceType = "folder", source = "/sdcard/Download/import-folder", workspacePath = "imports/folder") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_folder)) }
             } }
         }
+        item {
+            Card { Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("GitHub discovery", style = MaterialTheme.typography.titleMedium)
+                Text("Browse targeted GitHub searches, copy a repository URL, then paste it above to import. Public browsing uses Android's browser intent.")
+                DiscoveryLinks.forEach { link ->
+                    Button(onClick = { openUrl(link.url) }, modifier = Modifier.fillMaxWidth()) { Text("Browse: ${link.label}") }
+                    Text(link.detail, style = MaterialTheme.typography.bodySmall)
+                }
+            } }
+        }
         item { Text(stringResource(R.string.import_forge_timeline)) }
         items(state.timelineEvents) { Text("• $it") }
         if (state.step == ImportForgeStep.PROFILE) item { Text(stringResource(R.string.import_forge_profile_summary)) }
@@ -66,3 +82,14 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel) {
         state.blockedPolicyMessage?.let { m -> item { Text("Policy: $m") } }
     }
 }
+
+private data class DiscoveryLink(val label: String, val detail: String, val url: String)
+
+private val DiscoveryLinks = listOf(
+    DiscoveryLink("Discord.js", "Slash-command and Node repositories.", "https://github.com/search?type=repositories&q=discord.js+slash+commands+language%3ATypeScript"),
+    DiscoveryLink("Telegram / Telegraf", "Telegram automation repositories.", "https://github.com/search?type=repositories&q=telegraf+telegram+language%3ATypeScript"),
+    DiscoveryLink("Slack Bolt", "Slack app repositories.", "https://github.com/search?type=repositories&q=slack+bolt+language%3ATypeScript"),
+    DiscoveryLink("n8n workflows", "Workflow JSON examples for import inspection.", "https://github.com/search?type=repositories&q=n8n+workflow+json"),
+    DiscoveryLink("Webhook workers", "Small HTTP worker repositories.", "https://github.com/search?type=repositories&q=webhook+worker+fastify+language%3ATypeScript"),
+    DiscoveryLink("Python automation", "Python repositories with requirements or pyproject metadata.", "https://github.com/search?type=repositories&q=python+automation+requirements.txt"),
+)
