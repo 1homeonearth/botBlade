@@ -14,9 +14,9 @@ integrations, module/upstream governance, and phased implementation roadmap.
 
 ## Current state (as of this writing)
 - Design manual: complete (this document set)
-- Rust workspace: NOT YET IMPLEMENTED
+- Rust workspace: NOT YET IMPLEMENTED (Node gate currently implemented for ZIP import validation/extraction policy)
 - Repo safety scanner: NOT YET IMPLEMENTED
-- Security policy gates: NOT YET IMPLEMENTED
+- Security policy gates: PARTIALLY IMPLEMENTED (ZIP import path/type/size/count policy gate in backend)
 - Terminal backend sessions: NOT YET IMPLEMENTED
 - External integration registry: NOT YET IMPLEMENTED
 - Module/plugin system: NOT YET IMPLEMENTED

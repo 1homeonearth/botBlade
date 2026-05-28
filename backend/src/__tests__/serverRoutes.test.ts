@@ -239,7 +239,7 @@ test("import git route creates ready import record", async () => {
   const response = await request("POST", "/api/imports/git", { repoUrl: "https://github.com/example/repo.git", workspacePath: "/tmp" });
   assert.equal(response.statusCode, 201);
   assert.equal(response.body.source.type, "git");
-  assert.ok(["ready", "needs_secrets", "failed"].includes(response.body.state));
+  assert.ok(["ready", "needs_secrets", "failed", "blocked_by_policy"].includes(response.body.state));
 
   const fetched = await request("GET", `/api/imports/${response.body.id}`);
   assert.equal(fetched.statusCode, 200);
@@ -257,7 +257,7 @@ test("zip import route persists import state and includes structured failure det
   const response = await request("POST", "/api/imports/zip", { archivePath: "/missing.zip", workspacePath: "/definitely-missing-workspace" });
   assert.equal(response.statusCode, 201);
   assert.equal(response.body.source.type, "zip");
-  assert.ok(["ready", "needs_secrets", "failed"].includes(response.body.state));
+  assert.ok(["ready", "needs_secrets", "failed", "blocked_by_policy"].includes(response.body.state));
   if (response.body.state === "failed") {
     assert.equal(typeof response.body.failure.cause, "string");
     assert.equal(typeof response.body.failure.evidence, "string");
