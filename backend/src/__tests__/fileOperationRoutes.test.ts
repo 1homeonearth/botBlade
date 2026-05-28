@@ -84,6 +84,18 @@ test("file operation route helper creates folders, files, trees, renames, and de
   await assert.rejects(() => fileService.read(projectId, "src/commands/pong.ts"));
 });
 
+test("file operation route helper preserves editor write size limit", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "botblade-route-files-"));
+  const fileService = new ProjectFileService(root);
+  const projectId = "project_limit";
+  await handleFileOperationRoute(request({ path: "README.md", content: "ok" }), response() as never, context("POST", projectId, fileService));
+
+  await assert.rejects(
+    () => handleFileOperationRoute(request({ content: "x".repeat((512 * 1024) + 1) }), response() as never, context("PUT", projectId, fileService, "README.md")),
+    /512KB/,
+  );
+});
+
 test("file operation route helper returns false for unsupported methods", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "botblade-route-files-"));
   const fileService = new ProjectFileService(root);
