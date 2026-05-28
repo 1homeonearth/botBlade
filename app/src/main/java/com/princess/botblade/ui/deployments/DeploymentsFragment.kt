@@ -1,17 +1,31 @@
 package com.princess.botblade.ui.deployments
 
-import android.graphics.Color
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
-import com.princess.botblade.R
 import com.princess.botblade.data.api.ApiResult
 import com.princess.botblade.data.model.BuildSummary
 import com.princess.botblade.data.model.DeploymentJobSummary
@@ -19,6 +33,16 @@ import com.princess.botblade.data.model.DeploymentTargetSummary
 import com.princess.botblade.data.repository.BuildRepository
 import com.princess.botblade.data.repository.DeploymentRepository
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.components.BladeButton
+import com.princess.botblade.ui.components.BotBladeTokens
+import com.princess.botblade.ui.components.FlowLane
+import com.princess.botblade.ui.components.SectionTitle
+import com.princess.botblade.ui.components.StatusChip
+import com.princess.botblade.ui.components.StatusTone
+import com.princess.botblade.ui.components.TerminalView
+import com.princess.botblade.ui.components.WorkstationCard
+import com.princess.botblade.ui.theme.BotBladeTheme
+import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import kotlinx.coroutines.launch
 
 class DeploymentsFragment : Fragment() {
@@ -35,310 +59,290 @@ class DeploymentsFragment : Fragment() {
             arguments = args
         }
     }
+
     private val buildRepository = BuildRepository()
     private val deploymentRepository = DeploymentRepository()
-    private var projectId: String? = null
-    private var projectName: String? = null
-    private var latestSuccessfulBuild: BuildSummary? = null
-    private var selectedTarget: DeploymentTargetSummary? = null
-    private var targetsById: Map<String, DeploymentTargetSummary> = emptyMap()
-    private var availableTargets: List<DeploymentTargetSummary> = emptyList()
-    private var recentDeployments: List<DeploymentJobSummary> = emptyList()
-    private var hasBuilds: Boolean = false
-    private lateinit var status: TextView
-    private lateinit var list: LinearLayout
-    private lateinit var logs: TextView
-    private var githubStatusLine: String = ""
-    private lateinit var targetName: EditText
-    private lateinit var targetType: EditText
-    private lateinit var deployButton: Button
-    private lateinit var createBuildButton: Button
-    private lateinit var createTargetButton: Button
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
-        inflater.inflate(R.layout.fragment_deployments, container, false)
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+    override fun onCreateView(
+        inflater: android.view.LayoutInflater,
+        container: android.view.ViewGroup?,
+        savedInstanceState: Bundle?,
+    ) = ComposeView(requireContext()).apply {
         val store = ActiveProjectStore(requireContext())
-        projectId = arguments?.getString(ARG_PROJECT_ID) ?: store.getActiveProjectId()
-        projectName = arguments?.getString(ARG_PROJECT_NAME) ?: store.getActiveProjectName()
-        status = view.findViewById(R.id.deployments_status)
-        list = view.findViewById(R.id.build_list_container)
-        logs = view.findViewById(R.id.build_logs_text)
-        targetName = view.findViewById(R.id.deployment_target_name)
-        targetType = view.findViewById(R.id.deployment_target_type)
-        deployButton = view.findViewById(R.id.deploy_latest_build_button)
-        view.findViewById<TextView>(R.id.deployments_active_project).text = if (projectId == null) getString(R.string.active_project_none) else getString(R.string.active_project_value, projectName ?: projectId)
-
-        createBuildButton = view.findViewById(R.id.create_deployment_button)
-        createTargetButton = view.findViewById(R.id.create_target_button)
-        createBuildButton.setOnClickListener { startBuild() }
-        createTargetButton.setOnClickListener { createTarget() }
-        deployButton.setOnClickListener { deployLatest() }
-        view.findViewById<Button>(R.id.refresh_deployments_button).setOnClickListener { loadAll() }
-        view.findViewById<Button>(R.id.release_check_button).setOnClickListener { renderReleaseChecklist() }
-        updateDeployButton()
-        refreshOnEntry()
+        val projectId = arguments?.getString(ARG_PROJECT_ID) ?: store.getActiveProjectId()
+        val projectName = arguments?.getString(ARG_PROJECT_NAME) ?: store.getActiveProjectName()
+        setContent {
+            BotBladeTheme(useDynamicColor = isDynamicColorEnabled(requireContext())) {
+                DeploymentsScreen(projectId = projectId, projectName = projectName)
+            }
+        }
     }
 
-    private fun refreshOnEntry() {
-        loadAll()
-    }
+    @Composable
+    private fun DeploymentsScreen(projectId: String?, projectName: String?) {
+        val scope = rememberCoroutineScope()
+        var status by remember { mutableStateOf(if (projectId == null) "Select a project before deploying." else "Deployment console ready.") }
+        var terminalLines by remember { mutableStateOf(listOf("Deployment terminal ready.")) }
+        var targetName by remember { mutableStateOf("Local Process") }
+        var targetType by remember { mutableStateOf("local_process") }
+        var builds by remember { mutableStateOf<List<BuildSummary>>(emptyList()) }
+        var targets by remember { mutableStateOf<List<DeploymentTargetSummary>>(emptyList()) }
+        var deployments by remember { mutableStateOf<List<DeploymentJobSummary>>(emptyList()) }
+        var selectedTarget by remember { mutableStateOf<DeploymentTargetSummary?>(null) }
+        var githubStatus by remember { mutableStateOf("GitHub status not checked yet.") }
 
-    private fun loadAll() {
-        githubStatusLine = ""
-        if (projectId == null) {
-            status.text = getString(R.string.select_project_first)
-            list.removeAllViews()
-            updateDeployButton()
+        val latestSuccessfulBuild = builds
+            .asSequence()
+            .filter { it.status == "succeeded" }
+            .maxByOrNull { it.finishedAt ?: it.startedAt ?: "" }
+        val canDeploy = projectId != null && latestSuccessfulBuild != null && selectedTarget != null
+        val targetsById = targets.associateBy { it.id }
+
+        fun appendTerminal(line: String) {
+            terminalLines = (terminalLines + line).takeLast(250)
+        }
+
+        fun renderReleaseChecklist() {
+            val checklist = listOf(
+                "Release readiness",
+                "Project: ${projectName ?: projectId ?: "none"}",
+                "Active project: ${if (projectId != null) "yes" else "no"}",
+                "Successful build: ${latestSuccessfulBuild?.buildId ?: "needed"}",
+                "Deployment target: ${selectedTarget?.name ?: "needed"}",
+                "Secrets: verify in Settings / Vault",
+                "Ship order: scan, edit, add secrets, build, select target, deploy, inspect logs.",
+            )
+            terminalLines = checklist
+            status = if (projectId == null) "Select a project before deploying." else "Release checklist generated."
+        }
+
+        fun loadBuilds() = scope.launch {
+            val id = projectId ?: return@launch
+            when (val result = buildRepository.listBuilds(id)) {
+                is ApiResult.Success -> {
+                    builds = result.data
+                    if (result.data.isEmpty()) appendTerminal("No builds available. Create build to generate a deployable artifact.")
+                    status = "Loaded ${result.data.size} build(s)."
+                }
+                is ApiResult.Error -> status = "Build error: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun loadTargets() = scope.launch {
+            when (val result = deploymentRepository.listTargets()) {
+                is ApiResult.Success -> {
+                    targets = result.data
+                    selectedTarget = selectedTarget?.takeIf { selected -> result.data.any { it.id == selected.id } } ?: result.data.firstOrNull()
+                    if (result.data.isEmpty()) appendTerminal("No targets available. Add a deployment target to continue.")
+                    status = "Loaded ${result.data.size} target(s)."
+                }
+                is ApiResult.Error -> status = "Target error: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun loadDeployments() = scope.launch {
+            val id = projectId ?: return@launch
+            when (val result = deploymentRepository.listDeployments(id)) {
+                is ApiResult.Success -> {
+                    deployments = result.data
+                    status = "Loaded ${result.data.size} deployment job(s)."
+                }
+                is ApiResult.Error -> status = "Deployment error: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun loadGitHubStatus() = scope.launch {
+            githubStatus = when (val result = deploymentRepository.getGitHubStatus()) {
+                is ApiResult.Success -> "GitHub: ${if (result.data.connected) "connected" else "disconnected"}. ${result.data.message.orEmpty()}"
+                is ApiResult.Error -> "GitHub status unavailable: ${result.message}"
+                ApiResult.Loading -> githubStatus
+            }
+            appendTerminal(githubStatus)
+        }
+
+        fun loadAll() {
+            if (projectId == null) {
+                status = "Select a project before deploying."
+                loadGitHubStatus()
+                return
+            }
+            loadBuilds()
+            loadTargets()
+            loadDeployments()
             loadGitHubStatus()
-            return
         }
-        loadBuilds()
-        loadTargets()
-        loadDeployments()
-        loadGitHubStatus()
-    }
 
-    private fun renderReleaseChecklist() {
-        logs.text = buildString {
-            appendLine("Release readiness")
-            appendLine("Project: ${projectName ?: projectId ?: "none"}")
-            appendLine("Active project: ${if (projectId != null) "yes" else "no"}")
-            appendLine("Successful build: ${latestSuccessfulBuild?.buildId ?: "needed"}")
-            appendLine("Deployment target: ${selectedTarget?.name ?: "needed"}")
-            appendLine("Secrets: verify in Settings / Vault")
-            appendLine("Logs: inspect this terminal pane after deploy")
-            appendLine()
-            appendLine("Ship order")
-            appendLine("1. Scan and edit in Editor.")
-            appendLine("2. Add missing secrets in Settings / Vault.")
-            appendLine("3. Start a build and wait for success.")
-            appendLine("4. Create or select a deployment target.")
-            appendLine("5. Deploy latest successful build.")
-            appendLine("6. Inspect logs and write rollback notes.")
-        }
-        status.text = if (projectId == null) getString(R.string.select_project_first) else "Release checklist generated."
-    }
-
-    private fun startBuild() = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        status.text = "Starting build…"
-        when (val result = buildRepository.createBuild(id)) {
-            is ApiResult.Success -> { status.text = getString(R.string.build_started, result.data.buildId, result.data.status); loadBuilds() }
-            is ApiResult.Error -> status.text = "Error: ${result.message}"
-            ApiResult.Loading -> Unit
-        }
-    }
-
-    private fun loadBuilds() = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        when (val result = buildRepository.listBuilds(id)) {
-            is ApiResult.Success -> {
-                hasBuilds = result.data.isNotEmpty()
-                latestSuccessfulBuild = result.data
-                    .asSequence()
-                    .filter { it.status == "succeeded" }
-                    .maxByOrNull { it.finishedAt ?: it.startedAt ?: "" }
-                if (!hasBuilds) {
-                    status.text = "No builds found. Create build to start deployment flow."
-                    logs.text = "No builds available. Tap \"Create build\" to generate a deployable artifact."
+        fun createBuild() = scope.launch {
+            val id = projectId ?: return@launch
+            status = "Starting build…"
+            when (val result = buildRepository.createBuild(id)) {
+                is ApiResult.Success -> {
+                    status = "Build ${result.data.buildId}: ${result.data.status}"
+                    appendTerminal("Build ${result.data.buildId} started with status ${result.data.status}.")
+                    loadBuilds()
                 }
-                renderDeploymentList()
-                updateDeployButton()
+                is ApiResult.Error -> status = "Error: ${result.message}"
+                ApiResult.Loading -> Unit
             }
-            is ApiResult.Error -> status.text = "Build error: ${result.message}"
-            ApiResult.Loading -> Unit
         }
-    }
 
-    private fun loadTargets() = lifecycleScope.launch {
-        when (val result = deploymentRepository.listTargets()) {
-            is ApiResult.Success -> {
-                availableTargets = result.data
-                targetsById = result.data.associateBy { it.id }
-                if (selectedTarget == null || targetsById[selectedTarget?.id] == null) {
-                    selectedTarget = result.data.firstOrNull()
+        fun createTarget() = scope.launch {
+            when (val result = deploymentRepository.createTarget(targetName.ifBlank { "Local Process" }, targetType.ifBlank { "local_process" })) {
+                is ApiResult.Success -> {
+                    status = "Created target ${result.data.name}."
+                    appendTerminal("Created target ${result.data.name} (${result.data.type}).")
+                    loadTargets()
                 }
-                if (result.data.isEmpty()) {
-                    selectedTarget = null
-                    status.text = "No deployment targets found. Add target to continue."
-                    logs.text = "No targets available. Tap \"Add target\" to configure a deployment destination."
+                is ApiResult.Error -> status = "Error: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun deployLatest() = scope.launch {
+            val id = projectId ?: return@launch
+            val build = latestSuccessfulBuild ?: return@launch
+            val target = selectedTarget ?: return@launch
+            when (val result = deploymentRepository.createDeployment(id, target.id, build.buildId)) {
+                is ApiResult.Success -> {
+                    status = "Deployment ${result.data.deploymentId}: ${result.data.status}"
+                    appendTerminal("Deployment ${result.data.deploymentId} created for build ${build.buildId} on ${target.name}.")
+                    loadDeployments()
                 }
-                renderDeploymentList()
-                updateDeployButton()
+                is ApiResult.Error -> status = "Error: ${result.message}"
+                ApiResult.Loading -> Unit
             }
-            is ApiResult.Error -> status.text = "Target error: ${result.message}"
-            ApiResult.Loading -> Unit
         }
-    }
 
-    private fun loadDeployments() = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        when (val result = deploymentRepository.listDeployments(id)) {
-            is ApiResult.Success -> {
-                recentDeployments = result.data
-                renderDeploymentList()
+        fun testTarget(target: DeploymentTargetSummary) = scope.launch {
+            selectedTarget = target
+            status = "Testing target ${target.name}…"
+            when (val result = deploymentRepository.testTarget(target.id)) {
+                is ApiResult.Success -> {
+                    status = "Target ${target.name}: ${result.data.status}"
+                    appendTerminal("${target.name}: ${result.data.message}")
+                }
+                is ApiResult.Error -> status = "Target test failed: ${result.message}"
+                ApiResult.Loading -> Unit
             }
-            is ApiResult.Error -> status.text = "Deployment error: ${result.message}"
-            ApiResult.Loading -> Unit
-        }
-    }
-
-    private fun loadGitHubStatus() = lifecycleScope.launch {
-        githubStatusLine = when (val result = deploymentRepository.getGitHubStatus()) {
-            is ApiResult.Success -> "GitHub: ${if (result.data.connected) "connected" else "disconnected"}. ${result.data.message.orEmpty()}"
-            is ApiResult.Error -> "GitHub status unavailable: ${result.message}"
-            ApiResult.Loading -> githubStatusLine
-        }
-        if (logs.text.isNullOrBlank()) {
-            logs.text = githubStatusLine
-        }
-    }
-
-    private fun createTarget() = lifecycleScope.launch {
-        val name = targetName.text.toString().ifBlank { "Local Process" }
-        val type = targetType.text.toString().ifBlank { "local_process" }
-        when (val result = deploymentRepository.createTarget(name, type)) {
-            is ApiResult.Success -> { status.text = "Created target ${result.data.name}."; loadTargets() }
-            is ApiResult.Error -> status.text = "Error: ${result.message}"
-            ApiResult.Loading -> Unit
-        }
-    }
-
-    private fun deployLatest() = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        val build = latestSuccessfulBuild ?: return@launch
-        val target = selectedTarget ?: return@launch
-        when (val result = deploymentRepository.createDeployment(id, target.id, build.buildId)) {
-            is ApiResult.Success -> { status.text = "Deployment ${result.data.deploymentId}: ${result.data.status}"; loadDeployments() }
-            is ApiResult.Error -> status.text = "Error: ${result.message}"
-            ApiResult.Loading -> Unit
-        }
-    }
-
-    private fun renderDeploymentList() {
-        if (!hasBuilds) {
-            showEmptyStateAction(
-                message = "No builds found for this project.",
-                actionLabel = "Create build",
-                action = ::startBuild,
-            )
-            return
-        }
-        if (availableTargets.isEmpty()) {
-            showEmptyStateAction(
-                message = "No deployment targets found.",
-                actionLabel = "Add target",
-                action = ::focusCreateTarget,
-            )
-            return
         }
 
-        list.removeAllViews()
-        availableTargets.forEach { target ->
-            val row = Button(requireContext()).apply {
-                val unsupported = target.capabilities.actions.filterValues { supported -> !supported }.keys.sorted().joinToString(", ").ifBlank { "none" }
-                val supported = target.capabilities.actions.filterValues { supported -> supported }.keys.sorted().joinToString(", ").ifBlank { "none" }
-                text = "Target: ${target.name} (${target.type})\nSupported: $supported\nUnsupported: $unsupported\nTap to test/select"
-                isAllCaps = false
-                setOnClickListener { selectedTarget = target; updateDeployButton(); testTarget(target) }
+        fun loadDeploymentDetails(deployment: DeploymentJobSummary) = scope.launch {
+            val id = projectId ?: return@launch
+            val target = targetsById[deployment.targetId]
+            val canRestart = target?.capabilities?.actions?.get("restart") == true
+            val canRollback = target?.capabilities?.actions?.get("rollback") == true
+            val statusResult = deploymentRepository.getDeploymentStatus(id, deployment.deploymentId)
+            val logResult = deploymentRepository.getDeploymentLogs(id, deployment.deploymentId)
+            val statusText = when (statusResult) {
+                is ApiResult.Success -> "Adapter status: ${statusResult.data.status ?: "unknown"} ${statusResult.data.message.orEmpty()}"
+                is ApiResult.Error -> "Adapter status unavailable: ${statusResult.message}"
+                ApiResult.Loading -> "Adapter status loading…"
             }
-            list.addView(row)
-        }
-
-        recentDeployments.forEach { deployment ->
-            val row = Button(requireContext()).apply {
-                val target = targetsById[deployment.targetId]
-                val caps = target?.capabilities?.actions.orEmpty()
-                val restartSupport = if (caps["restart"] == true) "Restart supported" else "Restart unsupported"
-                val rollbackSupport = if (caps["rollback"] == true) "Rollback supported" else "Rollback unsupported"
-                text = "Deployment: ${deployment.deploymentId}\nStatus: ${deployment.status}\nBuild: ${deployment.buildId}\n$restartSupport · $rollbackSupport\nTap for logs/status"
-                isAllCaps = false
-                if (deployment.status == "failed") setTextColor(Color.RED)
-                setOnClickListener { loadDeploymentDetails(deployment) }
+            val logText = when (logResult) {
+                is ApiResult.Success -> logResult.data.ifBlank { "No logs captured." }
+                is ApiResult.Error -> "Error: ${logResult.message}"
+                ApiResult.Loading -> "Logs loading…"
             }
-            list.addView(row)
+            terminalLines = listOf(
+                githubStatus,
+                "Deployment ${deployment.deploymentId}",
+                statusText,
+                "Actions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}",
+            ) + logText.lines()
+            status = "Loaded deployment ${deployment.deploymentId}."
         }
 
-        status.text = "Loaded deployment data. Latest successful build: ${latestSuccessfulBuild?.buildId ?: "none"}."
-        recentDeployments.firstOrNull()?.let { loadDeploymentDetails(it) }
-    }
+        LaunchedEffect(projectId) { loadAll() }
 
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BotBladeTokens.Black)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                WorkstationCard(accent = BotBladeTokens.HotPink) {
+                    Text("Deployment Pipeline", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("Project: ${projectName ?: projectId ?: "none selected"}", color = BotBladeTokens.Muted)
+                    Text(status, color = BotBladeTokens.Muted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
+                        StatusChip("Build", if (latestSuccessfulBuild != null) StatusTone.Success else StatusTone.Warning)
+                        StatusChip("Target", if (selectedTarget != null) StatusTone.Success else StatusTone.Warning)
+                        StatusChip("Deploy", if (canDeploy) StatusTone.Success else StatusTone.Neutral)
+                    }
+                }
+            }
 
-    private fun testTarget(target: DeploymentTargetSummary) = lifecycleScope.launch {
-        status.text = "Testing target ${target.name}…"
-        when (val result = deploymentRepository.testTarget(target.id)) {
-            is ApiResult.Success -> status.text = "Target ${target.name}: ${result.data.status} — ${result.data.message}"
-            is ApiResult.Error -> status.text = "Target test failed: ${result.message}"
-            ApiResult.Loading -> Unit
+            item {
+                FlowLane("Pipeline", "Build → Test → Package → Deploy → Verify", BotBladeTokens.BabyBlue) {
+                    BladeButton("Create build", onClick = ::createBuild, enabled = projectId != null, modifier = Modifier.weight(1f))
+                    BladeButton("Deploy latest", onClick = ::deployLatest, enabled = canDeploy, modifier = Modifier.weight(1f))
+                }
+            }
+
+            item {
+                WorkstationCard(accent = BotBladeTokens.GlitterGold) {
+                    Text("Deployment target", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = targetName, onValueChange = { targetName = it }, label = { Text("Target name") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = targetType, onValueChange = { targetType = it }, label = { Text("Target type") }, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 10.dp)) {
+                        BladeButton("Add target", onClick = ::createTarget, modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = ::renderReleaseChecklist, modifier = Modifier.weight(1f)) { Text("Release check") }
+                    }
+                }
+            }
+
+            item { SectionTitle("Targets") }
+            if (targets.isEmpty()) {
+                item {
+                    WorkstationCard(accent = BotBladeTokens.GlitterGold) {
+                        Text("No deployment targets yet", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                        Text("Create a local process, Docker, or cloud target to continue.", color = BotBladeTokens.Muted)
+                    }
+                }
+            } else {
+                items(targets, key = { it.id }) { target ->
+                    WorkstationCard(accent = if (selectedTarget?.id == target.id) BotBladeTokens.Success else BotBladeTokens.BabyBlue) {
+                        Text(target.name, color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                        Text("Type: ${target.type}", color = BotBladeTokens.Muted)
+                        Text("Supported: ${target.capabilities.actions.filterValues { it }.keys.sorted().joinToString(", ").ifBlank { "none" }}", color = BotBladeTokens.Muted)
+                        Text("Unsupported: ${target.capabilities.actions.filterValues { !it }.keys.sorted().joinToString(", ").ifBlank { "none" }}", color = BotBladeTokens.Muted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {
+                            AssistChip(onClick = { selectedTarget = target }, label = { Text("Select") })
+                            AssistChip(onClick = { testTarget(target) }, label = { Text("Test") })
+                        }
+                    }
+                }
+            }
+
+            item { SectionTitle("Recent deployments") }
+            if (deployments.isEmpty()) {
+                item {
+                    WorkstationCard(accent = BotBladeTokens.HotPink) {
+                        Text("No deployment jobs yet", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                        Text("Deploy the latest successful build to create the first job.", color = BotBladeTokens.Muted)
+                    }
+                }
+            } else {
+                items(deployments, key = { it.deploymentId }) { deployment ->
+                    val target = targetsById[deployment.targetId]
+                    WorkstationCard(accent = if (deployment.status == "failed") BotBladeTokens.Danger else BotBladeTokens.HotPink) {
+                        Text("Deployment ${deployment.deploymentId}", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                        Text("Status: ${deployment.status}", color = BotBladeTokens.Muted)
+                        Text("Build: ${deployment.buildId}", color = BotBladeTokens.Muted)
+                        Text("Target: ${target?.name ?: deployment.targetId}", color = BotBladeTokens.Muted)
+                        AssistChip(onClick = { loadDeploymentDetails(deployment) }, label = { Text("Logs / status") })
+                    }
+                }
+            }
+
+            item {
+                TerminalView(title = "Deployment logs", lines = terminalLines)
+            }
         }
-    }
-
-    private fun loadDeploymentDetails(deployment: DeploymentJobSummary) = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        val target = targetsById[deployment.targetId]
-        val canRestart = target?.capabilities?.actions?.get("restart") == true
-        val canRollback = target?.capabilities?.actions?.get("rollback") == true
-        val statusResult = deploymentRepository.getDeploymentStatus(id, deployment.deploymentId)
-        val logResult = deploymentRepository.getDeploymentLogs(id, deployment.deploymentId)
-        val statusText = when (statusResult) {
-            is ApiResult.Success -> "Adapter status: ${statusResult.data.status ?: "unknown"} ${statusResult.data.message.orEmpty()}"
-            is ApiResult.Error -> "Adapter status unavailable: ${statusResult.message}"
-            ApiResult.Loading -> "Adapter status loading…"
-        }
-        val logText = when (logResult) {
-            is ApiResult.Success -> logResult.data.ifBlank { "No logs captured." }
-            is ApiResult.Error -> "Error: ${logResult.message}"
-            ApiResult.Loading -> "Logs loading…"
-        }
-        val deploymentDetails = "$statusText\nActions: restart=${if (canRestart) "supported" else "unsupported"}, rollback=${if (canRollback) "supported" else "unsupported"}\n\n$logText"
-        logs.text = if (githubStatusLine.isBlank()) deploymentDetails else "$githubStatusLine\n\n$deploymentDetails"
-        if (!canRestart || !canRollback) status.text = "Unsupported deployment actions are disabled by adapter capabilities."
-    }
-
-    private fun restartDeployment(deployment: DeploymentJobSummary) = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        if (targetsById[deployment.targetId]?.capabilities?.actions?.get("restart") != true) { status.text = "Restart is unsupported by this adapter."; return@launch }
-        when (val result = deploymentRepository.restartDeployment(id, deployment.deploymentId)) {
-            is ApiResult.Success -> status.text = result.data.message ?: "Restart requested."
-            is ApiResult.Error -> status.text = "Restart failed: ${result.message}"
-            ApiResult.Loading -> Unit
-        }
-    }
-
-    private fun rollbackDeployment(deployment: DeploymentJobSummary) = lifecycleScope.launch {
-        val id = projectId ?: return@launch
-        if (targetsById[deployment.targetId]?.capabilities?.actions?.get("rollback") != true) { status.text = "Rollback is unsupported by this adapter."; return@launch }
-        when (val result = deploymentRepository.rollbackDeployment(id, deployment.deploymentId)) {
-            is ApiResult.Success -> { status.text = "Rollback result: ${result.data.status}"; loadDeployments() }
-            is ApiResult.Error -> status.text = "Rollback failed: ${result.message}"
-            ApiResult.Loading -> Unit
-        }
-    }
-
-
-    private fun showEmptyStateAction(message: String, actionLabel: String, action: () -> Unit) {
-        list.removeAllViews()
-        val emptyMessage = TextView(requireContext()).apply {
-            text = message
-            setPadding(8, 8, 8, 12)
-        }
-        val actionButton = Button(requireContext()).apply {
-            text = actionLabel
-            setOnClickListener { action() }
-        }
-        list.addView(emptyMessage)
-        list.addView(actionButton)
-    }
-
-    private fun focusCreateTarget() {
-        targetName.requestFocus()
-        targetType.requestFocus()
-    }
-
-    private fun updateDeployButton() {
-        deployButton.isEnabled = projectId != null && latestSuccessfulBuild != null && selectedTarget != null
     }
 }

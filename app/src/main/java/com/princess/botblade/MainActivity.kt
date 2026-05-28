@@ -9,29 +9,34 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.view.Gravity
-import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.backend.BotEngineBindingState
 import com.princess.botblade.backend.BotEngineService
 import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.data.repository.LocalProjectRepository
 import com.princess.botblade.data.store.ActiveProjectStore
-import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
-import com.princess.botblade.ui.editor.CodeEditorFragment
 import com.princess.botblade.ui.logs.LogsFragment
-import com.princess.botblade.ui.importforge.ImportForgeFragment
-import com.princess.botblade.ui.settings.SettingsFragment
+import com.princess.botblade.ui.shell.BotBladeAppShell
+import com.princess.botblade.ui.shell.BotBladeDestination
+import com.princess.botblade.ui.theme.BotBladeTheme
+import com.princess.botblade.ui.theme.isDynamicColorEnabled
 
 class MainActivity : AppCompatActivity() {
     private var bound = false
     private var binder: BotEngineService.LocalBinder? = null
+    private var selectedDestination by mutableStateOf(BotBladeDestination.Dashboard)
+    private var shellReady = false
 
     private val runtimePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         val denied = results.filterValues { granted -> !granted }.keys
@@ -60,11 +65,31 @@ class MainActivity : AppCompatActivity() {
             StartupDiagnostics.mark("main_activity_on_create_start")
             ApiConfig.initialize(this)
             requestRuntimePermissionsIfNeeded()
-            setContentView(R.layout.activity_main)
-            setupBottomNavigation(savedInstanceState)
+            installComposeShell(savedInstanceState)
             window.decorView.post { StartupDiagnostics.mark("first_render") }
         }.onFailure { error ->
             showStartupFallback(error)
+        }
+    }
+
+    private fun installComposeShell(savedInstanceState: Bundle?) {
+        val shouldOpenDashboard = savedInstanceState == null
+        setContent {
+            val runtimeOnline by BotEngineBindingState.serviceRunning.collectAsState()
+            BotBladeTheme(useDynamicColor = isDynamicColorEnabled(this)) {
+                BotBladeAppShell(
+                    selectedDestination = selectedDestination,
+                    runtimeOnline = runtimeOnline,
+                    fragmentContainerId = R.id.fragment_container,
+                    onDestinationSelected = ::openDestination,
+                    contentReady = {
+                        shellReady = true
+                        if (shouldOpenDashboard && supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
+                            openDestination(BotBladeDestination.Dashboard)
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -85,22 +110,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupBottomNavigation(savedInstanceState: Bundle?) {
-        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-        bottomNavigation.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.navigation_dashboard -> showFragmentSafely { DashboardFragment() }
-                R.id.navigation_projects -> showFragmentSafely { ImportForgeFragment() }
-                R.id.navigation_editor -> showFragmentSafely { CodeEditorFragment() }
-                R.id.navigation_deployments -> showFragmentSafely { DeploymentsFragment.newInstance() }
-                R.id.navigation_settings -> showFragmentSafely { SettingsFragment() }
-                else -> false
-            }
-        }
-
-        if (savedInstanceState == null) {
-            bottomNavigation.selectedItemId = R.id.navigation_dashboard
-        }
+    fun openDestination(destination: BotBladeDestination) {
+        selectedDestination = destination
+        if (!shellReady) return
+        showFragmentSafely { destination.createFragment() }
     }
 
     private fun showFragmentSafely(factory: () -> Fragment): Boolean =
@@ -119,7 +132,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showStartupFallback(error: Throwable) {
         val message = "BotBlade recovered from a startup screen crash.\n\n${error::class.java.simpleName}: ${error.message ?: "Unknown error"}\n\nOpen Dashboard, Projects, or Settings after updating."
-        if (findViewById<ViewGroup?>(R.id.fragment_container) == null) {
+        if (!shellReady) {
             val fallback = TextView(this).apply {
                 text = message
                 gravity = Gravity.CENTER
@@ -142,14 +155,15 @@ class MainActivity : AppCompatActivity() {
         if (projectId != null) {
             ActiveProjectStore(this).setActiveProject(projectId, projectName)
         }
-        findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.navigation_editor
+        openDestination(BotBladeDestination.Editor)
     }
 
-
     fun openDeploymentsForProject(projectId: String?, projectName: String?) {
+        selectedDestination = BotBladeDestination.Deployments
         val args = DeploymentsFragment.buildArgs(projectId, projectName)
         showFragmentSafely { DeploymentsFragment.newInstance(args) }
     }
+
     fun openLogsScreen() {
         showFragmentSafely { LogsFragment() }
     }

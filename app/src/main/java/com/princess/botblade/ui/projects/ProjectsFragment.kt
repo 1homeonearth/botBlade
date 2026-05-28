@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -35,7 +34,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,7 +47,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,6 +56,12 @@ import com.princess.botblade.data.api.ApiResult
 import com.princess.botblade.data.model.ProjectScanResponse
 import com.princess.botblade.data.repository.EditorRepository
 import com.princess.botblade.data.repository.LocalProjectRepository
+import com.princess.botblade.ui.components.BladeButton
+import com.princess.botblade.ui.components.BotBladeTokens
+import com.princess.botblade.ui.components.SectionTitle
+import com.princess.botblade.ui.components.StatusChip
+import com.princess.botblade.ui.components.StatusTone
+import com.princess.botblade.ui.components.WorkstationCard
 import com.princess.botblade.ui.theme.BotBladeTheme
 import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import java.text.DateFormat
@@ -254,7 +257,8 @@ class ProjectsFragment : Fragment() {
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
-                            Button(
+                            BladeButton(
+                                text = "Continue",
                                 onClick = {
                                     when (selected.lane) {
                                         SourceLane.STARTER_TEMPLATE -> step = 2
@@ -267,7 +271,7 @@ class ProjectsFragment : Fragment() {
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Continue") }
+                            )
                         }
                         2 -> {
                             OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Project name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -282,16 +286,17 @@ class ProjectsFragment : Fragment() {
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 OutlinedButton(onClick = { step = 1 }, modifier = Modifier.weight(1f)) { Text("Back") }
-                                Button(onClick = { step = 3 }, enabled = canCreate, modifier = Modifier.weight(1f)) { Text("Review") }
+                                BladeButton("Review", onClick = { step = 3 }, enabled = canCreate, modifier = Modifier.weight(1f))
                             }
                         }
                         else -> {
                             ReviewCard(name.trim(), selected)
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 OutlinedButton(onClick = { step = 2 }, modifier = Modifier.weight(1f)) { Text("Back") }
-                                Button(
+                                BladeButton(
+                                    text = "Create + Open",
                                     onClick = {
-                                        val projectRoot = repo.createProject(name.trim(), selected.templateDir ?: return@Button)
+                                        val projectRoot = repo.createProject(name.trim(), selected.templateDir ?: return@BladeButton)
                                         val projectId = projectRoot.name
                                         projects = repo.listProjects()
                                         showWizard = false
@@ -316,7 +321,7 @@ class ProjectsFragment : Fragment() {
                                         }
                                     },
                                     modifier = Modifier.weight(1f),
-                                ) { Text("Create + Open") }
+                                )
                             }
                         }
                     }
@@ -363,7 +368,8 @@ class ProjectsFragment : Fragment() {
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(onClick = { showGitModal = false }, modifier = Modifier.weight(1f)) { Text("Cancel") }
-                        Button(
+                        BladeButton(
+                            text = "Import",
                             onClick = {
                                 banner = "Import from Git: registering repository as a managed project…"
                                 scope.launch {
@@ -375,7 +381,7 @@ class ProjectsFragment : Fragment() {
                             },
                             enabled = gitRepoUrl.trim().startsWith("http"),
                             modifier = Modifier.weight(1f),
-                        ) { Text("Import") }
+                        )
                     }
                 }
             }
@@ -383,13 +389,11 @@ class ProjectsFragment : Fragment() {
     }
 
     @Composable private fun Hero(banner: String, onAdd: () -> Unit) {
-        Card(colors = CardDefaults.cardColors(containerColor = RaisedPanel), border = BorderStroke(1.dp, HotPink), shape = RoundedCornerShape(24.dp)) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Projects", color = BabyBlue, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("Your forge floor for importing, creating, repairing, scanning, and opening bot workspaces.", color = OnSurface)
-                Text(banner, color = Muted)
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Add bot project") }
-            }
+        WorkstationCard(accent = HotPink) {
+            Text("Projects", color = BabyBlue, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Your forge floor for importing, creating, repairing, scanning, and opening bot workspaces.", color = OnSurface)
+            Text(banner, color = Muted)
+            BladeButton("Add bot project", onClick = onAdd, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
         }
     }
 
@@ -400,21 +404,19 @@ class ProjectsFragment : Fragment() {
                 "Create starter templates, register Git/ZIP/folder sources, or create a repair shell.",
                 "Every source lane creates a managed BotBlade project and opens it in Forge Editor.",
                 "After opening, run Scan, add secrets, build, and deploy from the workstation flow.",
-            ).forEach { line ->
-                Surface(color = Panel, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Stroke)) {
-                    Text(line, color = OnSurface, modifier = Modifier.fillMaxWidth().padding(14.dp))
+            ).forEachIndexed { index, line ->
+                WorkstationCard(accent = if (index % 2 == 0) BabyBlue else HotPink) {
+                    Text(line, color = OnSurface)
                 }
             }
         }
     }
 
     @Composable private fun EmptyState(onAdd: () -> Unit) {
-        Card(colors = CardDefaults.cardColors(containerColor = Panel), border = BorderStroke(1.dp, Stroke)) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("No bots in the forge yet", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Start with a starter template, Git source, ZIP archive, folder registration, or repair shell.", color = Muted)
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Create first project") }
-            }
+        WorkstationCard(accent = BabyBlue) {
+            Text("No bots in the forge yet", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Start with a starter template, Git source, ZIP archive, folder registration, or repair shell.", color = Muted)
+            BladeButton("Create first project", onClick = onAdd, modifier = Modifier.fillMaxWidth())
         }
     }
 
@@ -443,8 +445,10 @@ class ProjectsFragment : Fragment() {
                     TextButton(onClick = onMenu) { Text("⋯", color = HotPink) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = { onStatusClick(project) }, label = { Text(project.status) })
-                    AssistChip(onClick = { onForgeReadyClick(project) }, label = { Text("Forge-ready") })
+                    StatusChip(project.status, StatusTone.Info)
+                    StatusChip("Forge-ready", StatusTone.Success)
+                    AssistChip(onClick = { onStatusClick(project) }, label = { Text("Status") })
+                    AssistChip(onClick = { onForgeReadyClick(project) }, label = { Text("Scan") })
                     AssistChip(onClick = { onOpenClick(project) }, label = { Text("Open") })
                 }
                 Text("Tap to open editor. Long press or tap ⋯ for project actions.", color = Muted)
@@ -453,17 +457,13 @@ class ProjectsFragment : Fragment() {
     }
 
     @Composable private fun ReviewCard(projectName: String, source: Source) {
-        Card(colors = CardDefaults.cardColors(containerColor = BotBlack), border = BorderStroke(1.dp, BabyBlue)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Review forge order", color = BabyBlue, fontWeight = FontWeight.Bold)
-                Text("Name: $projectName", color = OnSurface)
-                Text("Source: ${source.title}", color = OnSurface)
-                Text("First action: create workspace, open Forge Editor, trigger scan, then continue with secrets and build.", color = Muted)
-            }
+        WorkstationCard(accent = BabyBlue) {
+            Text("Review forge order", color = BabyBlue, fontWeight = FontWeight.Bold)
+            Text("Name: $projectName", color = OnSurface)
+            Text("Source: ${source.title}", color = OnSurface)
+            Text("First action: create workspace, open Forge Editor, trigger scan, then continue with secrets and build.", color = Muted)
         }
     }
-
-    @Composable private fun SectionTitle(text: String) { Text(text, color = HotPink, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
 
     private fun nextRenamedName(currentName: String, projects: List<LocalProjectRepository.LocalProjectSummary>): String {
         val existing = projects.map { it.name.lowercase() }.toSet()
@@ -480,7 +480,6 @@ class ProjectsFragment : Fragment() {
 
     private data class Source(val title: String, val detail: String, val lane: SourceLane, val templateDir: String?)
 
-
     private data class PostCreateAction(val title: String, val detail: String)
 
     private fun ApiResult<ProjectScanResponse>?.toScanSummary(): String = when (this) {
@@ -496,8 +495,13 @@ class ProjectsFragment : Fragment() {
     private companion object {
         const val PREFS = "botblade_workstation_flow"
         const val OPEN_ADD_PROJECT = "open_add_project"
-        val BotBlack = Color(0xFF05060A); val Panel = Color(0xFF101522); val RaisedPanel = Color(0xFF151D2E); val Stroke = Color(0xFF2F405F)
-        val BabyBlue = Color(0xFF8FD8FF); val HotPink = Color(0xFFFF3EA5); val OnSurface = Color(0xFFEEF7FF); val Muted = Color(0xFFAAB8CC)
+        val BotBlack = BotBladeTokens.Black
+        val Panel = BotBladeTokens.Panel
+        val Stroke = BotBladeTokens.Stroke
+        val BabyBlue = BotBladeTokens.BabyBlue
+        val HotPink = BotBladeTokens.HotPink
+        val OnSurface = ColorToken.OnSurface
+        val Muted = BotBladeTokens.Muted
         val Sources = listOf(
             Source("Discord TypeScript Starter", "slash-command bot with generated TypeScript project files", SourceLane.STARTER_TEMPLATE, "project_templates/simple_echo_bot"),
             Source("Moderation Toolkit", "moderation-oriented starter ready for rules and actions", SourceLane.STARTER_TEMPLATE, "project_templates/moderation_bot"),
@@ -507,5 +511,9 @@ class ProjectsFragment : Fragment() {
             Source("Open Folder", "register an Android workspace folder as a BotBlade project", SourceLane.OPEN_FOLDER, null),
             Source("Repair Existing", "create metadata and repair notes for an existing workspace", SourceLane.REPAIR_EXISTING, null),
         )
+    }
+
+    private object ColorToken {
+        val OnSurface = androidx.compose.ui.graphics.Color(0xFFEEF7FF)
     }
 }
