@@ -264,3 +264,12 @@ test("zip import route persists import state and includes structured failure det
     assert.equal(typeof response.body.failure.safeAction, "string");
   }
 });
+
+
+test("project git status route returns safe non-git summary", async () => {
+  const created = await request("POST", "/api/projects", { name: "Git Status Project" });
+  const response = await request("GET", `/api/projects/${created.body.id}/git/status`);
+  assert.equal(response.statusCode, 200);
+  assert.equal(typeof response.body.available, "boolean");
+});
+

@@ -9,6 +9,7 @@ import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./s
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
 import { DeploymentTargetStore, deploymentTargetWithCapabilities, testDeploymentTarget } from "./services/deploymentTargets.js";
 import { GitHubIntegrationService } from "./services/githubIntegration.js";
+import { GitStatusService } from "./services/gitStatusService.js";
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
 import { ProjectFileService, parseFileWriteInput } from "./services/projectFiles.js";
 import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUpdateProjectInput, ProjectStore, RequestValidationError } from "./services/projectStore.js";
@@ -35,6 +36,7 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
 const importStore = new ImportStore(persistence);
+const gitStatusService = new GitStatusService();
 const defaultHost = "127.0.0.1";
 const host = (process.env.BIND_HOST ?? process.env.HOST ?? defaultHost).trim() || defaultHost;
 const portValue = process.env.PORT ?? "8000";
@@ -307,6 +309,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     return writeJson(res, 201, record);
   }
 
+  const gitStatusMatch = path.match(/^\/api\/projects\/([^/]+)\/git\/status$/);
+  if (gitStatusMatch) {
+    const [, projectId] = gitStatusMatch;
+    assertProjectAccess(actor, projectId);
+    if (!projectStore.get(projectId)) throw notFoundProject(projectId);
+    if (method === "GET") return writeJson(res, 200, await gitStatusService.readStatusSafe(fileService.workspace(projectId)));
+  }
+
   const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);
   if (commandsMatch) {
     const [, projectId, commandId] = commandsMatch;
@@ -355,6 +365,25 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       return writeJson(res, 200, result);
     }
     if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
+  }
+
+  const projectProfileMatch = path.match(/^\/api\/projects\/([^/]+)\/profile$/);
+  if (projectProfileMatch) {
+    const [, projectId] = projectProfileMatch;
+    assertProjectAccess(actor, projectId);
+    if (!projectStore.get(projectId)) throw notFoundProject(projectId);
+    if (method === "GET") {
+      const fs = await import("node:fs/promises");
+      const metadataPath = `${fileService.workspace(projectId)}/botblade.json`;
+      let profile: Record<string, unknown> | null = null;
+      try { profile = JSON.parse(await fs.readFile(metadataPath, "utf8")) as Record<string, unknown>; } catch {}
+      const git = await gitStatusService.readStatusSafe(fileService.workspace(projectId));
+      const existingCards = Array.isArray(profile?.repairCards) ? profile?.repairCards as Array<Record<string, unknown>> : [];
+      const repairCards = [...existingCards];
+      if (!git.available) repairCards.push({ title: "Git metadata unavailable", safeAction: "Initialize Git in the workspace or verify repository access, then refresh profile." });
+      if (profile && typeof profile === "object") return writeJson(res, 200, { ...profile, git, repairCards });
+      return writeJson(res, 200, { schemaVersion: "1.0.0", generatedBy: "botblade", generatedAt: new Date().toISOString(), project: { id: projectId }, git, repairCards });
+    }
   }
 
   const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/(archive|clone|validate|generate|regenerate))?$/);
