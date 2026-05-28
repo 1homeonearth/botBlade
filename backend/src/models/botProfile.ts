@@ -39,6 +39,29 @@ export interface BotProfileRepairCard {
   safeAction: string;
 }
 
+
+export type ScriptProfileSource = "package_json" | "file" | "blade_pack" | "repair_card" | "user" | "codex";
+
+export type ScriptProfileRuntime = "node" | "python" | "shell" | "powershell" | "docker" | "workflow" | "custom";
+
+export interface BotProfileScriptProfile {
+  id: string;
+  projectId?: string;
+  name: string;
+  description?: string;
+  source: ScriptProfileSource;
+  runtime: ScriptProfileRuntime;
+  command: string;
+  workingDirectory: string;
+  envRefs: string[];
+  secretRefs: string[];
+  timeoutSeconds: number;
+  requiresConfirmation: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BotProfile {
   schemaVersion: typeof BOT_PROFILE_SCHEMA_VERSION;
   generatedBy: "botblade";
@@ -62,6 +85,7 @@ export interface BotProfile {
     detected: BotProfilePackEvidence[];
   };
   commandPlan: BotProfileCommandPlan;
+  scriptProfiles: BotProfileScriptProfile[];
   secrets: {
     required: BotProfileSecretRequirement[];
     optional: BotProfileSecretRequirement[];

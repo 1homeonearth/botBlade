@@ -56,17 +56,30 @@ test("botblade metadata persists only secret metadata without raw values", async
 
   try {
     await fs.mkdir(workspace, { recursive: true });
-    await fs.writeFile(path.join(workspace, "package.json"), JSON.stringify({ name: "discord-bot", dependencies: { "discord.js": "^14.0.0" } }), "utf8");
+    await fs.writeFile(path.join(workspace, "package.json"), JSON.stringify({
+      name: "discord-bot",
+      dependencies: { "discord.js": "^14.0.0" },
+      scripts: { start: `DISCORD_TOKEN=${sentinelTokenValue} CLIENT_ID=${sentinelClientIdValue} node src/index.js` }
+    }), "utf8");
     await fs.writeFile(path.join(workspace, ".env.example"), `DISCORD_TOKEN=${sentinelTokenValue}\nCLIENT_ID=${sentinelClientIdValue}`, "utf8");
 
     const detection = await scanWorkspaceForBladePacks(workspace);
     const metadataPath = await writeBotbladeMetadata(workspace, detection, { kind: "git", url: "https://github.com/example/repo" });
     const metadataText = await fs.readFile(metadataPath, "utf8");
-    const metadata = JSON.parse(metadataText) as { secrets: { required: Array<{ name: string; configured: boolean }>; optional: Array<{ name: string; configured: boolean }> } };
+    const metadata = JSON.parse(metadataText) as {
+      secrets: { required: Array<{ name: string; configured: boolean }>; optional: Array<{ name: string; configured: boolean }> };
+      scriptProfiles: Array<{ source: string; runtime: string; command: string; envRefs: string[]; secretRefs: string[] }>;
+    };
 
     const allSecrets = [...metadata.secrets.required, ...metadata.secrets.optional];
     assert.ok(allSecrets.length > 0);
     assert.equal(allSecrets.every((secret) => secret.configured === false), true);
+    const startProfile = metadata.scriptProfiles.find((profile) => profile.source === "package_json" && profile.command.includes("node src/index.js"));
+    assert.ok(startProfile);
+    assert.equal(startProfile?.runtime, "node");
+    assert.equal(JSON.stringify(startProfile?.envRefs), JSON.stringify(["CLIENT_ID", "DISCORD_TOKEN"]));
+    assert.equal(JSON.stringify(startProfile?.secretRefs), JSON.stringify(["CLIENT_ID", "DISCORD_TOKEN"]));
+    assert.equal(startProfile?.command.includes("[redacted]"), true);
     assert.equal(metadataText.includes(sentinelTokenValue), false);
     assert.equal(metadataText.includes(sentinelClientIdValue), false);
   } finally {
