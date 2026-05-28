@@ -55,3 +55,16 @@ test("git status service tolerates unborn HEAD and still reports changed files",
   assert.equal(status.clean, false);
   assert.ok(status.changedFiles.some((entry) => entry.path === "fresh.txt"));
 });
+
+
+test("git status service does not inherit parent repository metadata", async () => {
+  const root = await tempDir("botblade-git-parent");
+  execFileSync("git", ["-C", root, "init"]);
+  const child = path.join(root, "generated-projects", "project-no-git");
+  await fs.mkdir(child, { recursive: true });
+  await fs.writeFile(path.join(child, "app.js"), "console.log('x')\n", "utf8");
+  const status = await new GitStatusService().readStatusSafe(child);
+  assert.equal(status.available, false);
+  assert.equal(status.branch, null);
+  assert.equal(status.changedFiles.length, 0);
+});

@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 
 export interface GitStatusRemote { name: string; url: string | null }
 export interface GitChangedFileSummary { path: string; status: string }
@@ -14,6 +15,7 @@ export interface GitStatusSummary {
 
 export class GitStatusService {
   async readStatus(workspacePath: string): Promise<GitStatusSummary> {
+    this.assertWorkspaceIsRepositoryRoot(workspacePath);
     const branch = this.currentBranch(workspacePath);
     const remotes = this.remotes(workspacePath);
     const changedFiles = this.changedFiles(workspacePath);
@@ -26,6 +28,13 @@ export class GitStatusService {
     } catch {
       return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
     }
+  }
+
+  private assertWorkspaceIsRepositoryRoot(workspacePath: string): void {
+    const topLevel = this.git(workspacePath, ["rev-parse", "--show-toplevel"]).trim();
+    const workspaceResolved = path.resolve(workspacePath);
+    const topLevelResolved = path.resolve(topLevel);
+    if (workspaceResolved !== topLevelResolved) throw new Error("Workspace is not a Git repository root.");
   }
 
   private currentBranch(workspacePath: string): string | null {
