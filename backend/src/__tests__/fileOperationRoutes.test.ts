@@ -90,10 +90,9 @@ test("file operation route helper preserves editor write size limit", async () =
   const projectId = "project_limit";
   await handleFileOperationRoute(request({ path: "README.md", content: "ok" }), response() as never, context("POST", projectId, fileService));
 
-  await assert.rejects(
-    () => handleFileOperationRoute(request({ content: "x".repeat((512 * 1024) + 1) }), response() as never, context("PUT", projectId, fileService, "README.md")),
-    /512KB/,
-  );
+  const failure = await captureFailure(() => handleFileOperationRoute(request({ content: "x".repeat((512 * 1024) + 1) }), response() as never, context("PUT", projectId, fileService, "README.md")));
+  assert.equal(failure.problems?.[0]?.field, "content");
+  assert.match(failure.problems?.[0]?.message ?? "", /512KB/);
 });
 
 test("file operation route helper returns false for unsupported methods", async () => {
@@ -102,3 +101,12 @@ test("file operation route helper returns false for unsupported methods", async 
   const handled = await handleFileOperationRoute(request(), response() as never, context("OPTIONS", "project_route", fileService));
   assert.equal(handled, false);
 });
+
+async function captureFailure(action: () => Promise<unknown>): Promise<{ problems?: Array<{ field: string; message: string }> }> {
+  try {
+    await action();
+  } catch (error) {
+    return error as { problems?: Array<{ field: string; message: string }> };
+  }
+  throw new Error("Expected action to fail.");
+}
