@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AuditService } from "./auditService.js";
-import type { ProjectFileService } from "./projectFiles.js";
-import { RequestValidationError } from "./projectStore.js";
+import { parseFileWriteInput, type ProjectFileService } from "./projectFiles.js";
 import { buildProjectTree, createProjectFile, createProjectFolder, deleteProjectPath, renameProjectPath } from "./projectFileOperations.js";
 
 export interface FileOperationRouteContext {
@@ -31,9 +30,8 @@ export async function handleFileOperationRoute(req: IncomingMessage, res: Server
   }
 
   if (method === "PUT" && filePath !== undefined) {
-    const body = await readJson(req) as { content?: unknown };
-    if (typeof body.content !== "string") throw new RequestValidationError([{ field: "content", message: "File content must be a string." }]);
-    writeJson(res, 200, await fileService.write(projectId, filePath, body.content));
+    const { content } = parseFileWriteInput(await readJson(req));
+    writeJson(res, 200, await fileService.write(projectId, filePath, content));
     return true;
   }
 
