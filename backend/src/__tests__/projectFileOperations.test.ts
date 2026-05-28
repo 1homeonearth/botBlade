@@ -19,6 +19,13 @@ test("buildProjectTree nests folders before files", () => {
   assert.equal(tree[0].children?.some((node) => node.path === "src/commands"), true);
 });
 
+test("buildProjectTree preserves literal percent signs in filenames", () => {
+  const tree = buildProjectTree([{ path: "docs/100%.md", size: 1, updatedAt: "now", generated: false, editable: true }]);
+
+  assert.equal(tree[0].name, "docs");
+  assert.equal(tree[0].children?.[0].name, "100%.md");
+});
+
 test("project file operations create folders, create files, rename paths, and delete paths", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "botblade-files-"));
   const service = new ProjectFileService(root);
@@ -37,13 +44,26 @@ test("project file operations create folders, create files, rename paths, and de
 
   const deleted = await deleteProjectPath(service, projectId, "src/commands/pong.ts");
   assert.equal(deleted.deleted, true);
-  await assert.rejects(() => service.read(projectId, "src/commands/pong.ts"), /Project file was not found/);
+  const readFailure = await captureFailure(() => service.read(projectId, "src/commands/pong.ts"));
+  assert.equal(readFailure.code, "FILE_NOT_FOUND");
 });
 
 test("project file operations reject traversal outside workspace", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "botblade-files-"));
   const service = new ProjectFileService(root);
 
-  await assert.rejects(() => createProjectFile(service, "project_safe", { path: "../escape.ts", content: "bad" }), /File path must stay within/);
-  await assert.rejects(() => renameProjectPath(service, "project_safe", { fromPath: "missing.ts", toPath: "../../escape.ts" }), /File path must stay within|Project path was not found/);
+  const createFailure = await captureFailure(() => createProjectFile(service, "project_safe", { path: "../escape.ts", content: "bad" }));
+  assert.equal(createFailure.code, "INVALID_FILE_PATH");
+
+  const renameFailure = await captureFailure(() => renameProjectPath(service, "project_safe", { fromPath: "missing.ts", toPath: "../../escape.ts" }));
+  assert.ok(renameFailure.code === "INVALID_FILE_PATH" || renameFailure.code === "FILE_NOT_FOUND");
 });
+
+async function captureFailure(action: () => Promise<unknown>): Promise<{ code?: string; message?: string }> {
+  try {
+    await action();
+  } catch (error) {
+    return error as { code?: string; message?: string };
+  }
+  throw new Error("Expected action to fail.");
+}
