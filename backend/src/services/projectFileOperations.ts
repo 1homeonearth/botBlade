@@ -64,7 +64,9 @@ export async function createProjectFile(fileService: ProjectFileService, project
   const overwrite = object.overwrite === true;
   const target = fileService.safePath(projectId, servicePath);
   assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
-  if (!overwrite && await exists(target)) throw conflict("FILE_EXISTS", "File already exists.", relativePath);
+  const existing = await fs.stat(target).catch(() => undefined);
+  if (existing?.isDirectory()) throw conflict("TARGET_IS_DIRECTORY", "Target path is a directory.", relativePath);
+  if (!overwrite && existing) throw conflict("FILE_EXISTS", "File already exists.", relativePath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content, "utf8");
   return fileService.read(projectId, servicePath);
@@ -74,9 +76,11 @@ export async function createProjectFolder(fileService: ProjectFileService, proje
   const relativePath = normalizeInputPath(asObject(input).path, "path");
   const target = fileService.safePath(projectId, encodeForProjectFileService(relativePath));
   assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
-  const existed = await exists(target);
+  const existing = await fs.stat(target).catch(() => undefined);
+  if (existing?.isFile()) throw conflict("TARGET_IS_FILE", "Target path is a file.", relativePath);
+  if (existing?.isDirectory()) return { path: relativePath, created: false };
   await fs.mkdir(target, { recursive: true });
-  return { path: relativePath, created: !existed };
+  return { path: relativePath, created: true };
 }
 
 export async function renameProjectPath(fileService: ProjectFileService, projectId: string, input: unknown): Promise<{ fromPath: string; toPath: string; moved: true }> {
@@ -121,23 +125,9 @@ function asObject(value: unknown): Record<string, unknown> {
 
 function normalizeInputPath(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new RequestValidationError([{ field, message: "Path is required." }]);
-  const normalized = maybeDecodePath(value).replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
   if (!normalized || normalized.includes("\0")) throw new RequestValidationError([{ field, message: "Path is invalid." }]);
   return normalized;
-}
-
-function maybeDecodePath(value: string): string {
-  let decoded = value.trim();
-  for (let index = 0; index < 2; index += 1) {
-    try {
-      const next = decodeURIComponent(decoded);
-      if (next === decoded) break;
-      decoded = next;
-    } catch {
-      break;
-    }
-  }
-  return decoded;
 }
 
 function normalizeSummaryPath(value: string): string {
