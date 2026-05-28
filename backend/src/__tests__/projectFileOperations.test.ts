@@ -48,6 +48,16 @@ test("project file operations create folders, create files, rename paths, and de
   assert.equal(readFailure.code, "FILE_NOT_FOUND");
 });
 
+test("project file operations preserve literal percent signs in operation paths", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "botblade-files-"));
+  const service = new ProjectFileService(root);
+  const projectId = "project_percent";
+
+  const created = await createProjectFile(service, projectId, { path: "docs/100%.md", content: "percent" });
+  assert.equal(created.path, "docs/100%.md");
+  assert.equal((await service.read(projectId, "docs/100%.md")).content, "percent");
+});
+
 test("project file operations reject traversal outside workspace", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "botblade-files-"));
   const service = new ProjectFileService(root);
@@ -57,6 +67,28 @@ test("project file operations reject traversal outside workspace", async () => {
 
   const renameFailure = await captureFailure(() => renameProjectPath(service, "project_safe", { fromPath: "missing.ts", toPath: "../../escape.ts" }));
   assert.ok(renameFailure.code === "INVALID_FILE_PATH" || renameFailure.code === "FILE_NOT_FOUND");
+});
+
+test("project file operations reject workspace-root and destructive rename cases", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "botblade-files-"));
+  const service = new ProjectFileService(root);
+  const projectId = "project_guard";
+
+  await createProjectFolder(service, projectId, { path: "src" });
+  await createProjectFile(service, projectId, { path: "src/index.ts", content: "index" });
+  await createProjectFile(service, projectId, { path: "src/target.ts", content: "target" });
+
+  const rootDelete = await captureFailure(() => deleteProjectPath(service, projectId, "%252e"));
+  assert.equal(rootDelete.code, "INVALID_FILE_PATH");
+
+  const samePath = await captureFailure(() => renameProjectPath(service, projectId, { fromPath: "src/index.ts", toPath: "src/index.ts" }));
+  assert.equal(samePath.code, "SAME_PATH");
+
+  const descendant = await captureFailure(() => renameProjectPath(service, projectId, { fromPath: "src", toPath: "src/nested" }));
+  assert.equal(descendant.code, "DESCENDANT_TARGET");
+
+  const targetExists = await captureFailure(() => renameProjectPath(service, projectId, { fromPath: "src/index.ts", toPath: "src/target.ts", overwrite: true }));
+  assert.equal(targetExists.code, "TARGET_EXISTS");
 });
 
 async function captureFailure(action: () => Promise<unknown>): Promise<{ code?: string; message?: string }> {
