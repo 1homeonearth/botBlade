@@ -1,5 +1,7 @@
 package com.princess.botblade.diagnostics
 
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.os.Environment
@@ -37,54 +39,35 @@ class DownloadsLogMirror(private val context: Context) {
 
     private fun mirrorNow() {
         val payload = buildPayload()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            mirrorViaMediaStore(payload)
-            return
-        }
-
-        mirrorViaLegacyDownloads(payload)
-    }
-
-    private fun mirrorViaMediaStore(payload: String) {
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        val targetUri = resolver.query(
+        val existingId = resolver.query(
             collection,
             arrayOf(MediaStore.Downloads._ID),
             "${MediaStore.Downloads.DISPLAY_NAME}=?",
             arrayOf(FILE_NAME),
             null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val id = cursor.getLong(0)
-                android.content.ContentUris.withAppendedId(collection, id)
-            } else {
-                null
-            }
-        } ?: resolver.insert(
-            collection,
-            android.content.ContentValues().apply {
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+
+        val targetUri = if (existingId == null) {
+            val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, FILE_NAME)
                 put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            },
-        ) ?: return
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+            }
+            resolver.insert(collection, values) ?: return
+        } else {
+            ContentUris.withAppendedId(collection, existingId)
+        }
 
         resolver.openOutputStream(targetUri, "wt")?.bufferedWriter()?.use { it.write(payload) }
-        resolver.update(
-            targetUri,
-            android.content.ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
-            null,
-            null,
-        )
-    }
 
-    private fun mirrorViaLegacyDownloads(payload: String) {
-        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        if (!downloadsDir.exists()) downloadsDir.mkdirs()
-        val target = File(downloadsDir, FILE_NAME)
-        target.writeText(payload)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolver.update(targetUri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        }
     }
 
     private fun buildPayload(): String {
