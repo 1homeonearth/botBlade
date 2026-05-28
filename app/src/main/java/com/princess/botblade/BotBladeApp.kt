@@ -16,7 +16,14 @@ class BotBladeApp : Application() {
         StartupDiagnostics.install(this, BuildConfig.VERSION_NAME, BuildConfig.BUILD_TYPE, BuildConfig.GIT_SHA)
         StartupDiagnostics.mark("di_init")
         StartupDiagnostics.mark("application_on_create_end")
-        downloadsLogMirror = DownloadsLogMirror(this).also { it.start() }
+        downloadsLogMirror = DownloadsLogMirror(this).also { mirror ->
+            mirror.start()
+            val previous = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                mirror.captureNow("app_crashed")
+                previous?.uncaughtException(thread, throwable) ?: throw throwable
+            }
+        }
     }
 
     override fun onTerminate() {

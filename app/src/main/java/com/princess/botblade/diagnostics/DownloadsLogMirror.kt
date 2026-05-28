@@ -14,7 +14,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.File
 import java.time.Instant
 
 class DownloadsLogMirror(private val context: Context) {
@@ -23,31 +22,34 @@ class DownloadsLogMirror(private val context: Context) {
 
     fun start() {
         if (syncJob?.isActive == true) return
+        captureNow("app_started")
         syncJob = scope.launch {
             while (isActive) {
-                runCatching { mirrorNow() }
-                delay(5_000)
+                delay(FIVE_MINUTES_MS)
+                captureNow("scheduled_5min")
             }
         }
     }
 
+    fun captureNow(reason: String) {
+        scope.launch {
+            runCatching { mirrorNow(reason) }
+        }
+    }
+
     fun stop() {
+        captureNow("app_stopped")
         syncJob?.cancel()
         syncJob = null
         scope.cancel()
     }
 
-    private fun mirrorNow() {
-        val payload = buildPayload()
+    private fun mirrorNow(reason: String) {
+        val payload = buildPayload(reason)
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        val existingId = resolver.query(
-            collection,
-            arrayOf(MediaStore.Downloads._ID),
-            "${MediaStore.Downloads.DISPLAY_NAME}=?",
-            arrayOf(FILE_NAME),
-            null,
-        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+        val existingId = resolver.query(collection, arrayOf(MediaStore.Downloads._ID), "${MediaStore.Downloads.DISPLAY_NAME}=?", arrayOf(FILE_NAME), null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
 
         val targetUri = if (existingId == null) {
             val values = ContentValues().apply {
@@ -59,31 +61,29 @@ class DownloadsLogMirror(private val context: Context) {
                 }
             }
             resolver.insert(collection, values) ?: return
-        } else {
-            ContentUris.withAppendedId(collection, existingId)
-        }
+        } else ContentUris.withAppendedId(collection, existingId)
 
         resolver.openOutputStream(targetUri, "wt")?.bufferedWriter()?.use { it.write(payload) }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            resolver.update(targetUri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) resolver.update(targetUri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
     }
 
-    private fun buildPayload(): String {
-        val engineLog = File(context.filesDir, "logs/engine.log").takeIf { it.exists() }?.readText().orEmpty()
-        val startupCrash = File(context.filesDir, "startup_crash_artifact.json").takeIf { it.exists() }?.readText().orEmpty()
+    private fun buildPayload(reason: String): String {
+        val logcat = runCatching {
+            ProcessBuilder("logcat", "-d", "-v", "threadtime", "-T", "5m").start().inputStream.bufferedReader().use { it.readText() }
+        }.getOrElse { "logcat_unavailable: ${it.message}" }
+
         return buildString {
-            appendLine("BotBlade live diagnostics mirror")
+            appendLine("BotBlade app log snapshot")
             appendLine("updatedAtUtc=${Instant.now()}")
+            appendLine("reason=$reason")
+            appendLine("note=Android app logcat snapshot written automatically to Downloads")
             appendLine()
-            appendLine("=== engine.log ===")
-            appendLine(engineLog.ifBlank { "(no engine logs yet)" })
-            appendLine()
-            appendLine("=== startup_crash_artifact.json ===")
-            appendLine(startupCrash.ifBlank { "(no startup crash artifact yet)" })
+            appendLine(logcat)
         }
     }
 
-    companion object { private const val FILE_NAME = "botblade-live-log.txt" }
+    companion object {
+        private const val FILE_NAME = "botblade-app-logcat.txt"
+        private const val FIVE_MINUTES_MS = 5 * 60 * 1000L
+    }
 }

@@ -85,3 +85,12 @@ Use `scripts/run-manifest-check.sh` to run Android manifest-processing tasks wit
 ## npm proxy warning mitigation
 
 If npm prints `Unknown env config "http-proxy"`, your shell or CI is exporting a deprecated npm env key. Prefer standard proxy env vars (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) or npm config keys written with underscores (`npm_config_http_proxy`, `npm_config_https_proxy`) to stay compatible with newer npm versions.
+
+
+## ZIP import validator runtime
+
+The current ZIP import security gate uses a Python 3 bridge for archive preflight validation and controlled extraction.
+
+- If `python3` is unavailable, `POST /api/imports/zip` fails closed with `blocked_by_policy` and a structured `ZIP_RUNTIME_UNAVAILABLE` violation.
+- To enable ZIP imports in local/dev environments, ensure `python3` is installed and on `PATH`.
+
