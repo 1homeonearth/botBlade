@@ -62,6 +62,7 @@ export async function createProjectFile(fileService: ProjectFileService, project
   const { content } = parseFileWriteInput(object);
   const overwrite = object.overwrite === true;
   const target = fileService.safePath(projectId, relativePath);
+  assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
   if (!overwrite && await exists(target)) throw conflict("FILE_EXISTS", "File already exists.", relativePath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content, "utf8");
@@ -71,6 +72,7 @@ export async function createProjectFile(fileService: ProjectFileService, project
 export async function createProjectFolder(fileService: ProjectFileService, projectId: string, input: unknown): Promise<{ path: string; created: boolean }> {
   const relativePath = normalizeInputPath(asObject(input).path, "path");
   const target = fileService.safePath(projectId, relativePath);
+  assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
   const existed = await exists(target);
   await fs.mkdir(target, { recursive: true });
   return { path: relativePath, created: !existed };
@@ -82,10 +84,13 @@ export async function renameProjectPath(fileService: ProjectFileService, project
   const toPath = normalizeInputPath(object.toPath, "toPath");
   const from = fileService.safePath(projectId, fromPath);
   const to = fileService.safePath(projectId, toPath);
+  assertNotWorkspaceRoot(fileService, projectId, from, fromPath);
+  assertNotWorkspaceRoot(fileService, projectId, to, toPath);
+  if (from === to) throw conflict("SAME_PATH", "Source and target paths must be different.", toPath);
+  if (to.startsWith(from + path.sep)) throw conflict("DESCENDANT_TARGET", "A path cannot be moved into its own descendant.", toPath);
   if (!await exists(from)) throw notFound(fromPath);
-  if (await exists(to) && object.overwrite !== true) throw conflict("TARGET_EXISTS", "Target path already exists.", toPath);
+  if (await exists(to)) throw conflict("TARGET_EXISTS", "Target path already exists.", toPath);
   await fs.mkdir(path.dirname(to), { recursive: true });
-  if (object.overwrite === true) await fs.rm(to, { recursive: true, force: true });
   await fs.rename(from, to);
   return { fromPath, toPath, moved: true };
 }
@@ -93,8 +98,11 @@ export async function renameProjectPath(fileService: ProjectFileService, project
 export async function deleteProjectPath(fileService: ProjectFileService, projectId: string, relativePathValue: unknown): Promise<{ path: string; deleted: true }> {
   const relativePath = normalizeInputPath(relativePathValue, "path");
   const target = fileService.safePath(projectId, relativePath);
-  if (!await exists(target)) throw notFound(relativePath);
-  await fs.rm(target, { recursive: true, force: true });
+  assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
+  const stat = await fs.stat(target).catch(() => undefined);
+  if (!stat) throw notFound(relativePath);
+  if (!stat.isFile()) throw conflict("DIRECTORY_DELETE_UNSUPPORTED", "Directory deletion is not supported by this editor operation.", relativePath);
+  await fs.rm(target);
   return { path: relativePath, deleted: true };
 }
 
@@ -112,13 +120,27 @@ function asObject(value: unknown): Record<string, unknown> {
 
 function normalizeInputPath(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new RequestValidationError([{ field, message: "Path is required." }]);
-  const normalized = decodeURIComponent(value).replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+  const normalized = maybeDecodePath(value).replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
   if (!normalized || normalized === "." || normalized.includes("\0")) throw new RequestValidationError([{ field, message: "Path is invalid." }]);
   return normalized;
 }
 
+function maybeDecodePath(value: string): string {
+  const trimmed = value.trim();
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
 function normalizeSummaryPath(value: string): string {
   return value.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+}
+
+function assertNotWorkspaceRoot(fileService: ProjectFileService, projectId: string, target: string, originalPath: string): void {
+  const workspace = fileService.resolveWorkspace(projectId).workspace;
+  if (path.resolve(target) === path.resolve(workspace)) throw { statusCode: 400, code: "INVALID_FILE_PATH", message: "Path must reference a file or folder inside the project workspace.", details: { path: originalPath } };
 }
 
 async function exists(filePath: string): Promise<boolean> {
