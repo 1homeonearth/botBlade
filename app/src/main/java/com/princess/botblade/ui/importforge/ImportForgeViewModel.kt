@@ -36,22 +36,24 @@ class ImportForgeViewModel(
         viewModelScope.launch {
             when (val result = importRepository.startImport(ImportStartRequest(sourceType = sourceType, source = source, workspacePath = workspacePath))) {
                 is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(importId = result.value.id)
-                    onBackendState(mapBackendState(result.value.state), result.value.blockedPolicy)
+                    _uiState.value = _uiState.value.copy(importId = result.data.id)
+                    onBackendState(mapBackendState(result.data.state), result.data.blockedPolicy)
                 }
                 is ApiResult.Error -> onBackendState(ImportForgeBackendState.FAILED, result.message)
+                ApiResult.Loading -> Unit
             }
         }
     }
 
-    private fun mapBackendState(raw: String): ImportForgeBackendState = when (raw.uppercase()) {
-        "QUEUED" -> ImportForgeBackendState.QUEUED
-        "SCANNING", "ANALYZING" -> ImportForgeBackendState.ANALYZING
-        "PROFILE_READY" -> ImportForgeBackendState.PROFILE_READY
-        "MISSING_SECRETS" -> ImportForgeBackendState.MISSING_SECRETS
-        "BLOCKED_POLICY" -> ImportForgeBackendState.BLOCKED_POLICY
-        "REPAIR_SUGGESTED" -> ImportForgeBackendState.REPAIR_SUGGESTED
-        "COMPLETED", "COMPLETE" -> ImportForgeBackendState.COMPLETE
+    private fun mapBackendState(raw: String): ImportForgeBackendState = when (raw.trim().lowercase()) {
+        "pending", "queued" -> ImportForgeBackendState.QUEUED
+        "scanning", "detecting", "analyzing" -> ImportForgeBackendState.ANALYZING
+        "profile_ready" -> ImportForgeBackendState.PROFILE_READY
+        "needs_secrets", "missing_secrets" -> ImportForgeBackendState.MISSING_SECRETS
+        "blocked_by_policy", "blocked_policy" -> ImportForgeBackendState.BLOCKED_POLICY
+        "repair_suggested", "blocked" -> ImportForgeBackendState.REPAIR_SUGGESTED
+        "ready", "completed", "complete" -> ImportForgeBackendState.COMPLETE
+        "failed" -> ImportForgeBackendState.FAILED
         else -> ImportForgeBackendState.FAILED
     }
 

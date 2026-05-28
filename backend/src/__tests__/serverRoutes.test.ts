@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 process.env.NODE_ENV = "test";
 process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
@@ -263,4 +265,32 @@ test("zip import route persists import state and includes structured failure det
     assert.equal(typeof response.body.failure.evidence, "string");
     assert.equal(typeof response.body.failure.safeAction, "string");
   }
+});
+
+
+test("project git status route returns safe non-git summary", async () => {
+  const created = await request("POST", "/api/projects", { name: "Git Status Project" });
+  const response = await request("GET", `/api/projects/${created.body.id}/git/status`);
+  assert.equal(response.statusCode, 200);
+  assert.equal(typeof response.body.available, "boolean");
+});
+
+
+
+test("profile route redacts importSource url credentials", async () => {
+  const created = await request("POST", "/api/projects", { name: "Profile Redaction" });
+  const workspace = path.join(process.cwd(), "generated-projects", created.body.id);
+  await fs.mkdir(workspace, { recursive: true });
+  await fs.writeFile(path.join(workspace, "botblade.json"), JSON.stringify({
+    schemaVersion: "1.0.0",
+    generatedBy: "botblade",
+    generatedAt: new Date().toISOString(),
+    project: { importSource: { kind: "git", url: "https://example.com/repo.git?access_token=abc123&expires=1" } },
+    repairCards: []
+  }), "utf8");
+  const response = await request("GET", `/api/projects/${created.body.id}/profile`);
+  assert.equal(response.statusCode, 200);
+  const url = response.body.project.importSource.url as string;
+  assert.equal(url.includes("abc123"), false);
+  assert.equal(url.includes("access_token=[REDACTED]"), true);
 });

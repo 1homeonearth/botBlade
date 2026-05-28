@@ -38,6 +38,9 @@ import com.princess.botblade.data.model.GitHubProjectConfig
 import com.princess.botblade.data.model.GitHubWorkflowResponse
 import com.princess.botblade.data.model.ImportStartRequest
 import com.princess.botblade.data.model.ImportSummary
+import com.princess.botblade.data.model.GitStatusApiSummary
+import com.princess.botblade.data.model.GitRemoteSummary
+import com.princess.botblade.data.model.GitChangedFileSummary
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -85,6 +88,31 @@ class BotBladeApiClient(
                 ?: body.normalizePlainStatus().takeIf { json == null },
             action = json?.optionalString("action") ?: request.action,
             message = json?.optionalString("message") ?: body.takeIf { it.isNotBlank() && json == null },
+        )
+    }
+
+
+    @Throws(IOException::class)
+    fun getProjectGitStatus(projectId: String): GitStatusApiSummary {
+        val json = requireNotNull(request(path = "/api/projects/${projectId.encodedPathSegment()}/git/status", method = "GET").asJsonOrNull()) { "Invalid git status response." }
+        val remotesJson = json.optJSONArray("remotes") ?: JSONArray()
+        val remotes = (0 until remotesJson.length()).map { index ->
+            val remote = remotesJson.getJSONObject(index)
+            GitRemoteSummary(name = remote.optString("name"), url = remote.optionalString("url"))
+        }
+        val changedJson = json.optJSONArray("changedFiles") ?: JSONArray()
+        val changed = (0 until changedJson.length()).map { index ->
+            val file = changedJson.getJSONObject(index)
+            GitChangedFileSummary(path = file.optString("path"), status = file.optString("status"))
+        }
+        return GitStatusApiSummary(
+            available = json.optBoolean("available", false),
+            branch = json.optionalString("branch"),
+            remotes = remotes,
+            clean = json.optBoolean("clean", true),
+            dirtyFileCount = json.optInt("dirtyFileCount", changed.size),
+            changedFiles = changed,
+            note = json.optionalString("note"),
         )
     }
 
@@ -660,10 +688,12 @@ private fun String.toImportSummary(): ImportSummary {
     val json = runCatching { JSONObject(this) }.getOrNull()
         ?: throw IllegalArgumentException("Invalid import response.")
     val import = json.optJSONObject("import") ?: json
+    val profileId = import.optString("profileId").takeIf { it.isNotBlank() }
+    val blockedPolicy = import.optString("blockedPolicy").takeIf { it.isNotBlank() }
     return ImportSummary(
         id = import.optString("id"),
         state = import.optString("state"),
-        profileId = import.optionalString("profileId"),
-        blockedPolicy = import.optionalString("blockedPolicy"),
+        profileId = profileId,
+        blockedPolicy = blockedPolicy,
     )
 }

@@ -83,7 +83,7 @@ android {
             initWith(getByName("debug"))
             applicationIdSuffix = ".ci"
             versionNameSuffix = "-ci"
-            isDebuggable = true
+            isDebuggable = false
             matchingFallbacks += listOf("debug")
         }
         release {

@@ -281,3 +281,24 @@ data class ImportSummary(
     val profileId: String? = null,
     val blockedPolicy: String? = null,
 )
+
+
+data class GitRemoteSummary(
+    val name: String,
+    val url: String? = null,
+)
+
+data class GitChangedFileSummary(
+    val path: String,
+    val status: String,
+)
+
+data class GitStatusApiSummary(
+    val available: Boolean = false,
+    val branch: String? = null,
+    val remotes: List<GitRemoteSummary> = emptyList(),
+    val clean: Boolean = true,
+    val dirtyFileCount: Int = 0,
+    val changedFiles: List<GitChangedFileSummary> = emptyList(),
+    val note: String? = null,
+)

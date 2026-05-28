@@ -63,8 +63,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ci_apk=app/build/outputs/apk/prod/ci/app-prod-ci.apk
-          [[ -f "$ci_apk" ]] || { echo "::error::Missing CI APK: $ci_apk"; exit 1; }
+          ci_apk=$(find app/build/outputs/apk -path '*prod*ci*.apk' | head -1)
+          [[ -n "$ci_apk" && -f "$ci_apk" ]] || { echo "::error::Missing CI APK under app/build/outputs/apk"; exit 1; }
+          echo "CI_APK=$ci_apk"
           sha256sum "$ci_apk"
       - name: Write workflow summary
         shell: bash
@@ -143,7 +144,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/release
-          cp app/build/outputs/apk/prod/ci/app-prod-ci.apk "dist/release/botBlade-ci-v${VERSION}.apk"
+          ci_apk=$(find app/build/outputs/apk -path "*prod*ci*.apk" | head -1)
+          [[ -n "$ci_apk" && -f "$ci_apk" ]] || { echo "::error::Missing CI APK under app/build/outputs/apk"; exit 1; }
+          cp "$ci_apk" "dist/release/botBlade-ci-v${VERSION}.apk"
           (cd dist/release && sha256sum "botBlade-ci-v${VERSION}.apk" > SHA256SUMS.txt)
           {
             echo "## BotBlade ${VERSION} Debug"
