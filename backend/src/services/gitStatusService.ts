@@ -25,7 +25,18 @@ export class GitStatusService {
   async readStatusSafe(workspacePath: string): Promise<GitStatusSummary> {
     try {
       return await this.readStatus(workspacePath);
-    } catch {
+    } catch (error) {
+      if (isEnobufsError(error)) {
+        return {
+          available: true,
+          branch: null,
+          remotes: [],
+          clean: false,
+          dirtyFileCount: 1,
+          changedFiles: [],
+          note: "too many changed files to display",
+        };
+      }
       return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
     }
   }
@@ -61,14 +72,20 @@ export class GitStatusService {
     return stdout.split(/\r?\n/).filter(Boolean).map((line: string) => ({ status: line.slice(0, 2).trim() || "?", path: line.slice(3).trim() }));
   }
 
-  private git(workspacePath: string, args: string[]): string {
+  protected git(workspacePath: string, args: string[]): string {
     return execFileSync("git", [
       "-C", workspacePath,
       "-c", "core.fsmonitor=false",
       "-c", "core.hooksPath=/dev/null",
       ...args,
-    ], { encoding: "utf8" });
+    ], { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 } as any);
   }
+}
+
+function isEnobufsError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  return code.toUpperCase() === "ENOBUFS";
 }
 
 export function redactCredentialUrl(url: string): string {

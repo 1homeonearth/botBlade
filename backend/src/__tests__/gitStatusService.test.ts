@@ -68,3 +68,23 @@ test("git status service does not inherit parent repository metadata", async () 
   assert.equal(status.branch, null);
   assert.equal(status.changedFiles.length, 0);
 });
+
+
+test("git status safe mode reports dirty when git status exceeds buffer", async () => {
+  const workspacePath = "/tmp/workspace";
+  const service = new class extends GitStatusService {
+    protected override git(_workspacePath: string, args: string[]): string {
+      if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return workspacePath;
+      if (args[0] === "status") {
+        const error = new Error("stdout maxBuffer length exceeded") as Error & { code?: string };
+        error.code = "ENOBUFS";
+        throw error;
+      }
+      return "";
+    }
+  }();
+  const status = await service.readStatusSafe(workspacePath);
+  assert.equal(status.available, true);
+  assert.equal(status.clean, false);
+  assert.equal(status.note, "too many changed files to display");
+});
