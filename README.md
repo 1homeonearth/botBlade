@@ -1,7 +1,7 @@
 # BotBlade
 
 <p align="center">
-  <img src="docs/app-icon.svg" alt="BotBlade app icon (neon cyborg forge mark)" width="180" />
+  <img src="docs/app-icon.svg" alt="BotBlade app icon" width="180" />
 </p>
 
 <p align="center">
@@ -84,4 +84,4 @@ BotBlade is production-usable for local workflows and still evolving for hardene
 
 ## App icon note
 
-The Android launcher icon and project icon artwork are the neon cyborg forge mark shown above.
+The Android launcher icon and project icon artwork now use the updated blade, terminator-bot, and glitter-gold WiFi mark shown above.
