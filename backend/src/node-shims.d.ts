@@ -42,6 +42,7 @@ declare module "node:assert/strict" {
   const assert: {
     equal(actual: unknown, expected: unknown, message?: string): void;
     ok(value: unknown, message?: string): void;
+    rejects(fn: () => Promise<unknown>, expected?: RegExp): Promise<void>;
   };
   export default assert;
 }
@@ -67,6 +68,7 @@ declare module "node:fs/promises" {
   export function stat(path: string): Promise<{ size: number; mtime: Date; isFile(): boolean; isDirectory(): boolean }>;
   export function access(path: string): Promise<void>;
   export function rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
+  export function rename(oldPath: string, newPath: string): Promise<void>;
   export interface Dirent { name: string; isDirectory(): boolean; isFile(): boolean; }
 }
 
