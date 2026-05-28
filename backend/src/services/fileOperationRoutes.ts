@@ -13,10 +13,11 @@ export interface FileOperationRouteContext {
   auditService: AuditService;
   readJson(req: IncomingMessage): Promise<unknown>;
   writeJson(res: ServerResponse, statusCode: number, body: unknown): void;
+  authorizeMutation(operation: string): void;
 }
 
 export async function handleFileOperationRoute(req: IncomingMessage, res: ServerResponse, context: FileOperationRouteContext): Promise<boolean> {
-  const { method, projectId, filePath, fileService, auditService, actorId, requestId, readJson, writeJson } = context;
+  const { method, projectId, filePath, fileService, auditService, actorId, requestId, readJson, writeJson, authorizeMutation } = context;
 
   if (method === "GET" && filePath === undefined) {
     const files = await fileService.list(projectId);
@@ -30,12 +31,14 @@ export async function handleFileOperationRoute(req: IncomingMessage, res: Server
   }
 
   if (method === "PUT" && filePath !== undefined) {
+    authorizeMutation("project file writes");
     const { content } = parseFileWriteInput(await readJson(req));
     writeJson(res, 200, await fileService.write(projectId, filePath, content));
     return true;
   }
 
   if (method === "POST" && filePath === undefined) {
+    authorizeMutation("project file create");
     const created = await createProjectFile(fileService, projectId, await readJson(req));
     const audit = auditService.record({ action: "file.create", actorId, projectId, resourceType: "file", resourceId: created.path, metadata: { path: created.path, size: created.size }, requestId });
     writeJson(res, 201, { ...created, auditEventId: audit.id });
@@ -43,6 +46,7 @@ export async function handleFileOperationRoute(req: IncomingMessage, res: Server
   }
 
   if (method === "PATCH" && filePath === undefined) {
+    authorizeMutation("project file rename");
     const renamed = await renameProjectPath(fileService, projectId, await readJson(req));
     const audit = auditService.record({ action: "file.rename", actorId, projectId, resourceType: "file", resourceId: renamed.toPath, metadata: { fromPath: renamed.fromPath, toPath: renamed.toPath }, requestId });
     writeJson(res, 200, { ...renamed, auditEventId: audit.id });
@@ -50,6 +54,7 @@ export async function handleFileOperationRoute(req: IncomingMessage, res: Server
   }
 
   if (method === "DELETE" && filePath === undefined) {
+    authorizeMutation("project file delete");
     const body = await readJson(req) as { path?: unknown };
     const deleted = await deleteProjectPath(fileService, projectId, body.path);
     const audit = auditService.record({ action: "file.delete", actorId, projectId, resourceType: "file", resourceId: deleted.path, metadata: { path: deleted.path }, requestId });
@@ -62,6 +67,7 @@ export async function handleFileOperationRoute(req: IncomingMessage, res: Server
 
 export async function handleFolderOperationRoute(req: IncomingMessage, res: ServerResponse, context: Omit<FileOperationRouteContext, "filePath">): Promise<boolean> {
   if (context.method !== "POST") return false;
+  context.authorizeMutation("project folder writes");
   const result = await createProjectFolder(context.fileService, context.projectId, await context.readJson(req));
   const audit = context.auditService.record({ action: "file.create", actorId: context.actorId, projectId: context.projectId, resourceType: "folder", resourceId: result.path, metadata: { path: result.path, created: result.created }, requestId: context.requestId });
   context.writeJson(res, 201, { ...result, auditEventId: audit.id });
