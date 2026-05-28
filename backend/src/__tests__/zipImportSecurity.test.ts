@@ -35,3 +35,11 @@ test("zip validator rejects symlink metadata deterministically", async () => {
   assert.equal(result.ok, false);
   assert.ok(result.violations.some((v) => v.code === "SYMLINK_ENTRY"));
 });
+
+test("zip validator fails closed with runtime-unavailable violation when python3 is missing", async () => {
+  const zipPath = await materializeFixture("absolute");
+  process.env.PATH = "";
+  const result = await validateZipArchive(zipPath);
+  assert.equal(result.ok, false);
+  assert.ok(result.violations.some((v) => v.code === "ZIP_RUNTIME_UNAVAILABLE"));
+});
