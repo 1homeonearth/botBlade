@@ -22,6 +22,9 @@ export type AuditAction =
   | "runtime.restart"
   | "github.push"
   | "discord.commands.register"
+  | "file.create"
+  | "file.rename"
+  | "file.delete"
   | "import.start"
   | "import.state_transition"
   | "import.failure";
