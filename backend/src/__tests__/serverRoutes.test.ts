@@ -234,3 +234,33 @@ test("invalid request URL returns 400", async () => {
   assert.equal(response.statusCode, 400);
   assert.equal(response.body.error.code, "INVALID_REQUEST_URL");
 });
+
+test("import git route creates ready import record", async () => {
+  const response = await request("POST", "/api/imports/git", { repoUrl: "https://github.com/example/repo.git", workspacePath: "/tmp" });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.body.source.type, "git");
+  assert.ok(["ready", "needs_secrets", "failed"].includes(response.body.state));
+
+  const fetched = await request("GET", `/api/imports/${response.body.id}`);
+  assert.equal(fetched.statusCode, 200);
+  assert.equal(fetched.body.id, response.body.id);
+});
+
+test("folder import route is feature-gated when SAF disabled", async () => {
+  delete process.env.BOTBLADE_SAF_IMPORT_ENABLED;
+  const response = await request("POST", "/api/imports/folder", { folderPath: "/tmp", workspacePath: "/tmp" });
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.error.code, "FEATURE_DISABLED");
+});
+
+test("zip import route persists import state and includes structured failure details when failed", async () => {
+  const response = await request("POST", "/api/imports/zip", { archivePath: "/missing.zip", workspacePath: "/definitely-missing-workspace" });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.body.source.type, "zip");
+  assert.ok(["ready", "needs_secrets", "failed"].includes(response.body.state));
+  if (response.body.state === "failed") {
+    assert.equal(typeof response.body.failure.cause, "string");
+    assert.equal(typeof response.body.failure.evidence, "string");
+    assert.equal(typeof response.body.failure.safeAction, "string");
+  }
+});

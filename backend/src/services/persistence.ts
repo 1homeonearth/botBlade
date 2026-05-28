@@ -5,6 +5,7 @@ import type { DeploymentTarget } from "./deploymentTargets.js";
 import type { BotProject } from "../models/project.js";
 import type { CreateProjectInput, UpdateProjectInput } from "./projectStore.js";
 import type { CreateSecretInput, SecretSummary, UpdateSecretInput } from "./secretStore.js";
+import type { ImportRecord } from "./imports/index.js";
 
 export interface ProjectStorePort {
   list(): BotProject[];
@@ -67,4 +68,10 @@ export interface SecretStorePersistence {
 export interface AuditServicePersistence {
   loadAuditEvents(): AuditEvent[];
   saveAuditEvent(event: AuditEvent): void;
+}
+
+
+export interface ImportStorePersistence {
+  loadImportRecords(): ImportRecord[];
+  saveImportRecord(record: ImportRecord): void;
 }

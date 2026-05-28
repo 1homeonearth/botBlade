@@ -7,12 +7,13 @@ import type { BuildJob } from "../services/buildService.js";
 import type { DeploymentJob } from "../services/deploymentJobs.js";
 import type { DeploymentTarget } from "../services/deploymentTargets.js";
 import type { BotProject } from "../models/project.js";
-import type { AuditServicePersistence, BuildServicePersistence, DeploymentJobStorePersistence, DeploymentTargetStorePersistence, ProjectStorePersistence, SecretRecord, SecretStorePersistence } from "../services/persistence.js";
+import type { ImportRecord } from "../services/imports/index.js";
+import type { AuditServicePersistence, BuildServicePersistence, DeploymentJobStorePersistence, DeploymentTargetStorePersistence, ImportStorePersistence, ProjectStorePersistence, SecretRecord, SecretStorePersistence } from "../services/persistence.js";
 
 const MIGRATION_DIR = fs.existsSync(path.resolve(process.cwd(), "migrations")) ? path.resolve(process.cwd(), "migrations") : path.resolve(process.cwd(), "backend/migrations");
 const DEFAULT_KEY_ID = "local-env";
 
-export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence {
+export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence, ImportStorePersistence {
   private readonly key: Buffer;
 
   constructor(private readonly databasePath: string, secretKey = process.env.BOTBLADE_SECRET_KEY) {
@@ -59,6 +60,9 @@ COMMIT;`);
   deleteDeploymentTarget(id: string): void { this.exec(`DELETE FROM deployment_targets WHERE id=${q(id)};`); }
 
   loadDeploymentJobs(): Array<{ job: DeploymentJob; logs: string }> { return this.rows<{ data_json: string; logs: string }>("SELECT data_json, logs FROM deployment_jobs ORDER BY created_at DESC").map((row) => ({ job: JSON.parse(row.data_json) as DeploymentJob, logs: row.logs })); }
+
+  loadImportRecords(): ImportRecord[] { return this.selectJson<ImportRecord>("SELECT data_json FROM imports ORDER BY updated_at DESC", "data_json"); }
+  saveImportRecord(record: ImportRecord): void { this.exec(`INSERT INTO imports (id, source_type, state, updated_at, data_json) VALUES (${q(record.id)}, ${q(record.source.type)}, ${q(record.state)}, ${q(record.updatedAt)}, ${q(JSON.stringify(record))}) ON CONFLICT(id) DO UPDATE SET source_type=excluded.source_type, state=excluded.state, updated_at=excluded.updated_at, data_json=excluded.data_json;`); }
   saveDeploymentJob(job: DeploymentJob, logs: string): void { this.exec(`INSERT INTO deployment_jobs (id, project_id, target_id, build_id, status, created_at, updated_at, data_json, logs) VALUES (${q(job.deploymentId)}, ${q(job.projectId)}, ${q(job.targetId)}, ${q(job.buildId)}, ${q(job.status)}, ${q(job.createdAt)}, ${q(job.updatedAt)}, ${q(JSON.stringify(job))}, ${q(logs)}) ON CONFLICT(id) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at, data_json=excluded.data_json, logs=excluded.logs;`); }
 
   backup(destinationPath: string): void {
