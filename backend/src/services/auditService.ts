@@ -48,11 +48,28 @@ export interface AuditInput {
   requestId: string;
 }
 
+export interface AuditListOptions {
+  limit?: number;
+}
+
+export interface AuditRetentionOptions {
+  maxEvents?: number;
+  retentionDays?: number;
+}
+
+const DEFAULT_MAX_EVENTS = 5_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export class AuditService implements AuditServicePort {
   private readonly events: AuditEvent[] = [];
+  private readonly maxEvents: number;
+  private readonly retentionDays?: number;
 
-  constructor(private readonly persistence?: AuditServicePersistence) {
+  constructor(private readonly persistence?: AuditServicePersistence, options: AuditRetentionOptions = {}) {
+    this.maxEvents = positiveInteger(options.maxEvents) ?? DEFAULT_MAX_EVENTS;
+    this.retentionDays = positiveInteger(options.retentionDays);
     this.events.push(...(persistence?.loadAuditEvents() ?? []));
+    this.enforceRetention();
   }
 
   record(input: AuditInput): AuditEvent {
@@ -68,15 +85,37 @@ export class AuditService implements AuditServicePort {
       requestId: input.requestId,
     };
     this.events.unshift(event);
+    this.enforceRetention();
     this.persistence?.saveAuditEvent(event);
     return event;
   }
 
-  list(projectId?: string): AuditEvent[] {
-    return this.events.filter((event) => projectId === undefined || event.projectId === projectId);
+  list(projectId?: string, options: AuditListOptions = {}): AuditEvent[] {
+    const limit = positiveInteger(options.limit);
+    const events = this.events.filter((event) => projectId === undefined || event.projectId === projectId);
+    return limit === undefined ? events : events.slice(0, limit);
+  }
+
+  private enforceRetention(): void {
+    const beforeIds = new Set(this.events.map((event) => event.id));
+    const cutoff = this.retentionDays === undefined ? undefined : Date.now() - this.retentionDays * DAY_MS;
+    if (cutoff !== undefined) {
+      for (let index = this.events.length - 1; index >= 0; index -= 1) {
+        const createdAt = Date.parse(this.events[index].createdAt);
+        if (!Number.isFinite(createdAt) || createdAt < cutoff) this.events.splice(index, 1);
+      }
+    }
+    if (this.events.length > this.maxEvents) this.events.splice(this.maxEvents);
+    const afterIds = new Set(this.events.map((event) => event.id));
+    const pruned = [...beforeIds].some((id) => !afterIds.has(id));
+    if (pruned) this.persistence?.pruneAuditEvents?.(this.events.map((event) => event.id));
   }
 }
 
 export function redactMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(redactSecrets(JSON.stringify(metadata))) as Record<string, unknown>;
+}
+
+function positiveInteger(value: number | undefined): number | undefined {
+  return Number.isInteger(value) && value !== undefined && value > 0 ? value : undefined;
 }

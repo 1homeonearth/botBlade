@@ -13,6 +13,14 @@ import type { AuditServicePersistence, BuildServicePersistence, DeploymentJobSto
 const MIGRATION_DIR = fs.existsSync(path.resolve(process.cwd(), "migrations")) ? path.resolve(process.cwd(), "migrations") : path.resolve(process.cwd(), "backend/migrations");
 const DEFAULT_KEY_ID = "local-env";
 
+export interface SqlitePersistenceDiagnostics {
+  adapter: "sqlite";
+  databasePath: string;
+  migrationDir: string;
+  appliedMigrations: string[];
+  tableCounts: Record<string, number>;
+}
+
 export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence, ImportStorePersistence {
   private readonly key: Buffer;
 
@@ -30,6 +38,17 @@ export class SqlitePersistence implements ProjectStorePersistence, SecretStorePe
     }
     if (!url.startsWith("sqlite://")) return undefined;
     return new SqlitePersistence(path.resolve(url.slice("sqlite://".length)));
+  }
+
+  diagnostics(): SqlitePersistenceDiagnostics {
+    const tables = ["projects", "secret_metadata", "audit_events", "build_jobs", "deployment_targets", "deployment_jobs", "imports"];
+    return {
+      adapter: "sqlite",
+      databasePath: this.databasePath,
+      migrationDir: MIGRATION_DIR,
+      appliedMigrations: this.rows<{ version: string }>("SELECT version FROM schema_migrations ORDER BY version").map((row) => row.version),
+      tableCounts: Object.fromEntries(tables.map((table) => [table, this.countRows(table)])),
+    };
   }
 
   loadProjects(): BotProject[] { return this.selectJson<BotProject>("SELECT data_json FROM projects ORDER BY updated_at DESC", "data_json"); }
@@ -51,6 +70,13 @@ COMMIT;`);
 
   loadAuditEvents(): AuditEvent[] { return this.selectJson<AuditEvent>("SELECT data_json FROM audit_events ORDER BY created_at DESC", "data_json"); }
   saveAuditEvent(event: AuditEvent): void { this.exec(`INSERT INTO audit_events (id, project_id, action, created_at, data_json) VALUES (${q(event.id)}, ${q(event.projectId)}, ${q(event.action)}, ${q(event.createdAt)}, ${q(JSON.stringify(event))}) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id, action=excluded.action, created_at=excluded.created_at, data_json=excluded.data_json;`); }
+  pruneAuditEvents(keepIds: string[]): void {
+    if (keepIds.length === 0) {
+      this.exec("DELETE FROM audit_events;");
+      return;
+    }
+    this.exec(`DELETE FROM audit_events WHERE id NOT IN (${keepIds.map(q).join(", ")});`);
+  }
 
   loadBuildJobs(): Array<{ job: BuildJob; logs: string }> { return this.rows<{ data_json: string; logs: string }>("SELECT data_json, logs FROM build_jobs ORDER BY started_at DESC").map((row) => ({ job: JSON.parse(row.data_json) as BuildJob, logs: row.logs })); }
   saveBuildJob(job: BuildJob, logs: string): void { this.exec(`INSERT INTO build_jobs (id, project_id, status, started_at, finished_at, data_json, logs) VALUES (${q(job.buildId)}, ${q(job.projectId)}, ${q(job.status)}, ${q(job.startedAt)}, ${q(job.finishedAt)}, ${q(JSON.stringify(job))}, ${q(logs)}) ON CONFLICT(id) DO UPDATE SET status=excluded.status, finished_at=excluded.finished_at, data_json=excluded.data_json, logs=excluded.logs;`); }
@@ -83,6 +109,7 @@ COMMIT;`);
   }
 
   private selectJson<T>(sql: string, field: string): T[] { return this.rows<Record<string, string>>(sql).map((row) => JSON.parse(row[field]) as T); }
+  private countRows(table: string): number { return this.rows<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table};`)[0]?.count ?? 0; }
   private rows<T>(sql: string): T[] {
     const output = execFileSync("sqlite3", ["-json", this.databasePath, sql], { encoding: "utf8" }).trim();
     return output ? JSON.parse(output) as T[] : [];

@@ -68,8 +68,8 @@ export interface SecretStorePersistence {
 export interface AuditServicePersistence {
   loadAuditEvents(): AuditEvent[];
   saveAuditEvent(event: AuditEvent): void;
+  pruneAuditEvents?(keepIds: string[]): void;
 }
-
 
 export interface ImportStorePersistence {
   loadImportRecords(): ImportRecord[];

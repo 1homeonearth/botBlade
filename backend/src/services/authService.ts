@@ -15,6 +15,9 @@ interface AuthCredential {
   roles: string[];
   projectIds: string[];
   authMethod?: "bearer" | "session";
+  createdAt?: string;
+  expiresAt?: string;
+  revokedAt?: string;
 }
 
 const GLOBAL_PROJECT = "*";
@@ -92,7 +95,7 @@ function firstHeaderValue(value: string | string[] | undefined): string | undefi
   return undefined;
 }
 function configuredCredentials(): AuthCredential[] {
-  const credentials = [...parseJsonCredentials(process.env.BOTBLADE_AUTH_TOKENS, "bearer"), ...parseJsonCredentials(process.env.BOTBLADE_SESSION_TOKENS, "session")];
+  const credentials = [...parseJsonCredentials(process.env.BOTBLADE_AUTH_TOKENS, "bearer"), ...parseJsonCredentials(process.env.BOTBLADE_SESSION_TOKENS, "session")].filter(isCredentialActive);
   ensureUniqueTokenIds(credentials);
   if (credentials.length > 0) return credentials;
   if (process.env.BOTBLADE_LOCAL_DEV !== "true") return [];
@@ -124,7 +127,17 @@ function normalizeCredential(value: unknown, index: number, authMethod: "bearer"
     roles: stringArray(record.roles),
     projectIds: stringArray(record.projectIds).length > 0 ? stringArray(record.projectIds) : [GLOBAL_PROJECT],
     authMethod,
+    createdAt: typeof record.createdAt === "string" && record.createdAt.trim() ? record.createdAt.trim() : undefined,
+    expiresAt: typeof record.expiresAt === "string" && record.expiresAt.trim() ? record.expiresAt.trim() : undefined,
+    revokedAt: typeof record.revokedAt === "string" && record.revokedAt.trim() ? record.revokedAt.trim() : undefined,
   }];
+}
+
+function isCredentialActive(credential: AuthCredential): boolean {
+  if (credential.revokedAt) return false;
+  if (!credential.expiresAt) return true;
+  const expiresAt = Date.parse(credential.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt > Date.now();
 }
 
 function stringArray(value: unknown): string[] {
