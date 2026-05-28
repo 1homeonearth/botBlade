@@ -53,13 +53,19 @@ cd backend
 npm install
 npm run preflight:node
 npm run build
-BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) npm start
+BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) PORT=8000 HOST=127.0.0.1 npm start
 ```
 
 Health check:
 
 ```bash
 curl http://localhost:8000/api/health
+```
+
+For LAN testing from a physical device, bind to all interfaces explicitly:
+
+```bash
+BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) PORT=8000 HOST=0.0.0.0 npm start
 ```
 
 ## Project docs
