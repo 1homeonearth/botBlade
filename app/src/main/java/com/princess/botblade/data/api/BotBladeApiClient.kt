@@ -688,10 +688,12 @@ private fun String.toImportSummary(): ImportSummary {
     val json = runCatching { JSONObject(this) }.getOrNull()
         ?: throw IllegalArgumentException("Invalid import response.")
     val import = json.optJSONObject("import") ?: json
+    val profileId = import.optString("profileId").takeIf { it.isNotBlank() }
+    val blockedPolicy = import.optString("blockedPolicy").takeIf { it.isNotBlank() }
     return ImportSummary(
         id = import.optString("id"),
         state = import.optString("state"),
-        profileId = import.optionalString("profileId"),
-        blockedPolicy = import.optionalString("blockedPolicy"),
+        profileId = profileId,
+        blockedPolicy = blockedPolicy,
     )
 }
