@@ -59,19 +59,20 @@ export function buildProjectTree(files: ProjectFileSummary[]): ProjectTreeNode[]
 export async function createProjectFile(fileService: ProjectFileService, projectId: string, input: unknown): Promise<ProjectFileSummary> {
   const object = asObject(input);
   const relativePath = normalizeInputPath(object.path, "path");
+  const servicePath = encodeForProjectFileService(relativePath);
   const { content } = parseFileWriteInput(object);
   const overwrite = object.overwrite === true;
-  const target = fileService.safePath(projectId, relativePath);
+  const target = fileService.safePath(projectId, servicePath);
   assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
   if (!overwrite && await exists(target)) throw conflict("FILE_EXISTS", "File already exists.", relativePath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content, "utf8");
-  return fileService.read(projectId, relativePath);
+  return fileService.read(projectId, servicePath);
 }
 
 export async function createProjectFolder(fileService: ProjectFileService, projectId: string, input: unknown): Promise<{ path: string; created: boolean }> {
   const relativePath = normalizeInputPath(asObject(input).path, "path");
-  const target = fileService.safePath(projectId, relativePath);
+  const target = fileService.safePath(projectId, encodeForProjectFileService(relativePath));
   assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
   const existed = await exists(target);
   await fs.mkdir(target, { recursive: true });
@@ -82,8 +83,8 @@ export async function renameProjectPath(fileService: ProjectFileService, project
   const object = asObject(input);
   const fromPath = normalizeInputPath(object.fromPath, "fromPath");
   const toPath = normalizeInputPath(object.toPath, "toPath");
-  const from = fileService.safePath(projectId, fromPath);
-  const to = fileService.safePath(projectId, toPath);
+  const from = fileService.safePath(projectId, encodeForProjectFileService(fromPath));
+  const to = fileService.safePath(projectId, encodeForProjectFileService(toPath));
   assertNotWorkspaceRoot(fileService, projectId, from, fromPath);
   assertNotWorkspaceRoot(fileService, projectId, to, toPath);
   if (from === to) throw conflict("SAME_PATH", "Source and target paths must be different.", toPath);
@@ -97,7 +98,7 @@ export async function renameProjectPath(fileService: ProjectFileService, project
 
 export async function deleteProjectPath(fileService: ProjectFileService, projectId: string, relativePathValue: unknown): Promise<{ path: string; deleted: true }> {
   const relativePath = normalizeInputPath(relativePathValue, "path");
-  const target = fileService.safePath(projectId, relativePath);
+  const target = fileService.safePath(projectId, encodeForProjectFileService(relativePath));
   assertNotWorkspaceRoot(fileService, projectId, target, relativePath);
   const stat = await fs.stat(target).catch(() => undefined);
   if (!stat) throw notFound(relativePath);
@@ -121,7 +122,7 @@ function asObject(value: unknown): Record<string, unknown> {
 function normalizeInputPath(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new RequestValidationError([{ field, message: "Path is required." }]);
   const normalized = maybeDecodePath(value).replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
-  if (!normalized || normalized === "." || normalized.includes("\0")) throw new RequestValidationError([{ field, message: "Path is invalid." }]);
+  if (!normalized || normalized.includes("\0")) throw new RequestValidationError([{ field, message: "Path is invalid." }]);
   return normalized;
 }
 
@@ -141,6 +142,10 @@ function maybeDecodePath(value: string): string {
 
 function normalizeSummaryPath(value: string): string {
   return value.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+}
+
+function encodeForProjectFileService(relativePath: string): string {
+  return relativePath.split("/").map((segment) => encodeURIComponent(segment)).join("/");
 }
 
 function assertNotWorkspaceRoot(fileService: ProjectFileService, projectId: string, target: string, originalPath: string): void {
