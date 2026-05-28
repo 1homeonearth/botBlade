@@ -194,6 +194,93 @@ test("project PATCH preserves omitted nested config fields", async () => {
   assert.equal(githubPatched.body.github.lastPushedAt, "2026-05-01T00:00:00.000Z");
 });
 
+
+test("file operation routes enforce auth and expose tree", async () => {
+  const created = await request("POST", "/api/projects", { name: "File Route Auth" });
+  const projectId = created.body.id as string;
+
+  const unauthenticated = await request("GET", `/api/projects/${projectId}/files`, undefined, { unauthenticated: true });
+  assert.equal(unauthenticated.statusCode, 401);
+  assert.equal(unauthenticated.body.error.code, "AUTHENTICATION_REQUIRED");
+
+  process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
+    { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
+    { token: "read-token-0001", actorId: "read_user", roles: ["member"], projectIds: [projectId] },
+    { token: "exec-token-0001", actorId: "exec_user", roles: ["execute"], projectIds: [projectId] },
+  ]);
+
+  const deniedCreate = await request("POST", `/api/projects/${projectId}/files`, { path: "src/blocked.txt", content: "blocked" }, { token: "read-token-0001" });
+  assert.equal(deniedCreate.statusCode, 403);
+  assert.equal(deniedCreate.body.error.code, "EXECUTION_ACCESS_DENIED");
+
+  const createdFolder = await request("POST", `/api/projects/${projectId}/folders`, { path: "src/routes" }, { token: "exec-token-0001" });
+  assert.equal(createdFolder.statusCode, 201);
+  assert.equal(createdFolder.body.path, "src/routes");
+  assert.equal(createdFolder.body.created, true);
+  assert.equal(typeof createdFolder.body.auditEventId, "string");
+
+  const createdFile = await request("POST", `/api/projects/${projectId}/files`, { path: "src/routes/hello.ts", content: "export const hello = 'world';\n" }, { token: "exec-token-0001" });
+  assert.equal(createdFile.statusCode, 201);
+  assert.equal(createdFile.body.path, "src/routes/hello.ts");
+  assert.equal(typeof createdFile.body.auditEventId, "string");
+
+  const read = await request("GET", `/api/projects/${projectId}/files/src/routes/hello.ts`, undefined, { token: "read-token-0001" });
+  assert.equal(read.statusCode, 200);
+  assert.equal(read.body.content, "export const hello = 'world';\n");
+
+  const deniedWrite = await request("PUT", `/api/projects/${projectId}/files/src/routes/hello.ts`, { content: "blocked" }, { token: "read-token-0001" });
+  assert.equal(deniedWrite.statusCode, 403);
+  assert.equal(deniedWrite.body.error.code, "EXECUTION_ACCESS_DENIED");
+
+  const written = await request("PUT", `/api/projects/${projectId}/files/src/routes/hello.ts`, { content: "export const hello = 'again';\n" }, { token: "exec-token-0001" });
+  assert.equal(written.statusCode, 200);
+  assert.equal(written.body.content, "export const hello = 'again';\n");
+
+  const files = await request("GET", `/api/projects/${projectId}/files`, undefined, { token: "read-token-0001" });
+  assert.equal(files.statusCode, 200);
+  assert.ok(Array.isArray(files.body.files));
+  assert.ok(Array.isArray(files.body.tree));
+  assert.ok(files.body.files.some((file: { path: string }) => file.path === "src/routes/hello.ts"));
+  assert.ok(files.body.tree.some((node: { name: string; type: string }) => node.name === "src" && node.type === "directory"));
+});
+
+test("file operation routes allow execute actors to rename and delete", async () => {
+  const created = await request("POST", "/api/projects", { name: "File Route Mutations" });
+  const projectId = created.body.id as string;
+  process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
+    { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
+    { token: "read-token-0002", actorId: "read_user", roles: ["member"], projectIds: [projectId] },
+    { token: "exec-token-0002", actorId: "exec_user", roles: ["execute"], projectIds: [projectId] },
+  ]);
+
+  const createdFile = await request("POST", `/api/projects/${projectId}/files`, { path: "notes/todo.txt", content: "todo\n" }, { token: "exec-token-0002" });
+  assert.equal(createdFile.statusCode, 201);
+
+  const deniedRename = await request("PATCH", `/api/projects/${projectId}/files`, { fromPath: "notes/todo.txt", toPath: "notes/done.txt" }, { token: "read-token-0002" });
+  assert.equal(deniedRename.statusCode, 403);
+  assert.equal(deniedRename.body.error.code, "EXECUTION_ACCESS_DENIED");
+
+  const renamed = await request("PATCH", `/api/projects/${projectId}/files`, { fromPath: "notes/todo.txt", toPath: "notes/done.txt" }, { token: "exec-token-0002" });
+  assert.equal(renamed.statusCode, 200);
+  assert.equal(renamed.body.fromPath, "notes/todo.txt");
+  assert.equal(renamed.body.toPath, "notes/done.txt");
+  assert.equal(typeof renamed.body.auditEventId, "string");
+
+  const deniedDelete = await request("DELETE", `/api/projects/${projectId}/files`, { path: "notes/done.txt" }, { token: "read-token-0002" });
+  assert.equal(deniedDelete.statusCode, 403);
+  assert.equal(deniedDelete.body.error.code, "EXECUTION_ACCESS_DENIED");
+
+  const deleted = await request("DELETE", `/api/projects/${projectId}/files`, { path: "notes/done.txt" }, { token: "exec-token-0002" });
+  assert.equal(deleted.statusCode, 200);
+  assert.equal(deleted.body.path, "notes/done.txt");
+  assert.equal(deleted.body.deleted, true);
+  assert.equal(typeof deleted.body.auditEventId, "string");
+
+  const missing = await request("GET", `/api/projects/${projectId}/files/notes/done.txt`, undefined, { token: "exec-token-0002" });
+  assert.equal(missing.statusCode, 404);
+  assert.equal(missing.body.error.code, "FILE_NOT_FOUND");
+});
+
 test("secret create/rotate/delete audit and never return secret value", async () => {
   const secretValue = "test-secret-value-route-audit";
   const created = await request("POST", "/api/secrets", { name: "Discord", type: "discord_bot_token", value: secretValue });
