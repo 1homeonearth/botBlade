@@ -13,7 +13,8 @@ import { DeploymentTargetStore, deploymentTargetWithCapabilities, testDeployment
 import { GitHubIntegrationService } from "./services/githubIntegration.js";
 import { GitStatusService, redactCredentialUrl } from "./services/gitStatusService.js";
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
-import { ProjectFileService, parseFileWriteInput } from "./services/projectFiles.js";
+import { handleFileOperationRoute, handleFolderOperationRoute } from "./services/fileOperationRoutes.js";
+import { ProjectFileService } from "./services/projectFiles.js";
 import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUpdateProjectInput, ProjectStore, RequestValidationError } from "./services/projectStore.js";
 import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
@@ -220,9 +221,37 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
-    if (method === "GET" && filePath === undefined) return writeJson(res, 200, { files: await fileService.list(projectId) });
-    if (method === "GET" && filePath !== undefined) return writeJson(res, 200, await fileService.read(projectId, filePath));
-    if (method === "PUT" && filePath !== undefined) { assertExecutionAccess(actor, "project file writes"); return writeJson(res, 200, await fileService.write(projectId, filePath, parseFileWriteInput(await readJson(req)).content)); }
+    if (await handleFileOperationRoute(req, res, {
+      method,
+      projectId,
+      filePath,
+      actorId: actor.id,
+      requestId,
+      fileService,
+      auditService,
+      readJson,
+      writeJson,
+      authorizeMutation: (operation) => assertExecutionAccess(actor, operation),
+    })) return;
+  }
+
+  const folderMatch = path.match(/^\/api\/projects\/([^/]+)\/folders$/);
+  if (folderMatch) {
+    const [, projectId] = folderMatch;
+    assertProjectAccess(actor, projectId);
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (await handleFolderOperationRoute(req, res, {
+      method,
+      projectId,
+      actorId: actor.id,
+      requestId,
+      fileService,
+      auditService,
+      readJson,
+      writeJson,
+      authorizeMutation: (operation) => assertExecutionAccess(actor, operation),
+    })) return;
   }
 
   const buildMatch = path.match(/^\/api\/projects\/([^/]+)\/builds(?:\/([^/]+)(?:\/(logs))?)?$/);
