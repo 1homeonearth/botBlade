@@ -3,7 +3,7 @@ package com.princess.botblade.data.api
 import com.princess.botblade.BuildConfig
 
 object BackendConfig {
-    const val localUrl: String = "http://127.0.0.1:7432"
+    const val localUrl: String = BuildConfig.API_BASE_URL
     const val remoteUrl: String = ""
 
     val baseUrl: String

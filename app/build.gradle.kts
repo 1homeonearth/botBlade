@@ -67,7 +67,7 @@ android {
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${providers.gradleProperty("PROD_API_BASE_URL").orNull ?: "http://127.0.0.1:7432"}\"",
+                "\"${providers.gradleProperty("PROD_API_BASE_URL").orNull ?: "http://127.0.0.1:8000"}\"",
             )
             buildConfigField("boolean", "USE_REMOTE_BACKEND", "false")
         }
