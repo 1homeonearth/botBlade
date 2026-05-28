@@ -4,27 +4,19 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +25,13 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.princess.botblade.MainActivity
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.components.BladeButton
+import com.princess.botblade.ui.components.BotBladeTokens
+import com.princess.botblade.ui.components.FlowLane
+import com.princess.botblade.ui.components.SectionTitle
+import com.princess.botblade.ui.components.StatusChip
+import com.princess.botblade.ui.components.StatusTone
+import com.princess.botblade.ui.components.WorkstationCard
 import com.princess.botblade.ui.shell.BotBladeDestination
 import com.princess.botblade.ui.theme.BotBladeTheme
 import com.princess.botblade.ui.theme.isDynamicColorEnabled
@@ -138,128 +137,103 @@ private fun DashboardScreen(
     val uptime = (SystemClock.elapsedRealtime() - started) / 1000
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(BotBlack).padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BotBladeTokens.Black)
+            .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Text("BotBlade", color = BabyBlue, fontWeight = FontWeight.Bold)
-                Text("Command Center", color = HotPink, fontWeight = FontWeight.Bold)
+                Text("BotBlade", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                Text("Command Center", color = BotBladeTokens.HotPink, fontWeight = FontWeight.Bold)
             }
-            Text("Build, run, and release bots from one Android workstation.", color = Muted, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                "Build, run, and release bots from one Android workstation.",
+                color = BotBladeTokens.Muted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
 
         item {
-            WorkstationCard(accent = HotPink) {
-                Text("Active workspace", color = BabyBlue, fontWeight = FontWeight.Bold)
-                Text("Runtime: $runtimeState • uptime ${uptime}s", color = Muted, modifier = Modifier.padding(top = 8.dp))
+            WorkstationCard(accent = BotBladeTokens.HotPink) {
+                Text("Active workspace", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                Text(
+                    "Runtime: $runtimeState • uptime ${uptime}s",
+                    color = BotBladeTokens.Muted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 18.dp)) {
-                    StatusChip("Backend", if (runtimeState == "unknown") Muted else Success)
-                    StatusChip("Runtime", if (controls.running) Success else Warning)
-                    StatusChip("Logs", BabyBlue)
+                    StatusChip("Backend", if (runtimeState == "unknown") StatusTone.Neutral else StatusTone.Success)
+                    StatusChip("Runtime", if (controls.running) StatusTone.Success else StatusTone.Warning)
+                    StatusChip("Logs", StatusTone.Info)
                 }
             }
         }
 
         item {
-            WorkstationCard(accent = BabyBlue) {
-                Text("Working order", color = BabyBlue, fontWeight = FontWeight.Bold)
-                Text("Start with a project. Prepare it in Editor and Vault. Build and run it. Use Ops Deck to deploy and inspect release readiness.", color = Muted, modifier = Modifier.padding(top = 8.dp))
+            WorkstationCard(accent = BotBladeTokens.BabyBlue) {
+                Text("Working order", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                Text(
+                    "Start with a project. Prepare it in Editor and Vault. Build and run it. Use Ops Deck to deploy and inspect release readiness.",
+                    color = BotBladeTokens.Muted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         }
 
         item {
-            FlowLane("Start", "Create a starter bot, import work, or open an existing workspace.", HotPink) {
-                Button(onClick = onCreateProject, modifier = Modifier.weight(1f)) { Text("Create / Import") }
+            FlowLane("Start", "Create a starter bot, import work, or open an existing workspace.", BotBladeTokens.HotPink) {
+                BladeButton("Create / Import", onClick = onCreateProject, modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = onOpenProjects, modifier = Modifier.weight(1f)) { Text("Projects") }
             }
         }
 
         item {
-            FlowLane("Prepare", "Scan the project, edit files, and add required secrets.", BabyBlue) {
-                Button(onClick = onOpenEditor, modifier = Modifier.weight(1f)) { Text("Scan + Edit") }
+            FlowLane("Prepare", "Scan the project, edit files, and add required secrets.", BotBladeTokens.BabyBlue) {
+                BladeButton("Scan + Edit", onClick = onOpenEditor, modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("Vault") }
             }
         }
 
         item {
-            FlowLane("Build & Run", "Build from Editor, then control runtime and inspect logs.", HotPink) {
-                Button(onClick = onOpenBuild, modifier = Modifier.weight(1f)) { Text("Builds") }
+            FlowLane("Build & Run", "Build from Editor, then control runtime and inspect logs.", BotBladeTokens.HotPink) {
+                BladeButton("Builds", onClick = onOpenBuild, modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f)) { Text("Run") }
             }
         }
 
         item {
-            FlowLane("Deploy", "Create targets, deploy the latest successful build, and inspect release readiness.", BabyBlue) {
-                Button(onClick = onOpenOps, modifier = Modifier.weight(1f)) { Text("Ops Deck") }
+            FlowLane("Deploy", "Create targets, deploy the latest successful build, and inspect release readiness.", BotBladeTokens.BabyBlue) {
+                BladeButton("Ops Deck", onClick = onOpenOps, modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("Settings") }
             }
         }
 
         item {
-            WorkstationCard(accent = HotPink) {
-                Text("Runtime console", color = BabyBlue, fontWeight = FontWeight.Bold)
+            WorkstationCard(accent = BotBladeTokens.HotPink) {
+                Text("Runtime console", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
-                    Button(onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f)) { Text("Start") }
-                    Button(onClick = vm::stop, enabled = controls.canStop, modifier = Modifier.weight(1f)) { Text("Stop") }
-                    Button(onClick = vm::restart, enabled = controls.canRestart, modifier = Modifier.weight(1f)) { Text("Restart") }
+                    BladeButton("Start", onClick = vm::start, enabled = controls.canStart, modifier = Modifier.weight(1f))
+                    BladeButton("Stop", onClick = vm::stop, enabled = controls.canStop, modifier = Modifier.weight(1f))
+                    BladeButton("Restart", onClick = vm::restart, enabled = controls.canRestart, modifier = Modifier.weight(1f))
                 }
-                Button(onClick = onLogs, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Open Logs") }
+                BladeButton("Open Logs", onClick = onLogs, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             }
         }
 
         if (logs.isNotEmpty()) {
-            item { Text("Live logs", color = HotPink, fontWeight = FontWeight.Bold) }
+            item { SectionTitle("Live logs") }
             items(logs.takeLast(25)) { line ->
-                Text(line, color = Success, modifier = Modifier.fillMaxWidth().background(Ink).padding(8.dp))
+                Text(
+                    line,
+                    color = BotBladeTokens.Success,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BotBladeTokens.Ink)
+                        .padding(8.dp),
+                )
             }
         }
     }
 }
-
-@Composable
-private fun FlowLane(
-    title: String,
-    detail: String,
-    accent: Color,
-    buttons: @Composable RowScope.() -> Unit,
-) {
-    WorkstationCard(accent = accent) {
-        Text(title, color = BabyBlue, fontWeight = FontWeight.Bold)
-        Text(detail, color = Muted, modifier = Modifier.padding(top = 8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
-            buttons()
-        }
-    }
-}
-
-@Composable
-private fun WorkstationCard(accent: Color, content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        color = Panel,
-        shape = RoundedCornerShape(22.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, Stroke, RoundedCornerShape(22.dp)),
-    ) {
-        Row {
-            Surface(color = accent, modifier = Modifier.fillMaxWidth(0.02f)) {}
-            Column(modifier = Modifier.padding(22.dp), content = content)
-        }
-    }
-}
-
-@Composable
-private fun StatusChip(label: String, color: Color) {
-    Surface(color = Ink, shape = RoundedCornerShape(18.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Stroke)) {
-        Text(label, color = color, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-    }
-}
-
-private val BotBlack = Color(0xFF05060A)
-private val Ink = Color(0xFF090B12)
-private val Panel = Color(0xFF101522)
-private val Stroke = Color(0xFF2F405F)
-private val BabyBlue = Color(0xFF8FD8FF)
-private val HotPink = Color(0xFFFF3EA5)
-private val Muted = Color(0xFFAAB8CC)
-private val Success = Color(0xFF7CFFB2)
-private val Warning = Color(0xFFFFD166)
