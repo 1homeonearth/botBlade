@@ -26,7 +26,7 @@ import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorFragment
 import com.princess.botblade.ui.logs.LogsFragment
-import com.princess.botblade.ui.projects.ProjectsFragment
+import com.princess.botblade.ui.importforge.ImportForgeFragment
 import com.princess.botblade.ui.settings.SettingsFragment
 
 class MainActivity : AppCompatActivity() {
@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
         bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.navigation_dashboard -> showFragmentSafely { DashboardFragment() }
-                R.id.navigation_projects -> showFragmentSafely { ProjectsFragment() }
+                R.id.navigation_projects -> showFragmentSafely { ImportForgeFragment() }
                 R.id.navigation_editor -> showFragmentSafely { CodeEditorFragment() }
                 R.id.navigation_deployments -> showFragmentSafely { DeploymentsFragment.newInstance() }
                 R.id.navigation_settings -> showFragmentSafely { SettingsFragment() }

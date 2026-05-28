@@ -36,6 +36,8 @@ import com.princess.botblade.data.model.GitHubConnectRequest
 import com.princess.botblade.data.model.GitHubLinkRepoRequest
 import com.princess.botblade.data.model.GitHubProjectConfig
 import com.princess.botblade.data.model.GitHubWorkflowResponse
+import com.princess.botblade.data.model.ImportStartRequest
+import com.princess.botblade.data.model.ImportSummary
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -280,6 +282,35 @@ class BotBladeApiClient(
         request(path = "/api/projects/${projectId.encodedPathSegment()}/scan", method = "POST", requestBody = "{}").toProjectScanResponse()
 
     @Throws(IOException::class)
+    fun startImport(request: ImportStartRequest): ImportSummary = when (request.sourceType.lowercase()) {
+        "git" -> {
+            val payload = JSONObject()
+                .put("repoUrl", request.source)
+                .put("workspacePath", request.workspacePath)
+                .toString()
+            this.request(path = "/api/imports/git", method = "POST", requestBody = payload).toImportSummary()
+        }
+        "zip" -> {
+            val payload = JSONObject()
+                .put("archivePath", request.source)
+                .put("workspacePath", request.workspacePath)
+                .toString()
+            this.request(path = "/api/imports/zip", method = "POST", requestBody = payload).toImportSummary()
+        }
+        "folder" -> {
+            val payload = JSONObject()
+                .put("folderPath", request.source)
+                .put("workspacePath", request.workspacePath)
+                .toString()
+            this.request(path = "/api/imports/folder", method = "POST", requestBody = payload).toImportSummary()
+        }
+        else -> throw IOException("Unsupported import source type: ${request.sourceType}")
+    }
+
+    @Throws(IOException::class)
+    fun getImport(importId: String): ImportSummary =
+        request(path = "/api/imports/${importId.encodedPathSegment()}", method = "GET").toImportSummary()
+
     fun listDeploymentTargets(): List<DeploymentTargetSummary> {
         val body = request(path = "/api/deployment-targets", method = "GET")
         val targets = requireNotNull(body.asJsonOrNull()) { "Invalid deployment targets response." }.optJSONArray("targets") ?: JSONArray()
@@ -622,4 +653,17 @@ class BotBladeApiClient(
     } finally {
         disconnect()
     }
+}
+
+
+private fun String.toImportSummary(): ImportSummary {
+    val json = runCatching { JSONObject(this) }.getOrNull()
+        ?: throw IllegalArgumentException("Invalid import response.")
+    val import = json.optJSONObject("import") ?: json
+    return ImportSummary(
+        id = import.optString("id"),
+        state = import.optString("state"),
+        profileId = import.optionalString("profileId"),
+        blockedPolicy = import.optionalString("blockedPolicy"),
+    )
 }

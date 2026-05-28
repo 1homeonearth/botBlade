@@ -163,4 +163,16 @@ Repository: %3$s</string>
     <string name="apk_download_links"><![CDATA[Download latest debug APK: <a href="https://github.com/%1$s/releases/latest/download/botBlade-debug.apk">botBlade-debug.apk</a>
 Download latest unsigned release APK: <a href="https://github.com/%1$s/releases/latest/download/botBlade-release-unsigned.apk">botBlade-release-unsigned.apk</a>]]></string>
 
+
+    <string name="import_forge_title">Import Forge</string>
+    <string name="import_forge_source_picker">Source picker screen</string>
+    <string name="import_forge_git_url">Git URL input</string>
+    <string name="import_forge_import_git">Import from Git</string>
+    <string name="import_forge_import_zip">ZIP hook</string>
+    <string name="import_forge_import_folder">Folder hook</string>
+    <string name="import_forge_timeline">Import timeline</string>
+    <string name="import_forge_profile_summary">Profile summary screen</string>
+    <string name="import_forge_missing_secrets">Missing-secrets screen</string>
+    <string name="import_forge_repair_cards">Repair-cards screen</string>
+
 </resources>
