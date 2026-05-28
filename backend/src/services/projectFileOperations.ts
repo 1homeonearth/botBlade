@@ -126,12 +126,17 @@ function normalizeInputPath(value: unknown, field: string): string {
 }
 
 function maybeDecodePath(value: string): string {
-  const trimmed = value.trim();
-  try {
-    return decodeURIComponent(trimmed);
-  } catch {
-    return trimmed;
+  let decoded = value.trim();
+  for (let index = 0; index < 2; index += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    } catch {
+      break;
+    }
   }
+  return decoded;
 }
 
 function normalizeSummaryPath(value: string): string {
