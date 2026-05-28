@@ -60,7 +60,7 @@ export class ImportStore {
     }
 
     await mkdir(record.workspacePath, { recursive: true });
-    await extractZipFromPlan(archivePath, record.workspacePath);
+    await extractZipFromPlan(archivePath, record.workspacePath, validation.extractionPlan);
   }
 
   private transition(record: ImportRecord, state: ImportState, auditService: AuditService, actorId: string, requestId: string): void {
