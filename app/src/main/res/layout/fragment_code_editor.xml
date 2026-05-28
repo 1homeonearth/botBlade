@@ -21,105 +21,147 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="@string/code_editor_empty_message"
-            android:textColor="@color/botblade_on_surface_muted"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-        <TextView
-            android:id="@+id/detected_pack_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@color/botblade_panel"
-            android:padding="12dp"
-            android:textColor="@color/botblade_baby_blue"
-            android:text="@string/detected_pack_placeholder" />
-
-        <TextView
-            android:id="@+id/missing_secrets_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@color/botblade_panel"
-            android:padding="12dp"
-            android:textColor="@color/botblade_hot_pink"
-            android:text="@string/missing_secrets_placeholder" />
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="@color/botblade_on_surface_muted" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:layout_marginTop="16dp"
+            android:background="@color/botblade_panel"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Workbench Actions"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="@color/botblade_baby_blue"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/generate_project_button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/generate_project" />
+
+                <Button
+                    android:id="@+id/scan_project_button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/scan_project" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/run_first_check_button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/run_first_check" />
+
+                <Button
+                    android:id="@+id/start_build_button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/start_build" />
+            </LinearLayout>
 
             <Button
-                android:id="@+id/generate_project_button"
-                android:layout_width="0dp"
+                android:id="@+id/open_ops_button"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/generate_project" />
-
-            <Button
-                android:id="@+id/start_build_button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:text="@string/start_build" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/scan_project_button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/scan_project" />
-
-            <Button
-                android:id="@+id/run_first_check_button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:text="@string/run_first_check" />
+                android:layout_marginTop="8dp"
+                android:text="Open Ops Deck" />
         </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="@string/project_files"
-            android:textColor="@color/botblade_hot_pink"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
+            android:text="Project Explorer"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_hot_pink" />
+
+        <EditText
+            android:id="@+id/file_search_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@color/botblade_ink"
+            android:hint="Search files"
+            android:inputType="text"
+            android:padding="12dp"
+            android:textColor="@color/botblade_on_surface"
+            android:textColorHint="@color/botblade_on_surface_muted" />
 
         <LinearLayout
             android:id="@+id/file_list_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Recent Files"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_baby_blue" />
+
+        <LinearLayout
+            android:id="@+id/recent_files_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/current_file_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="No file open"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_hot_pink"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/selected_file_metadata"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:text="@string/no_file_selected"
             android:textColor="@color/botblade_on_surface_muted" />
 
         <EditText
             android:id="@+id/file_content_editor"
             android:layout_width="match_parent"
-            android:layout_height="360dp"
+            android:layout_height="420dp"
             android:layout_marginTop="8dp"
             android:background="@color/botblade_ink"
+            android:fontFamily="monospace"
             android:gravity="top|start"
             android:hint="@string/file_content_hint"
             android:inputType="textMultiLine|textNoSuggestions"
-            android:fontFamily="monospace"
             android:padding="12dp"
             android:textColor="@color/botblade_on_surface"
             android:textColorHint="@color/botblade_on_surface_muted" />
@@ -145,5 +187,60 @@
                 android:layout_weight="1"
                 android:text="@string/revert_file" />
         </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Diagnostics"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_hot_pink" />
+
+        <TextView
+            android:id="@+id/detected_pack_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@color/botblade_panel"
+            android:padding="12dp"
+            android:text="@string/detected_pack_placeholder"
+            android:textColor="@color/botblade_baby_blue" />
+
+        <TextView
+            android:id="@+id/missing_secrets_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@color/botblade_panel"
+            android:padding="12dp"
+            android:text="@string/missing_secrets_placeholder"
+            android:textColor="@color/botblade_hot_pink" />
+
+        <LinearLayout
+            android:id="@+id/problems_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Build Output"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/botblade_baby_blue" />
+
+        <TextView
+            android:id="@+id/build_output_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@color/botblade_ink"
+            android:fontFamily="monospace"
+            android:minHeight="160dp"
+            android:padding="12dp"
+            android:text="Run First Check or Start Build to see validation output."
+            android:textColor="@color/botblade_on_surface" />
     </LinearLayout>
 </ScrollView>
