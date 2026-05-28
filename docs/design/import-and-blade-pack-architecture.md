@@ -171,3 +171,12 @@ JGit starter slice:
 - Defer write operations until credential, audit, and confirmation UI are ready.
 
 Deferred follow-ups: import wizard UI polish, Project Map UI, secrets repair cards UI, Panic Glow log consumption of rules, native editor spike, JGit diff/commit UI, xterm.js console spike.
+
+## 24) Phase 4 import implementation checklist
+- [ ] Backend detector coverage includes Discord.js, Telegraf, Slack Bolt, n8n workflow JSON, Botpress-style projects, generic Node, and generic Python.
+- [ ] `POST /api/projects/:projectId/scan` and import flows return structured data sufficient for Android to render the detected profile, missing secrets, repair cards, command plans, and Git status.
+- [ ] `botblade.json` conforms to `backend/src/models/botProfile.ts` and never stores or serializes secret values.
+- [ ] Import sources cover Git repository URL, ZIP archive, gated folder/local path support, workflow JSON, and first-party templates.
+- [ ] Repair cards are generated for broken or incomplete imports.
+- [ ] Tests cover detector scoring, metadata writing, archive policy blocking, secret redaction metadata, and Android parsing/view-model state transitions.
+- [ ] Phase 4 explicitly excludes Codex task APIs, a Codex screen, Codex PR automation, and Codex trigger behavior.
