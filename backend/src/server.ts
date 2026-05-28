@@ -81,7 +81,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const method = req.method ?? "GET";
   const path = extractPathname(req.url);
 
-  if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
+  if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION, persistence: persistence ? "sqlite" : "memory" });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
   if (method === "GET" && path === "/api/diagnostics/startup-crash") {
     const artifactPath = process.env.BOTBLADE_STARTUP_CRASH_ARTIFACT;
@@ -96,6 +96,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   }
 
   const actor = authenticateRequest(req);
+
+  if (method === "GET" && path === "/api/persistence/status") {
+    assertGlobalAccess(actor, "persistence status");
+    return writeJson(res, 200, persistence ? persistence.diagnostics() : { adapter: "memory", durable: false });
+  }
 
   if (method === "GET" && path === "/api/audit-events") {
     assertGlobalAccess(actor, "audit events");
