@@ -1,14 +1,20 @@
 package com.princess.botblade
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.backend.BotEngineBindingState
@@ -26,6 +32,13 @@ import com.princess.botblade.ui.settings.SettingsFragment
 class MainActivity : AppCompatActivity() {
     private var bound = false
     private var binder: BotEngineService.LocalBinder? = null
+
+    private val runtimePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        val denied = results.filterValues { granted -> !granted }.keys
+        if (denied.isNotEmpty()) {
+            Toast.makeText(this, "BotBlade could not enable Downloads log mirroring for: ${denied.joinToString()}", Toast.LENGTH_LONG).show()
+        }
+    }
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -46,11 +59,29 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             StartupDiagnostics.mark("main_activity_on_create_start")
             ApiConfig.initialize(this)
+            requestRuntimePermissionsIfNeeded()
             setContentView(R.layout.activity_main)
             setupBottomNavigation(savedInstanceState)
             window.decorView.post { StartupDiagnostics.mark("first_render") }
         }.onFailure { error ->
             showStartupFallback(error)
+        }
+    }
+
+    private fun requestRuntimePermissionsIfNeeded() {
+        val needed = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            needed += Manifest.permission.WRITE_EXTERNAL_STORAGE
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            needed += Manifest.permission.POST_NOTIFICATIONS
+        }
+        if (needed.isNotEmpty()) {
+            runtimePermissionLauncher.launch(needed.toTypedArray())
         }
     }
 

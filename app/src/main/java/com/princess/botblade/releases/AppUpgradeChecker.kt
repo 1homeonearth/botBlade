@@ -15,7 +15,7 @@ class AppUpgradeChecker(
 ) {
     suspend fun latestReleaseForChannel(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/1homeonearth/botBlade/releases")
+            .url("https://api.github.com/repos/princessraven/botBlade/releases")
             .header("Accept", "application/vnd.github+json")
             .build()
 
