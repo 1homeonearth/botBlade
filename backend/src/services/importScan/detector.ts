@@ -70,14 +70,14 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
   const top = matches[0];
   const selectedPack = BLADE_PACKS.find((pack) => pack.id === top?.id);
   const commandPlan = {
-    install: [ctx.packageManager === "pip" ? "pip install -r requirements.txt" : "npm install"],
+    install: selectedPack?.commands.install ? [selectedPack.commands.install] : [],
     build: selectedPack?.commands.build ? [selectedPack.commands.build] : [],
     test: selectedPack?.commands.test ? [selectedPack.commands.test] : [],
     validate: ["botblade validate"],
     start: selectedPack?.commands.run ? [selectedPack.commands.run] : [],
     stop: ["botblade runtime stop"],
     restart: ["botblade runtime restart"],
-    deploy: ["botblade deploy"]
+    deploy: selectedPack?.commands.deploy ? [selectedPack.commands.deploy] : []
   };
   const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
   const optional = (selectedPack?.secrets ?? []).filter((s) => !s.required).map((s) => ({ name: s.name, required: false, configured: false }));

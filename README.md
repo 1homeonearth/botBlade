@@ -1,7 +1,7 @@
 # BotBlade
 
 <p align="center">
-  <img src="docs/app-icon.svg" alt="BotBlade app icon" width="180" />
+  <img src="docs/app-icon.svg" alt="BotBlade app icon (neon cyborg forge mark)" width="180" />
 </p>
 
 <p align="center">
@@ -80,3 +80,8 @@ BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) PORT=8000 HOST=0.0.0.0 npm start
 ## Status
 
 BotBlade is production-usable for local workflows and still evolving for hardened cloud deployment and long-running mobile-hosted reliability.
+
+
+## App icon note
+
+The Android launcher icon and project icon artwork are the neon cyborg forge mark shown above.
