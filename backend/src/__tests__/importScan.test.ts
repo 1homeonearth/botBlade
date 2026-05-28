@@ -62,12 +62,57 @@ test("botblade metadata persists only secret metadata without raw values", async
     const detection = await scanWorkspaceForBladePacks(workspace);
     const metadataPath = await writeBotbladeMetadata(workspace, detection, { kind: "git", url: "https://github.com/example/repo" });
     const metadataText = await fs.readFile(metadataPath, "utf8");
-    const metadata = JSON.parse(metadataText) as { secrets: Array<{ name: string; configured: boolean }> };
+    const metadata = JSON.parse(metadataText) as { secrets: { required: Array<{ name: string; configured: boolean }>; optional: Array<{ name: string; configured: boolean }> } };
 
-    assert.ok(metadata.secrets.length > 0);
-    assert.equal(metadata.secrets.every((secret) => secret.configured === false), true);
+    const allSecrets = [...metadata.secrets.required, ...metadata.secrets.optional];
+    assert.ok(allSecrets.length > 0);
+    assert.equal(allSecrets.every((secret) => secret.configured === false), true);
     assert.equal(metadataText.includes(sentinelTokenValue), false);
     assert.equal(metadataText.includes(sentinelClientIdValue), false);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+
+test("unknown metadata profile remains valid", async () => {
+  const workspace = path.join(os.tmpdir(), `botblade-import-scan-unknown-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as { bladePack: { selected: string }, project: { type: string } };
+    assert.equal(metadata.bladePack.selected, "unknown");
+    assert.equal(metadata.project.type, "unknown");
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("package manager detection remains correct", async () => {
+  const workspace = path.join(os.tmpdir(), `botblade-import-scan-pm-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "pnpm-lock.yaml"), "lockfileVersion: '9.0'", "utf8");
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as { runtime: { packageManager: string } };
+    assert.equal(metadata.runtime.packageManager, "pnpm");
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("scored match evidence persists in metadata", async () => {
+  const detection = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "discord"));
+  const workspace = path.join(os.tmpdir(), `botblade-import-scan-evidence-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as { bladePack: { detected: Array<{ id: string; matchedEvidence: string[] }> } };
+    const discord = metadata.bladePack.detected.find((m) => m.id === "discord-js");
+    assert.ok(discord);
+    assert.ok((discord?.matchedEvidence ?? []).length > 0);
   } finally {
     await fs.rm(workspace, { recursive: true, force: true });
   }

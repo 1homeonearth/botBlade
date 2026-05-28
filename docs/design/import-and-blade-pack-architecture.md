@@ -48,7 +48,7 @@ n8n pack is **import-only**: detect workflow JSON, extract credentials reference
 ## 5) `botblade.json` specification
 `botblade.json` is BotBlade-local metadata that complements native project manifests (`package.json`, `pyproject.toml`, workflow JSON, framework config). It stores detector results and operational metadata without secret values.
 
-Stored fields: `schemaVersion`, `generatedBy`, `generatedAt`, `project`, `runtime`, `bladePack.selected`, `bladePack.detected[]`, `commands`, `secrets[].configured`, `panels`, `healthSignals`.
+Stored fields (schema `1.0.0`): `schemaVersion`, `generatedBy`, `generatedAt`, `project`, `runtime.detectedLanguages`, `runtime.detectedFrameworks`, `runtime.packageManager`, `bladePack.selected`, `bladePack.detected[]` (including `matchedEvidence`), `commandPlan` (`install/build/test/validate/start/stop/restart/deploy`), `secrets.required[]`, `secrets.optional[]` (configured flags only), `permissions`, `capabilities`, `importantFiles`, `warnings`, `repairCards`, and `git` (`branch/status/remotes`).
 
 Never persist secret values in `botblade.json`. The writer must create the workspace directory before writing metadata so a fresh scan cannot fail with `ENOENT`.
 
