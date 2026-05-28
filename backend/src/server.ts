@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 type Socket = any;
 import crypto from "node:crypto";
+import pathModule from "node:path";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
 import { AuditService } from "./services/auditService.js";
 import { assertExecutionAccess, assertGlobalAccess, assertProjectAccess, authenticateRequest, canAccessProject, hasGlobalProjectAccess } from "./services/authService.js";
@@ -288,9 +289,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   }
 
   if (method === "POST" && path === "/api/imports/git") {
-    const body = await readJson(req) as { repoUrl?: string; workspacePath?: string; ref?: string };
+    const body = await readJson(req) as { repoUrl?: string; workspacePath?: string; ref?: string; projectName?: string };
     if (!body?.repoUrl || !body?.workspacePath) throw new RequestValidationError([{ field: "repoUrl|workspacePath", message: "repoUrl and workspacePath are required." }]);
     const record = await importStore.createAndRun({ type: "git", repoUrl: body.repoUrl, ref: body.ref }, body.workspacePath, auditService, actor.id, requestId);
+    if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
+      const repoNameFromUrl = body.repoUrl.split("/").filter(Boolean).pop() ?? "imported-project";
+      const repoName = repoNameFromUrl.endsWith(".git") ? repoNameFromUrl.slice(0, -4) : repoNameFromUrl;
+      const project = projectStore.create({ name: body.projectName?.trim() || repoName, slug: repoName, description: `Imported from ${body.repoUrl}` });
+      record.managedProject = { id: project.id, slug: project.slug };
+      const workspace = fileService.workspace(project.id);
+      const fs = await import("node:fs/promises");
+      await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+      await copyDirectory(record.workspacePath, workspace);
+    }
     return writeJson(res, 201, record);
   }
   if (method === "POST" && path === "/api/imports/zip") {
@@ -421,6 +433,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     }
   }
   throw { statusCode: 404, code: "NOT_FOUND", message: "Route not found.", details: {} };
+}
+
+async function copyDirectory(from: string, to: string): Promise<void> {
+  const fs = await import("node:fs/promises");
+  await fs.mkdir(to, { recursive: true });
+  const entries = await fs.readdir(from, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourcePath = `${from}/${entry.name}`;
+    const targetPath = `${to}/${entry.name}`;
+    if (entry.isDirectory()) await copyDirectory(sourcePath, targetPath);
+    else if (entry.isFile()) await fs.writeFile(targetPath, await fs.readFile(sourcePath, "utf8"), "utf8");
+  }
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
