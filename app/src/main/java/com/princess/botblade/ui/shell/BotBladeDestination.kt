@@ -3,7 +3,7 @@ package com.princess.botblade.ui.shell
 import androidx.fragment.app.Fragment
 import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
-import com.princess.botblade.ui.editor.CodeEditorFragment
+import com.princess.botblade.ui.editor.CodeEditorComposeFragment
 import com.princess.botblade.ui.importforge.ImportForgeFragment
 import com.princess.botblade.ui.settings.SettingsFragment
 
@@ -17,7 +17,7 @@ enum class BotBladeDestination(val label: String, val commandLabel: String) {
     fun createFragment(): Fragment = when (this) {
         Dashboard -> DashboardFragment()
         Projects -> ImportForgeFragment()
-        Editor -> CodeEditorFragment()
+        Editor -> CodeEditorComposeFragment()
         Deployments -> DeploymentsFragment.newInstance()
         Settings -> SettingsFragment()
     }
