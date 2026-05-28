@@ -15,7 +15,7 @@ class AppUpgradeChecker(
 ) {
     suspend fun latestReleaseForChannel(): AppUpgradeInfo? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/1homeonearth/botBlade/releases")
+            .url("https://api.github.com/repos/princessraven/botBlade/releases")
             .header("Accept", "application/vnd.github+json")
             .build()
 
@@ -30,7 +30,7 @@ class AppUpgradeChecker(
                 if (release.optBoolean("draft", false)) continue
                 if (!releaseMatchesCurrentChannel(release)) continue
 
-                val asset = firstInstallableApkAsset(release) ?: continue
+                val asset = firstInstallableApkAsset(release) ?: firstAnyApkAsset(release) ?: continue
                 return@withContext AppUpgradeInfo(
                     tagName = release.optString("tag_name"),
                     pageUrl = release.optString("html_url"),
@@ -95,6 +95,15 @@ class AppUpgradeChecker(
         }
     }
 
+
+    private fun firstAnyApkAsset(release: JSONObject): JSONObject? {
+        val assets = release.optJSONArray("assets") ?: return null
+        for (index in 0 until assets.length()) {
+            val asset = assets.optJSONObject(index) ?: continue
+            if (asset.optString("name").lowercase().endsWith(".apk")) return asset
+        }
+        return null
+    }
     private fun versionRank(value: String): Int {
         val normalized = value.trim().removePrefix("v")
         val parts = normalized.split(".")
