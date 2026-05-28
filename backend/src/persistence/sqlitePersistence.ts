@@ -13,6 +13,14 @@ import type { AuditServicePersistence, BuildServicePersistence, DeploymentJobSto
 const MIGRATION_DIR = fs.existsSync(path.resolve(process.cwd(), "migrations")) ? path.resolve(process.cwd(), "migrations") : path.resolve(process.cwd(), "backend/migrations");
 const DEFAULT_KEY_ID = "local-env";
 
+export interface SqlitePersistenceDiagnostics {
+  adapter: "sqlite";
+  databasePath: string;
+  migrationDir: string;
+  appliedMigrations: string[];
+  tableCounts: Record<string, number>;
+}
+
 export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence, ImportStorePersistence {
   private readonly key: Buffer;
 
@@ -30,6 +38,17 @@ export class SqlitePersistence implements ProjectStorePersistence, SecretStorePe
     }
     if (!url.startsWith("sqlite://")) return undefined;
     return new SqlitePersistence(path.resolve(url.slice("sqlite://".length)));
+  }
+
+  diagnostics(): SqlitePersistenceDiagnostics {
+    const tables = ["projects", "secret_metadata", "audit_events", "build_jobs", "deployment_targets", "deployment_jobs", "imports"];
+    return {
+      adapter: "sqlite",
+      databasePath: this.databasePath,
+      migrationDir: MIGRATION_DIR,
+      appliedMigrations: this.rows<{ version: string }>("SELECT version FROM schema_migrations ORDER BY version").map((row) => row.version),
+      tableCounts: Object.fromEntries(tables.map((table) => [table, this.countRows(table)])),
+    };
   }
 
   loadProjects(): BotProject[] { return this.selectJson<BotProject>("SELECT data_json FROM projects ORDER BY updated_at DESC", "data_json"); }
@@ -83,6 +102,7 @@ COMMIT;`);
   }
 
   private selectJson<T>(sql: string, field: string): T[] { return this.rows<Record<string, string>>(sql).map((row) => JSON.parse(row[field]) as T); }
+  private countRows(table: string): number { return this.rows<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table};`)[0]?.count ?? 0; }
   private rows<T>(sql: string): T[] {
     const output = execFileSync("sqlite3", ["-json", this.databasePath, sql], { encoding: "utf8" }).trim();
     return output ? JSON.parse(output) as T[] : [];
