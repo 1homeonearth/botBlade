@@ -19,17 +19,26 @@ export class GitStatusService {
     const changedFiles = this.changedFiles(workspacePath);
     return { available: true, branch, remotes, clean: changedFiles.length === 0, dirtyFileCount: changedFiles.length, changedFiles };
   }
+
   async readStatusSafe(workspacePath: string): Promise<GitStatusSummary> {
-    try { return await this.readStatus(workspacePath); } catch {
+    try {
+      return await this.readStatus(workspacePath);
+    } catch {
       return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
     }
   }
+
   private currentBranch(workspacePath: string): string | null {
-    const value = execFileSync("git", ["-C", workspacePath, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
-    return value && value !== "HEAD" ? value : null;
+    try {
+      const value = this.git(workspacePath, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+      return value && value !== "HEAD" ? value : null;
+    } catch {
+      return null;
+    }
   }
+
   private remotes(workspacePath: string): GitStatusRemote[] {
-    const stdout = execFileSync("git", ["-C", workspacePath, "remote", "-v"], { encoding: "utf8" });
+    const stdout = this.git(workspacePath, ["remote", "-v"]);
     const map = new Map<string, string>();
     for (const line of stdout.split(/\r?\n/)) {
       const match = line.match(/^(\S+)\s+(\S+)\s+\((fetch|push)\)$/);
@@ -37,9 +46,19 @@ export class GitStatusService {
     }
     return [...map.entries()].map(([name, url]) => ({ name, url }));
   }
+
   private changedFiles(workspacePath: string): GitChangedFileSummary[] {
-    const stdout = execFileSync("git", ["-C", workspacePath, "status", "--porcelain"], { encoding: "utf8" });
+    const stdout = this.git(workspacePath, ["status", "--porcelain"]);
     return stdout.split(/\r?\n/).filter(Boolean).map((line: string) => ({ status: line.slice(0, 2).trim() || "?", path: line.slice(3).trim() }));
+  }
+
+  private git(workspacePath: string, args: string[]): string {
+    return execFileSync("git", [
+      "-C", workspacePath,
+      "-c", "core.fsmonitor=false",
+      "-c", "core.hooksPath=/dev/null",
+      ...args,
+    ], { encoding: "utf8" });
   }
 }
 

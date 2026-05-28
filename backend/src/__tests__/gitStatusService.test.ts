@@ -43,3 +43,15 @@ test("git status service safe mode returns unavailable for non-git workspace", a
   assert.equal(status.available, false);
   assert.equal(status.branch, null);
 });
+
+
+test("git status service tolerates unborn HEAD and still reports changed files", async () => {
+  const dir = await tempDir("botblade-git-unborn");
+  execFileSync("git", ["-C", dir, "init"]);
+  await fs.writeFile(path.join(dir, "fresh.txt"), "hello\n", "utf8");
+  const status = await new GitStatusService().readStatus(dir);
+  assert.equal(status.available, true);
+  assert.equal(status.branch, null);
+  assert.equal(status.clean, false);
+  assert.ok(status.changedFiles.some((entry) => entry.path === "fresh.txt"));
+});
