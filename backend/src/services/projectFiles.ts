@@ -140,7 +140,27 @@ export function templateFiles(project: BotProject): Record<string, string> {
     }, null, 2) + "\n",
     "package-lock.json": generatedBotPackageLock(project.slug),
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", outDir: "dist", rootDir: "src", strict: true, skipLibCheck: true }, include: ["src/**/*.ts"] }, null, 2) + "\n",
-    "Dockerfile": `FROM node:22-alpine AS deps\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev || npm install --omit=dev\n\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci || npm install\nCOPY tsconfig.json ./\nCOPY src ./src\nRUN npm run build\n\nFROM node:22-alpine AS runtime\nWORKDIR /app\nENV NODE_ENV=production\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY --from=build /app/dist ./dist\nCOPY package.json ./package.json\nCMD ["node", "dist/index.js"]\n`,
+    "Dockerfile": `FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev || npm install --omit=dev
+
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci || npm install
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+FROM node:22-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./package.json
+CMD ["node", "dist/index.js"]
+`,
     ".dockerignore": "node_modules\ndist\n.env\n*.log\n",
     "README.md": `# ${project.name}
 
@@ -175,12 +195,110 @@ Keep authentication tokens in your shell, CI secret store, or user-level npm con
 \`npm test\` includes a config validation test that confirms the bot fails clearly when DISCORD_TOKEN is missing.
 `,
     ".env.example": `DISCORD_TOKEN=<secret reference resolved at runtime>\n${requireApplicationId ? "DISCORD_APPLICATION_ID=<discord app id>\n" : ""}${requireGuildId ? "DISCORD_GUILD_ID=<discord guild id>\n" : ""}`,
-    "src/node-env.d.ts": `declare const process: { env: Record<string, string | undefined> };\n\ndeclare namespace NodeJS {\n  interface ProcessEnv {\n    [key: string]: string | undefined;\n  }\n}\n\ndeclare module "node:test" {\n  const test: (name: string, fn: () => void | Promise<void>) => void;\n  export default test;\n}\n\ndeclare module "node:assert/strict" {\n  const assert: {\n    ok(value: unknown, message?: string): void;\n    throws(fn: () => unknown, expected?: RegExp): void;\n  };\n  export default assert;\n}\n`,
-    "src/config.ts": `export interface BotConfig {\n  discordToken: string;\n  discordApplicationId: string;\n  discordGuildId: string | null;\n}\n\nexport function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {\n  const discordToken = env.DISCORD_TOKEN;\n  if (!discordToken) {\n    throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef in botBlade or set DISCORD_TOKEN before starting the bot.");\n  }\n  const discordApplicationId = env.DISCORD_APPLICATION_ID;\n  if (!discordApplicationId) {\n    throw new Error("DISCORD_APPLICATION_ID is required for command registration.");\n  }\n  const commandRegistration = env.DISCORD_COMMAND_REGISTRATION ?? ${JSON.stringify(project.discord.commandRegistration)};\n  const discordGuildId = env.DISCORD_GUILD_ID ?? null;\n  if (commandRegistration === "guild" && !discordGuildId) {\n    throw new Error("DISCORD_GUILD_ID is required when command registration mode is guild.");\n  }\n  return { discordToken, discordApplicationId, discordGuildId };\n}\n`,
-    "src/config.test.ts": `import test from "node:test";\nimport assert from "node:assert/strict";\nimport { loadConfig } from "./config.js";\n\ntest("config validation fails without required env vars", () => {\n  assert.throws(() => loadConfig({}), /DISCORD_TOKEN is required/);\n});\n`,
-    "src/commands/load.test.ts": `${commandTestImports}\nimport test from "node:test";\nimport assert from "node:assert/strict";\n\nconst commands = [${commandArray}];\n\ntest("command modules load", () => {\n  assert.ok(commands.length > 0);\n  assert.ok(commands.every((command) => command.data.name));\n});\n\ntest("command payloads are serializable for registration", () => {\n  const payload = commands.map((command) => command.data);\n  const serialized = JSON.stringify(payload);\n  assert.ok(serialized.includes(commands[0].data.name));\n});\n`,
-    "src/register-commands.ts": `${commandImports}\nimport { REST, Routes } from "discord.js";\nimport { loadConfig } from "./config.js";\n\nconst commands = [${commandArray}].map((command) => command.data);\nconst config = loadConfig();\nconst registrationMode = process.env.DISCORD_COMMAND_REGISTRATION ?? ${JSON.stringify(project.discord.commandRegistration)};\n\nasync function registerCommands(): Promise<void> {\n  const rest = new REST({ version: "10" }).setToken(config.discordToken);\n  const route = registrationMode === "guild"\n    ? Routes.applicationGuildCommands(config.discordApplicationId, config.discordGuildId ?? "")\n    : Routes.applicationCommands(config.discordApplicationId);\n  await rest.put(route, { body: commands });\n  console.log(\`Registered \${commands.length} command(s) in ${registrationModeMessage} mode.\`);\n}\n\nregisterCommands().catch((error) => {\n  console.error("Failed to register commands", error);\n  process.exitCode = 1;\n});\n`,
-    "src/index.ts": `${commandImports}\nimport { Client, GatewayIntentBits } from "discord.js";\nimport { loadConfig } from "./config.js";\n\nconst commands = [${commandArray}];\nconst config = loadConfig();\n\nconst client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });\nclient.once("ready", () => {\n  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);\n});\nclient.login(config.discordToken);\n`,
+    "src/node-env.d.ts": `declare const process: { env: Record<string, string | undefined> };
+
+declare namespace NodeJS {
+  interface ProcessEnv {
+    [key: string]: string | undefined;
+  }
+}
+
+declare module "node:test" {
+  const test: (name: string, fn: () => void | Promise<void>) => void;
+  export default test;
+}
+
+declare module "node:assert/strict" {
+  const assert: {
+    ok(value: unknown, message?: string): void;
+    throws(fn: () => unknown, expected?: RegExp): void;
+  };
+  export default assert;
+}
+`,
+    "src/config.ts": `export interface BotConfig {
+  discordToken: string;
+  discordApplicationId: string;
+  discordGuildId: string | null;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): BotConfig {
+  const discordToken = env.DISCORD_TOKEN;
+  if (!discordToken) {
+    throw new Error("DISCORD_TOKEN is required. Configure discord.tokenSecretRef in botBlade or set DISCORD_TOKEN before starting the bot.");
+  }
+  const discordApplicationId = env.DISCORD_APPLICATION_ID;
+  if (!discordApplicationId) {
+    throw new Error("DISCORD_APPLICATION_ID is required for command registration.");
+  }
+  const commandRegistration = env.DISCORD_COMMAND_REGISTRATION ?? ${JSON.stringify(project.discord.commandRegistration)};
+  const discordGuildId = env.DISCORD_GUILD_ID ?? null;
+  if (commandRegistration === "guild" && !discordGuildId) {
+    throw new Error("DISCORD_GUILD_ID is required when command registration mode is guild.");
+  }
+  return { discordToken, discordApplicationId, discordGuildId };
+}
+`,
+    "src/config.test.ts": `import test from "node:test";
+import assert from "node:assert/strict";
+import { loadConfig } from "./config.js";
+
+test("config validation fails without required env vars", () => {
+  assert.throws(() => loadConfig({}), /DISCORD_TOKEN is required/);
+});
+`,
+    "src/commands/load.test.ts": `${commandTestImports}
+import test from "node:test";
+import assert from "node:assert/strict";
+
+const commands = [${commandArray}];
+
+test("command modules load", () => {
+  assert.ok(commands.length > 0);
+  assert.ok(commands.every((command) => command.data.name));
+});
+
+test("command payloads are serializable for registration", () => {
+  const payload = commands.map((command) => command.data);
+  const serialized = JSON.stringify(payload);
+  assert.ok(serialized.includes(commands[0].data.name));
+});
+`,
+    "src/register-commands.ts": `${commandImports}
+import { REST, Routes } from "discord.js";
+import { loadConfig } from "./config.js";
+
+const commands = [${commandArray}].map((command) => command.data);
+const config = loadConfig();
+const registrationMode = process.env.DISCORD_COMMAND_REGISTRATION ?? ${JSON.stringify(project.discord.commandRegistration)};
+
+async function registerCommands(): Promise<void> {
+  const rest = new REST({ version: "10" }).setToken(config.discordToken);
+  const route = registrationMode === "guild"
+    ? Routes.applicationGuildCommands(config.discordApplicationId, config.discordGuildId ?? "")
+    : Routes.applicationCommands(config.discordApplicationId);
+  await rest.put(route, { body: commands });
+  console.log(\`Registered \${commands.length} command(s) in ${registrationModeMessage} mode.\`);
+}
+
+registerCommands().catch((error) => {
+  console.error("Failed to register commands", error);
+  process.exitCode = 1;
+});
+`,
+    "src/index.ts": `${commandImports}
+import { Client, GatewayIntentBits } from "discord.js";
+import { loadConfig } from "./config.js";
+
+const commands = [${commandArray}];
+const config = loadConfig();
+
+const client = new Client({ intents: [${intents.map((intent) => `GatewayIntentBits.${intent}`).join(", ")}] });
+client.once("ready", () => {
+  console.log(\`Bot logged in with \${commands.length} command definition(s).\`);
+});
+client.login(config.discordToken);
+`,
   };
   for (const command of commands) files[`src/commands/${sanitizeCommandFile(command.name)}.ts`] = commandFile(command);
   return files;
@@ -188,7 +306,22 @@ Keep authentication tokens in your shell, CI secret store, or user-level npm con
 
 function commandFile(command: BotProject["commands"][number]): string {
   const response = typeof command.handler === "object" && command.handler.kind === "static_response" ? command.handler.content ?? "" : "TODO: implement custom TypeScript handler.";
-  return `export const ${commandExportName(command.name)} = {\n  data: {\n    name: ${JSON.stringify(command.name)},\n    description: ${JSON.stringify(command.description)},\n    type: ${JSON.stringify(command.type ?? "chat_input")},\n    options: ${JSON.stringify(command.options ?? [])},\n    defaultMemberPermissions: ${JSON.stringify(command.permissions?.defaultMemberPermissions ?? null)},\n    dmPermission: ${JSON.stringify(command.permissions?.dmPermission ?? false)}\n  },\n  handler: {\n    kind: ${JSON.stringify(typeof command.handler === "object" ? command.handler.kind : "custom_typescript_placeholder")},\n    ephemeral: ${JSON.stringify(Boolean(typeof command.handler === "object" ? command.handler.ephemeral : false))},\n    content: ${JSON.stringify(response)}\n  }\n};\n`;
+  return `export const ${commandExportName(command.name)} = {
+  data: {
+    name: ${JSON.stringify(command.name)},
+    description: ${JSON.stringify(command.description)},
+    type: ${JSON.stringify(command.type ?? "chat_input")},
+    options: ${JSON.stringify(command.options ?? [])},
+    defaultMemberPermissions: ${JSON.stringify(command.permissions?.defaultMemberPermissions ?? null)},
+    dmPermission: ${JSON.stringify(command.permissions?.dmPermission ?? false)}
+  },
+  handler: {
+    kind: ${JSON.stringify(typeof command.handler === "object" ? command.handler.kind : "custom_typescript_placeholder")},
+    ephemeral: ${JSON.stringify(Boolean(typeof command.handler === "object" ? command.handler.ephemeral : false))},
+    content: ${JSON.stringify(response)}
+  }
+};
+`;
 }
 
 function sanitizeCommandFile(name: string): string {
@@ -219,7 +352,17 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 function normalizeRelativePath(value: string): string {
-  return decodeURIComponent(value).replace(/\\/g, "/").replace(/^\/+/, "");
+  let decoded = value.trim();
+  for (let index = 0; index < 2; index += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    } catch {
+      break;
+    }
+  }
+  return decoded.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
 function sanitizeId(value: string): string {
