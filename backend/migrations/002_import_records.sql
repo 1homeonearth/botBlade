@@ -7,3 +7,5 @@ CREATE TABLE IF NOT EXISTS imports (
 );
 
 CREATE INDEX IF NOT EXISTS idx_imports_updated_at ON imports(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_imports_state ON imports(state);
+CREATE INDEX IF NOT EXISTS idx_imports_source_type ON imports(source_type);
