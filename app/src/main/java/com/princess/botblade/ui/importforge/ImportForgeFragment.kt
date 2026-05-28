@@ -49,9 +49,9 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel) {
             Card { Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.import_forge_source_picker))
                 OutlinedTextField(value = gitUrl, onValueChange = { gitUrl = it }, label = { Text(stringResource(R.string.import_forge_git_url)) }, modifier = Modifier.fillMaxWidth())
-                Button(onClick = { if (gitUrl.startsWith("http")) viewModel.startImport("git-${System.currentTimeMillis()}") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_git)) }
-                Button(onClick = { viewModel.startImport("zip-${System.currentTimeMillis()}") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_zip)) }
-                Button(onClick = { viewModel.startImport("folder-${System.currentTimeMillis()}") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_folder)) }
+                Button(onClick = { if (gitUrl.startsWith("http")) viewModel.startImport(sourceType = "git", source = gitUrl, workspacePath = "imports/git") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_git)) }
+                Button(onClick = { viewModel.startImport(sourceType = "zip", source = "/sdcard/Download/import.zip", workspacePath = "imports/zip") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_zip)) }
+                Button(onClick = { viewModel.startImport(sourceType = "folder", source = "/sdcard/Download/import-folder", workspacePath = "imports/folder") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.import_forge_import_folder)) }
             } }
         }
         item { Text(stringResource(R.string.import_forge_timeline)) }

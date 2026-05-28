@@ -282,12 +282,29 @@ class BotBladeApiClient(
         request(path = "/api/projects/${projectId.encodedPathSegment()}/scan", method = "POST", requestBody = "{}").toProjectScanResponse()
 
     @Throws(IOException::class)
-
-
-    @Throws(IOException::class)
-    fun startImport(request: ImportStartRequest): ImportSummary {
-        val payload = JSONObject().put("sourceType", request.sourceType).put("source", request.source).toString()
-        return request(path = "/api/imports", method = "POST", requestBody = payload).toImportSummary()
+    fun startImport(request: ImportStartRequest): ImportSummary = when (request.sourceType.lowercase()) {
+        "git" -> {
+            val payload = JSONObject()
+                .put("repoUrl", request.source)
+                .put("workspacePath", request.workspacePath)
+                .toString()
+            this.request(path = "/api/imports/git", method = "POST", requestBody = payload).toImportSummary()
+        }
+        "zip" -> {
+            val payload = JSONObject()
+                .put("archivePath", request.source)
+                .put("workspacePath", request.workspacePath)
+                .toString()
+            this.request(path = "/api/imports/zip", method = "POST", requestBody = payload).toImportSummary()
+        }
+        "folder" -> {
+            val payload = JSONObject()
+                .put("folderPath", request.source)
+                .put("workspacePath", request.workspacePath)
+                .toString()
+            this.request(path = "/api/imports/folder", method = "POST", requestBody = payload).toImportSummary()
+        }
+        else -> throw IOException("Unsupported import source type: ${request.sourceType}")
     }
 
     @Throws(IOException::class)
@@ -640,7 +657,8 @@ class BotBladeApiClient(
 
 
 private fun String.toImportSummary(): ImportSummary {
-    val json = requireNotNull(asJsonOrNull()) { "Invalid import response." }
+    val json = runCatching { JSONObject(this) }.getOrNull()
+        ?: throw IllegalArgumentException("Invalid import response.")
     val import = json.optJSONObject("import") ?: json
     return ImportSummary(
         id = import.optString("id"),

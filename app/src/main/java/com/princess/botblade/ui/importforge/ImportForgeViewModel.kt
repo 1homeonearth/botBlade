@@ -1,6 +1,11 @@
 package com.princess.botblade.ui.importforge
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.princess.botblade.data.api.ApiResult
+import com.princess.botblade.data.model.ImportStartRequest
+import com.princess.botblade.data.repository.ImportRepository
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,12 +21,38 @@ data class ImportForgeUiState(
     val timelineEvents: List<String> = emptyList(),
 )
 
-class ImportForgeViewModel : ViewModel() {
+class ImportForgeViewModel(
+    private val importRepository: ImportRepository = ImportRepository(),
+) : ViewModel() {
     private val _uiState = MutableStateFlow(ImportForgeUiState())
     val uiState: StateFlow<ImportForgeUiState> = _uiState.asStateFlow()
 
     fun startImport(importId: String) {
         _uiState.value = _uiState.value.copy(step = ImportForgeStep.TIMELINE, importId = importId, backendState = ImportForgeBackendState.QUEUED, timelineEvents = listOf("Import queued"))
+    }
+
+    fun startImport(sourceType: String, source: String, workspacePath: String) {
+        _uiState.value = _uiState.value.copy(step = ImportForgeStep.TIMELINE, backendState = ImportForgeBackendState.QUEUED, timelineEvents = _uiState.value.timelineEvents + "Starting $sourceType import")
+        viewModelScope.launch {
+            when (val result = importRepository.startImport(ImportStartRequest(sourceType = sourceType, source = source, workspacePath = workspacePath))) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(importId = result.value.id)
+                    onBackendState(mapBackendState(result.value.state), result.value.blockedPolicy)
+                }
+                is ApiResult.Error -> onBackendState(ImportForgeBackendState.FAILED, result.message)
+            }
+        }
+    }
+
+    private fun mapBackendState(raw: String): ImportForgeBackendState = when (raw.uppercase()) {
+        "QUEUED" -> ImportForgeBackendState.QUEUED
+        "SCANNING", "ANALYZING" -> ImportForgeBackendState.ANALYZING
+        "PROFILE_READY" -> ImportForgeBackendState.PROFILE_READY
+        "MISSING_SECRETS" -> ImportForgeBackendState.MISSING_SECRETS
+        "BLOCKED_POLICY" -> ImportForgeBackendState.BLOCKED_POLICY
+        "REPAIR_SUGGESTED" -> ImportForgeBackendState.REPAIR_SUGGESTED
+        "COMPLETED", "COMPLETE" -> ImportForgeBackendState.COMPLETE
+        else -> ImportForgeBackendState.FAILED
     }
 
     fun onBackendState(state: ImportForgeBackendState, detail: String? = null) {

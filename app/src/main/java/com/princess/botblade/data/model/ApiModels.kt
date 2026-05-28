@@ -272,6 +272,7 @@ data class ProjectScanResponse(
 data class ImportStartRequest(
     val sourceType: String,
     val source: String,
+    val workspacePath: String,
 )
 
 data class ImportSummary(
