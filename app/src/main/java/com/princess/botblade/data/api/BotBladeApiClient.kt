@@ -36,6 +36,8 @@ import com.princess.botblade.data.model.GitHubConnectRequest
 import com.princess.botblade.data.model.GitHubLinkRepoRequest
 import com.princess.botblade.data.model.GitHubProjectConfig
 import com.princess.botblade.data.model.GitHubWorkflowResponse
+import com.princess.botblade.data.model.ImportStartRequest
+import com.princess.botblade.data.model.ImportSummary
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -280,6 +282,18 @@ class BotBladeApiClient(
         request(path = "/api/projects/${projectId.encodedPathSegment()}/scan", method = "POST", requestBody = "{}").toProjectScanResponse()
 
     @Throws(IOException::class)
+
+
+    @Throws(IOException::class)
+    fun startImport(request: ImportStartRequest): ImportSummary {
+        val payload = JSONObject().put("sourceType", request.sourceType).put("source", request.source).toString()
+        return request(path = "/api/imports", method = "POST", requestBody = payload).toImportSummary()
+    }
+
+    @Throws(IOException::class)
+    fun getImport(importId: String): ImportSummary =
+        request(path = "/api/imports/${importId.encodedPathSegment()}", method = "GET").toImportSummary()
+
     fun listDeploymentTargets(): List<DeploymentTargetSummary> {
         val body = request(path = "/api/deployment-targets", method = "GET")
         val targets = requireNotNull(body.asJsonOrNull()) { "Invalid deployment targets response." }.optJSONArray("targets") ?: JSONArray()
@@ -622,4 +636,16 @@ class BotBladeApiClient(
     } finally {
         disconnect()
     }
+}
+
+
+private fun String.toImportSummary(): ImportSummary {
+    val json = requireNotNull(asJsonOrNull()) { "Invalid import response." }
+    val import = json.optJSONObject("import") ?: json
+    return ImportSummary(
+        id = import.optString("id"),
+        state = import.optString("state"),
+        profileId = import.optionalString("profileId"),
+        blockedPolicy = import.optionalString("blockedPolicy"),
+    )
 }

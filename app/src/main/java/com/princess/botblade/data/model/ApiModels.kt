@@ -267,3 +267,16 @@ data class ProjectScanResponse(
     val matches: List<ScanDetectionMatch> = emptyList(),
     val warnings: List<String> = emptyList(),
 )
+
+
+data class ImportStartRequest(
+    val sourceType: String,
+    val source: String,
+)
+
+data class ImportSummary(
+    val id: String,
+    val state: String,
+    val profileId: String? = null,
+    val blockedPolicy: String? = null,
+)
