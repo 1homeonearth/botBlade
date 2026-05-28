@@ -73,10 +73,10 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     install: selectedPack?.commands.install ? [selectedPack.commands.install] : [],
     build: selectedPack?.commands.build ? [selectedPack.commands.build] : [],
     test: selectedPack?.commands.test ? [selectedPack.commands.test] : [],
-    validate: ["botblade validate"],
-    start: selectedPack?.commands.run ? [selectedPack.commands.run] : [],
-    stop: ["botblade runtime stop"],
-    restart: ["botblade runtime restart"],
+    validate: selectedPack?.commands.validate ? [selectedPack.commands.validate] : ["botblade validate"],
+    start: selectedPack?.commands.start ? [selectedPack.commands.start] : selectedPack?.commands.run ? [selectedPack.commands.run] : [],
+    stop: selectedPack?.commands.stop ? [selectedPack.commands.stop] : ["botblade runtime stop"],
+    restart: selectedPack?.commands.restart ? [selectedPack.commands.restart] : ["botblade runtime restart"],
     deploy: selectedPack?.commands.deploy ? [selectedPack.commands.deploy] : []
   };
   const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
