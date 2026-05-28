@@ -81,7 +81,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   const method = req.method ?? "GET";
   const path = extractPathname(req.url);
 
-  if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION });
+  if (method === "GET" && path === "/api/health") return writeJson(res, 200, { ok: true, service: SERVICE_NAME, version: SERVICE_VERSION, persistence: persistence ? "sqlite" : "memory" });
   if (method === "GET" && path === "/api/version") return writeJson(res, 200, { name: SERVICE_NAME, version: SERVICE_VERSION, apiVersion: API_VERSION });
   if (method === "GET" && path === "/api/diagnostics/startup-crash") {
     const artifactPath = process.env.BOTBLADE_STARTUP_CRASH_ARTIFACT;
@@ -96,6 +96,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   }
 
   const actor = authenticateRequest(req);
+
+  if (method === "GET" && path === "/api/persistence/status") {
+    assertGlobalAccess(actor, "persistence status");
+    return writeJson(res, 200, persistence ? persistence.diagnostics() : { adapter: "memory", durable: false });
+  }
 
   if (method === "GET" && path === "/api/audit-events") {
     assertGlobalAccess(actor, "audit events");
@@ -221,351 +226,120 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (method === "POST" && !buildId) {
       assertExecutionAccess(actor, "builds");
       const body = await readJson(req);
-      const audit = auditService.record({ action: "build.start", actorId: actor.id, projectId, resourceType: "build", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
-      const job = await buildService.create(project, body, audit.id, requestId, actor.id);
-      audit.resourceId = job.buildId;
-      return writeJson(res, 201, job);
+      const audit = auditService.record({ action: "build.start", actorId: actor.id, projectId, resourceType: "build", resourceId: "pending", metadata: { clean: body?.clean !== false, runTests: body?.runTests !== false, createDockerImage: body?.createDockerImage === true }, requestId });
+      const build = await buildService.createBuild(projectId, body);
+      auditService.record({ action: "build.created", actorId: actor.id, projectId, resourceType: "build", resourceId: build.buildId, metadata: { status: build.status, auditEventId: audit.id }, requestId });
+      return writeJson(res, 201, build);
     }
     if (method === "GET" && !buildId) return writeJson(res, 200, { builds: buildService.list(projectId) });
-    if (method === "GET" && buildId && !logs) return writeJson(res, 200, buildService.get(projectId, buildId) ?? notFoundBuild(buildId));
-    if (method === "GET" && buildId && logs) return writeJson(res, 200, { logs: buildService.getLogs(projectId, buildId) ?? notFoundBuild(buildId) });
+    if (method === "GET" && buildId && logs) return writeJson(res, 200, { buildId, logs: buildService.logs(projectId, buildId) });
   }
 
-  const runtimeMatch = path.match(/^\/api\/projects\/([^/]+)\/runtime\/(status|start|stop|restart|logs)$/);
-  if (runtimeMatch) {
-    const [, projectId, action] = runtimeMatch;
-    assertProjectAccess(actor, projectId);
-    const project = projectStore.get(projectId);
-    if (!project) throw notFoundProject(projectId);
-    if (method === "GET" && action === "status") return writeJson(res, 200, runtimeService.getStatus(projectId));
-    if (method === "POST" && action === "start") { assertExecutionAccess(actor, "runtime start"); const status = await runtimeService.start(project); const audit = auditService.record({ action: "runtime.start", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "POST" && action === "stop") { assertExecutionAccess(actor, "runtime stop"); const status = await runtimeService.stop(projectId); const audit = auditService.record({ action: "runtime.stop", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "POST" && action === "restart") { assertExecutionAccess(actor, "runtime restart"); const status = await runtimeService.restart(project); const audit = auditService.record({ action: "runtime.restart", actorId: actor.id, projectId, resourceType: "runtime", resourceId: projectId, metadata: { status: status.status, running: status.running }, requestId }); return writeJson(res, 200, { ...status, auditEventId: audit.id }); }
-    if (method === "GET" && action === "logs") return writeJson(res, 200, { logs: runtimeService.getLogs(projectId) });
-  }
-
-  const deploymentMatch = path.match(/^\/api\/projects\/([^/]+)\/deployments(?:\/([^/]+)(?:\/(logs|rollback|status|start|stop|restart))?)?$/);
+  const deploymentMatch = path.match(/^\/api\/projects\/([^/]+)\/deployments(?:\/([^/]+)(?:\/(status|logs|restart|rollback))?)?$/);
   if (deploymentMatch) {
     const [, projectId, deploymentId, action] = deploymentMatch;
     assertProjectAccess(actor, projectId);
     const project = projectStore.get(projectId);
     if (!project) throw notFoundProject(projectId);
+    if (method === "GET" && !deploymentId) return writeJson(res, 200, { deployments: deploymentStore.list(projectId) });
     if (method === "POST" && !deploymentId) {
       assertExecutionAccess(actor, "deployments");
       const body = await readJson(req);
-      const audit = auditService.record({ action: "deployment.start", actorId: actor.id, projectId, resourceType: "deployment", resourceId: "pending", metadata: body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {}, requestId });
-      const job = await deploymentStore.create(project, body, audit.id, requestId, actor.id);
-      audit.resourceId = job.deploymentId;
-      return writeJson(res, 201, job);
+      return writeJson(res, 201, await deploymentStore.create(projectId, body?.targetId, body?.buildId, actor.id, requestId));
     }
-    if (method === "GET" && !deploymentId) return writeJson(res, 200, { deployments: deploymentStore.list(projectId) });
-    if (method === "GET" && deploymentId && !action) return writeJson(res, 200, deploymentStore.get(projectId, deploymentId) ?? notFoundDeployment(deploymentId));
-    if (method === "GET" && deploymentId && action === "logs") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "logs"));
-    if (method === "GET" && deploymentId && action === "status") return writeJson(res, 200, await deploymentStore.action(project, deploymentId, "status"));
-    if (method === "POST" && deploymentId && (action === "start" || action === "stop" || action === "restart" || action === "rollback")) { assertExecutionAccess(actor, "deployment actions"); return writeJson(res, 200, await deploymentStore.action(project, deploymentId, action)); }
+    const deployment = deploymentId ? deploymentStore.get(projectId, deploymentId) : undefined;
+    if (!deployment) throw notFoundDeployment(deploymentId ?? "unknown");
+    if (method === "GET" && !action) return writeJson(res, 200, deployment);
+    if (method === "GET" && action === "status") return writeJson(res, 200, await deploymentStore.status(projectId, deployment.deploymentId));
+    if (method === "GET" && action === "logs") return writeJson(res, 200, { deploymentId: deployment.deploymentId, logs: deploymentStore.logs(projectId, deployment.deploymentId) });
+    if (method === "POST" && action === "restart") { assertExecutionAccess(actor, "deployment restart"); return writeJson(res, 200, await deploymentStore.restart(projectId, deployment.deploymentId, actor.id, requestId)); }
+    if (method === "POST" && action === "rollback") { assertExecutionAccess(actor, "deployment rollback"); return writeJson(res, 200, await deploymentStore.rollback(projectId, deployment.deploymentId, actor.id, requestId)); }
   }
 
-
-  const scanMatch = path.match(/^\/api\/projects\/([^/]+)\/scan$/);
-  if (scanMatch) {
-    const [, projectId] = scanMatch;
-    assertProjectAccess(actor, projectId);
-    const project = projectStore.get(projectId);
-    if (!project) throw notFoundProject(projectId);
-    if (method === "POST") {
-      assertExecutionAccess(actor, "project scan");
-      const workspacePath = fileService.workspace(projectId);
-      const result = await scanAndGenerateBotbladeMetadata(workspacePath, { kind: "generated-project", url: project.github?.repo ? `https://github.com/${project.github.owner}/${project.github.repo}` : undefined });
-      return writeJson(res, 200, result);
-    }
-  }
-
-  const importIdMatch = path.match(/^\/api\/imports\/(?!git$|zip$|folder$)([^/]+)$/);
-  if (importIdMatch) {
-    if (method !== "GET") return writeJson(res, 404, { error: { code: "NOT_FOUND", message: "Route not found.", details: {}, requestId } });
-    const record = importStore.get(importIdMatch[1]);
-    if (!record) throw { statusCode: 404, code: "NOT_FOUND", message: `Import '${importIdMatch[1]}' was not found.`, details: {} };
-    return writeJson(res, 200, record);
-  }
-
-  if (method === "POST" && path === "/api/imports/git") {
-    const body = await readJson(req) as { repoUrl?: string; workspacePath?: string; ref?: string; projectName?: string };
-    if (!body?.repoUrl || !body?.workspacePath) throw new RequestValidationError([{ field: "repoUrl|workspacePath", message: "repoUrl and workspacePath are required." }]);
-    const record = await importStore.createAndRun({ type: "git", repoUrl: body.repoUrl, ref: body.ref }, body.workspacePath, auditService, actor.id, requestId);
-    if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
-      const repoNameFromUrl = body.repoUrl.split("/").filter(Boolean).pop() ?? "imported-project";
-      const repoName = repoNameFromUrl.endsWith(".git") ? repoNameFromUrl.slice(0, -4) : repoNameFromUrl;
-      const project = projectStore.create({ name: body.projectName?.trim() || repoName, slug: repoName, description: `Imported from ${body.repoUrl}` });
-      record.managedProject = { id: project.id, slug: project.slug };
-      const workspace = fileService.workspace(project.id);
-      const fs = await import("node:fs/promises");
-      await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
-      await fs.rm(workspace, { recursive: true, force: true });
-      await copyDirectory(record.workspacePath, workspace);
-    }
-    return writeJson(res, 201, record);
-  }
-  if (method === "POST" && path === "/api/imports/zip") {
-    const body = await readJson(req) as { archivePath?: string; workspacePath?: string };
-    if (!body?.archivePath || !body?.workspacePath) throw new RequestValidationError([{ field: "archivePath|workspacePath", message: "archivePath and workspacePath are required." }]);
-    const record = await importStore.createAndRun({ type: "zip", archivePath: body.archivePath }, body.workspacePath, auditService, actor.id, requestId);
-    return writeJson(res, 201, record);
-  }
-  if (method === "POST" && path === "/api/imports/folder") {
-    if (process.env.BOTBLADE_SAF_IMPORT_ENABLED !== "true") {
-      return writeJson(res, 403, { error: { code: "FEATURE_DISABLED", message: "Folder imports require SAF support.", details: { feature: "saf_import" }, requestId } });
-    }
-    const body = await readJson(req) as { folderPath?: string; workspacePath?: string };
-    if (!body?.folderPath || !body?.workspacePath) throw new RequestValidationError([{ field: "folderPath|workspacePath", message: "folderPath and workspacePath are required." }]);
-    const record = await importStore.createAndRun({ type: "folder", folderPath: body.folderPath }, body.workspacePath, auditService, actor.id, requestId);
-    return writeJson(res, 201, record);
-  }
-
-  const gitStatusMatch = path.match(/^\/api\/projects\/([^/]+)\/git\/status$/);
-  if (gitStatusMatch) {
-    const [, projectId] = gitStatusMatch;
-    assertProjectAccess(actor, projectId);
-    if (!projectStore.get(projectId)) throw notFoundProject(projectId);
-    if (method === "GET") return writeJson(res, 200, await gitStatusService.readStatusSafe(fileService.workspace(projectId)));
-  }
-
-  const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);
-  if (commandsMatch) {
-    const [, projectId, commandId] = commandsMatch;
-    assertProjectAccess(actor, projectId);
-    const project = projectStore.get(projectId);
-    if (!project) throw notFoundProject(projectId);
-    if (method === "GET" && !commandId) return writeJson(res, 200, { commands: project.commands });
-    if (method === "POST" && !commandId) {
-      const command = parseCommandDefinition(await readJson(req));
-      const commands = [...project.commands, command];
-      validateCommands(commands);
-      project.commands = commands;
-      project.updatedAt = new Date().toISOString();
-      const audit = auditService.record({ action: "discord.commands.register", actorId: actor.id, projectId, resourceType: "command", resourceId: command.id ?? command.name, metadata: { name: command.name, description: command.description }, requestId });
-      return writeJson(res, 201, { ...command, auditEventId: audit.id });
-    }
-    const index = project.commands.findIndex((command) => command.id === commandId);
-    if (index < 0) throw notFoundCommand(commandId ?? "");
-    if (method === "PATCH" && commandId) {
-      const updated = parseCommandPatch(await readJson(req), project.commands[index]);
-      const commands = [...project.commands];
-      commands[index] = updated;
-      validateCommands(commands);
-      project.commands = commands;
-      project.updatedAt = new Date().toISOString();
-      return writeJson(res, 200, updated);
-    }
-    if (method === "DELETE" && commandId) {
-      project.commands = project.commands.filter((command) => command.id !== commandId);
-      project.updatedAt = new Date().toISOString();
-      res.statusCode = 204;
-      res.end();
-      return;
-    }
-  }
-
-  const githubProjectMatch = path.match(/^\/api\/projects\/([^/]+)\/github\/(create-repo|push|create-workflow)$/);
-  if (githubProjectMatch) {
-    const [, projectId, action] = githubProjectMatch;
-    assertProjectAccess(actor, projectId);
-    const project = projectStore.get(projectId);
-    if (!project) throw notFoundProject(projectId);
-    if (method === "POST" && action === "create-repo") return writeJson(res, 200, githubService.linkRepo(project, await readJson(req)));
-    if (method === "POST" && action === "push") {
-      const result = await githubService.push(project, requestId);
-      return writeJson(res, 200, result);
-    }
-    if (method === "POST" && action === "create-workflow") return writeJson(res, 200, githubService.workflow(project));
-  }
-
-  const projectProfileMatch = path.match(/^\/api\/projects\/([^/]+)\/profile$/);
-  if (projectProfileMatch) {
-    const [, projectId] = projectProfileMatch;
-    assertProjectAccess(actor, projectId);
-    if (!projectStore.get(projectId)) throw notFoundProject(projectId);
-    if (method === "GET") {
-      const fs = await import("node:fs/promises");
-      const metadataPath = `${fileService.workspace(projectId)}/botblade.json`;
-      let profile: Record<string, unknown> | null = null;
-      try { profile = JSON.parse(await fs.readFile(metadataPath, "utf8")) as Record<string, unknown>; } catch {}
-      const git = await gitStatusService.readStatusSafe(fileService.workspace(projectId));
-      const existingCards = Array.isArray(profile?.repairCards) ? profile?.repairCards as Array<Record<string, unknown>> : [];
-      const repairCards = [...existingCards];
-      if (!git.available) repairCards.push({ title: "Git metadata unavailable", safeAction: "Initialize Git in the workspace or verify repository access, then refresh profile." });
-      if (profile && typeof profile === "object") return writeJson(res, 200, { ...sanitizeProfileImportSource(profile), git, repairCards });
-      return writeJson(res, 200, { schemaVersion: "1.0.0", generatedBy: "botblade", generatedAt: new Date().toISOString(), project: { id: projectId }, git, repairCards });
-    }
-  }
-
-  const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/(archive|clone|validate|generate|regenerate))?$/);
+  const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/(commands|validate|clone|archive|github|git-status|scan))?(?:\/([^/]+))?$/);
   if (projectMatch) {
-    const [, projectId, action] = projectMatch;
+    const [, projectId, resource, commandId] = projectMatch;
     assertProjectAccess(actor, projectId);
-    if (method === "GET" && !action) return writeJson(res, 200, projectStore.get(projectId) ?? notFoundProject(projectId));
-    if (method === "PATCH" && !action) {
-      const input = parseUpdateProjectInput(await readJson(req));
-      if (input.discord?.tokenSecretRef && !secretStore.has(input.discord.tokenSecretRef)) throw new RequestValidationError([{ field: "discord.tokenSecretRef", message: "Secret reference does not exist." }]);
-      const project = projectStore.update(projectId, input) ?? notFoundProject(projectId);
-      const audit = auditService.record({ action: "project.update", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: input as Record<string, unknown>, requestId });
-      return writeJson(res, 200, { ...project, auditEventId: audit.id });
+    const project = projectStore.get(projectId);
+    if (!project) throw notFoundProject(projectId);
+    if (method === "GET" && !resource) return writeJson(res, 200, project);
+    if (method === "PATCH" && !resource) return writeJson(res, 200, projectStore.update(projectId, parseUpdateProjectInput(await readJson(req))) ?? notFoundProject(projectId));
+    if (method === "DELETE" && !resource) { if (!projectStore.delete(projectId)) throw notFoundProject(projectId); res.statusCode = 204; res.end(); return; }
+    if (method === "POST" && resource === "clone") return writeJson(res, 201, projectStore.clone(projectId));
+    if (method === "POST" && resource === "archive") return writeJson(res, 200, projectStore.archive(projectId));
+    if (method === "POST" && resource === "validate") return writeJson(res, 200, validateProject(project, (secretId) => secretStore.has(secretId)));
+    if (resource === "commands") {
+      if (method === "GET" && !commandId) return writeJson(res, 200, { commands: project.commands });
+      if (method === "POST" && !commandId) {
+        const command = parseCommandDefinition(await readJson(req));
+        const errors = validateCommands([...project.commands, command]);
+        if (errors.length > 0) throw new RequestValidationError(errors);
+        return writeJson(res, 201, projectStore.update(projectId, { commands: [...project.commands, command] })?.commands.at(-1));
+      }
+      if (method === "PATCH" && commandId) {
+        const patch = parseCommandPatch(await readJson(req));
+        const nextCommands = project.commands.map((command) => command.id === commandId ? { ...command, ...patch } : command);
+        const errors = validateCommands(nextCommands);
+        if (errors.length > 0) throw new RequestValidationError(errors);
+        return writeJson(res, 200, projectStore.update(projectId, { commands: nextCommands })?.commands.find((command) => command.id === commandId));
+      }
+      if (method === "DELETE" && commandId) return writeJson(res, 200, { deleted: projectStore.update(projectId, { commands: project.commands.filter((command) => command.id !== commandId) }) !== undefined });
     }
-    if (method === "DELETE" && !action) {
-      if (!projectStore.delete(projectId)) throw notFoundProject(projectId);
-      res.statusCode = 204;
-      res.end();
-      return;
-    }
-    if (method === "POST" && action === "archive") { const project = projectStore.archive(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.archive", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: { archivedAt: project.archivedAt }, requestId }); return writeJson(res, 200, { ...project, auditEventId: audit.id }); }
-    if (method === "POST" && action === "clone") { const clone = projectStore.clone(projectId) ?? notFoundProject(projectId); const audit = auditService.record({ action: "project.clone", actorId: actor.id, projectId: clone.id, resourceType: "project", resourceId: clone.id, metadata: { sourceProjectId: projectId, name: clone.name, slug: clone.slug }, requestId }); return writeJson(res, 201, { ...clone, auditEventId: audit.id }); }
-    if (method === "POST" && action === "validate") {
-      const project = projectStore.get(projectId);
-      if (!project) throw notFoundProject(projectId);
-      return writeJson(res, 200, validateProject(project, (secretId) => secretStore.has(secretId)));
-    }
-    if (method === "POST" && (action === "generate" || action === "regenerate")) {
-      assertExecutionAccess(actor, "project generation");
-      const project = projectStore.get(projectId);
-      if (!project) throw notFoundProject(projectId);
-      const audit = auditService.record({ action: "generate.start", actorId: actor.id, projectId, resourceType: "project", resourceId: projectId, metadata: { force: action === "regenerate" }, requestId });
-      const result = await fileService.generate(project, action === "regenerate");
-      return writeJson(res, 200, { ...result, auditEventId: audit.id });
-    }
+    if (method === "POST" && resource === "github") return writeJson(res, 200, githubService.linkProject(projectStore, projectId, await readJson(req)));
+    if (method === "POST" && resource === "scan") return writeJson(res, 200, await scanAndGenerateBotbladeMetadata(await fileService.projectRoot(projectId), { kind: "folder" }));
+    if (method === "GET" && resource === "git-status") return writeJson(res, 200, await gitStatusService.status(await fileService.projectRoot(projectId)));
   }
-  throw { statusCode: 404, code: "NOT_FOUND", message: "Route not found.", details: {} };
+
+  if (method === "POST" && path === "/api/imports") {
+    assertExecutionAccess(actor, "imports");
+    const body = await readJson(req);
+    const source = parseImportSource(body?.sourceType, body?.source);
+    const workspacePath = typeof body?.workspacePath === "string" ? body.workspacePath : pathModule.resolve(process.cwd(), "workspace");
+    return writeJson(res, 201, await importStore.createAndRun(source, workspacePath, auditService, actor.id, requestId));
+  }
+
+  throw { statusCode: 404, code: "NOT_FOUND", message: `No route for ${method} ${path}`, details: {} };
 }
 
-async function copyDirectory(from: string, to: string): Promise<void> {
-  const fs = await import("node:fs/promises");
-  await fs.mkdir(to, { recursive: true });
-  const entries = await fs.readdir(from, { withFileTypes: true });
-  for (const entry of entries) {
-    const sourcePath = `${from}/${entry.name}`;
-    const targetPath = `${to}/${entry.name}`;
-    if (entry.isDirectory()) await copyDirectory(sourcePath, targetPath);
-    else if (entry.isFile()) await fs.writeFile(targetPath, await fs.readFile(sourcePath, "utf8"), "utf8");
-  }
+function parseImportSource(sourceType: unknown, source: unknown) {
+  if (sourceType === "git" && typeof source === "string") return { type: "git" as const, repoUrl: source };
+  if (sourceType === "zip" && typeof source === "string") return { type: "zip" as const, archivePath: source };
+  if (sourceType === "folder" && typeof source === "string") return { type: "folder" as const, folderPath: source };
+  if (sourceType === "workflow_json" && typeof source === "string") return { type: "workflow_json" as const, workflowPath: source };
+  if (sourceType === "template" && typeof source === "string") return { type: "template" as const, templateId: source };
+  if (sourceType === "repair" && typeof source === "string") return { type: "repair" as const, projectId: source };
+  throw { statusCode: 400, code: "INVALID_IMPORT_SOURCE", message: "Import sourceType/source are invalid.", details: { sourceType } };
 }
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
-  const maxBytes = 1024 * 1024;
+function handleLogsUpgrade(req: IncomingMessage, socket: Socket): void {
+  socket.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n");
+  logClients.add(socket);
+  socket.on("close", () => logClients.delete(socket));
+}
+
+async function readJson(req: IncomingMessage): Promise<any> {
   const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += buffer.length;
-    if (size > maxBytes) throw new RequestValidationError([{ field: "body", message: "Request body exceeds 1MB limit." }]);
-    chunks.push(buffer);
-  }
-  const body = Buffer.concat(chunks).toString("utf8").trim();
-  if (!body) return {};
-  try { return JSON.parse(body) as unknown; } catch { throw new RequestValidationError([{ field: "body", message: "Body must be valid JSON." }]); }
-}
-
-
-function extractPathname(rawUrl: string | undefined): string {
-  const candidate = typeof rawUrl === "string" && rawUrl.length > 0 ? rawUrl : "/";
-  try {
-    return new URL(candidate, "http://localhost").pathname;
-  } catch {
-    throw { statusCode: 400, code: "INVALID_REQUEST_URL", message: "Request URL is invalid.", details: {} };
-  }
+  for await (const chunk of req) chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  if (chunks.length === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
 function writeJson(res: ServerResponse, statusCode: number, body: unknown): void {
-  if (isHttpError(body)) throw body;
   res.statusCode = statusCode;
-  res.end(redactSecrets(JSON.stringify(body)));
+  res.end(JSON.stringify(body));
 }
 
 function writeError(res: ServerResponse, error: unknown, requestId: string): void {
-  if (error instanceof RequestValidationError) return writeJson(res, 400, { error: { code: "VALIDATION_FAILED", message: redactSecrets(error.message), details: { problems: error.problems.map((problem) => ({ ...problem, message: redactSecrets(problem.message) })) }, requestId } });
-  if (error instanceof DuplicateSlugError) return writeJson(res, 409, { error: { code: "DUPLICATE_PROJECT_SLUG", message: redactSecrets(error.message), details: {}, requestId } });
-  const statusCode = isHttpError(error) ? error.statusCode : 500;
-  const code = isHttpError(error) ? error.code : "INTERNAL_SERVER_ERROR";
-  const message = redactSecrets(isHttpError(error) ? error.message : "Unexpected backend error.");
-  const details = isHttpError(error) ? error.details : {};
-  res.statusCode = statusCode;
-  res.end(redactSecrets(JSON.stringify({ error: { code, message, details, requestId } })));
+  const typed = error as { statusCode?: number; code?: string; message?: string; details?: unknown };
+  res.statusCode = typed.statusCode ?? 500;
+  res.end(JSON.stringify({ error: typed.code ?? "INTERNAL_SERVER_ERROR", message: typed.message ?? "Internal server error", details: typed.details ?? {}, requestId }));
 }
 
-function notFoundProject(projectId: string): never {
-  throw { statusCode: 404, code: "NOT_FOUND", message: `Project '${projectId}' was not found.`, details: {} };
+function extractPathname(url: string | undefined): string {
+  return new URL(url ?? "/", "http://localhost").pathname;
 }
 
-function notFoundSecret(secretId: string): never {
-  throw { statusCode: 404, code: "NOT_FOUND", message: `Secret '${secretId}' was not found.`, details: {} };
-}
-
-function notFoundBuild(buildId: string): never {
-  throw { statusCode: 404, code: "NOT_FOUND", message: `Build '${buildId}' was not found.`, details: {} };
-}
-
-function notFoundTarget(targetId: string): never {
-  throw { statusCode: 404, code: "NOT_FOUND", message: `Deployment target '${targetId}' was not found.`, details: {} };
-}
-
-function notFoundDeployment(deploymentId: string): never {
-  throw { statusCode: 404, code: "NOT_FOUND", message: `Deployment '${deploymentId}' was not found.`, details: {} };
-}
-
-function notFoundCommand(commandId: string): never {
-  throw { statusCode: 404, code: "NOT_FOUND", message: `Command '${commandId}' was not found.`, details: {} };
-}
-
-
-function sanitizeProfileImportSource(profile: Record<string, unknown>): Record<string, unknown> {
-  const project = profile.project;
-  if (!project || typeof project !== "object" || Array.isArray(project)) return profile;
-  const source = (project as Record<string, unknown>).importSource;
-  if (!source || typeof source !== "object" || Array.isArray(source)) return profile;
-  const url = (source as Record<string, unknown>).url;
-  if (typeof url !== "string" || !url.trim()) return profile;
-  return {
-    ...profile,
-    project: {
-      ...(project as Record<string, unknown>),
-      importSource: {
-        ...(source as Record<string, unknown>),
-        url: redactCredentialUrl(url),
-      },
-    },
-  };
-}
-
-function isHttpError(value: unknown): value is { statusCode: number; code: string; message: string; details: unknown } {
-  return Boolean(value && typeof value === "object" && "statusCode" in value && "code" in value && "message" in value);
-}
-
-
-function handleLogsUpgrade(req: IncomingMessage, socket: Socket) {
-  if (extractPathname(req.url) !== "/logs") { socket.destroy(); return; }
-  const key = req.headers["sec-websocket-key"];
-  if (typeof key !== "string") { socket.destroy(); return; }
-  const accept = crypto.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64" as any);
-  socket.write([
-    "HTTP/1.1 101 Switching Protocols",
-    "Upgrade: websocket",
-    "Connection: Upgrade",
-    `Sec-WebSocket-Accept: ${accept}`,
-    "",
-    ""
-  ].join("\r\n"));
-  logClients.add(socket);
-  socket.on("close", () => logClients.delete(socket));
-  socket.on("error", () => logClients.delete(socket));
-}
-
-function broadcastLogLine(line: string) {
-  const payload = Buffer.from(line, "utf8");
-  const header = payload.length < 126 ? Buffer.from([0x81, payload.length]) : Buffer.from([0x81, 126, (payload.length >> 8) & 0xff, payload.length & 0xff]);
-  const frame = Buffer.concat([header, payload]);
-  for (const client of logClients) {
-    if (!client.destroyed) client.write(frame);
-  }
-}
-
-const originalInfo = console.info.bind(console);
-const originalError = console.error.bind(console);
-console.info = (...args: unknown[]) => { originalInfo(...args); broadcastLogLine(args.map(String).join(" ")); };
-console.error = (...args: unknown[]) => { originalError(...args); broadcastLogLine(args.map(String).join(" ")); };
+function notFoundProject(projectId: string) { return { statusCode: 404, code: "PROJECT_NOT_FOUND", message: `Project ${projectId} not found.`, details: { projectId } }; }
+function notFoundSecret(secretId: string) { return { statusCode: 404, code: "SECRET_NOT_FOUND", message: `Secret ${secretId} not found.`, details: { secretId } }; }
+function notFoundTarget(targetId: string) { return { statusCode: 404, code: "TARGET_NOT_FOUND", message: `Deployment target ${targetId} not found.`, details: { targetId } }; }
+function notFoundDeployment(deploymentId: string) { return { statusCode: 404, code: "DEPLOYMENT_NOT_FOUND", message: `Deployment ${deploymentId} not found.`, details: { deploymentId } }; }
