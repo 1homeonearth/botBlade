@@ -290,3 +290,18 @@ Future. Currently returns `GITHUB_PUSH_NOT_IMPLEMENTED`.
 ### `POST /api/projects/:projectId/github/create-workflow`
 
 Returns a GitHub Actions workflow file path and content.
+
+### `POST /api/projects/:projectId/scan`
+
+Returns `{ "detection", "botbladeJsonPath" }` where `botblade.json` contains the shipped Bot Profile schema:
+
+- `schemaVersion`: `"1.0.0"`
+- `generatedBy`, `generatedAt`
+- `project`: `name`, `type`, `root`, `importSource`
+- `runtime`: `type`, `version`, `packageManager`, `detectedLanguages[]`, `detectedFrameworks[]`
+- `bladePack`: `selected`, `version`, `detected[]` (`id`, `name`, `score`, `confidence`, `matchedEvidence[]`)
+- `commandPlan`: `install[]`, `build[]`, `test[]`, `validate[]`, `start[]`, `stop[]`, `restart[]`, `deploy[]`
+- `secrets.required[]` / `secrets.optional[]`: `name`, `required`, `configured`
+- `permissions[]`, `capabilities[]`, `importantFiles[]`, `warnings[]`, `repairCards[]`, `git` (`branch`, `status`, `remotes[]`)
+
+Secret safety guarantee: profile metadata stores only secret requirement metadata and configured flags. Secret values are never serialized.

@@ -18,10 +18,8 @@ class BotBladeApp : Application() {
         StartupDiagnostics.mark("application_on_create_end")
         downloadsLogMirror = DownloadsLogMirror(this).also { mirror ->
             mirror.start()
-            val previous = Thread.getDefaultUncaughtExceptionHandler()
-            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-                mirror.captureNow("app_crashed")
-                previous?.uncaughtException(thread, throwable) ?: throw throwable
+            StartupDiagnostics.addCrashObserver {
+                mirror.captureNow("app_crashed", StartupDiagnostics.readLatest(this))
             }
         }
     }
