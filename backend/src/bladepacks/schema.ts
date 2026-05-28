@@ -1,3 +1,5 @@
+export type BladePackSchemaVersion = "0.2.0";
+
 export type BladePackRuntime = {
   type: "node" | "python" | "bun" | "workflow" | "unknown";
   versionRange?: string;
@@ -13,6 +15,60 @@ export type BladePackDetector =
   | { kind: "knownFilename"; path: string; weight: number }
   | { kind: "knownDirectory"; path: string; weight: number }
   | { kind: "jsonShape"; file: string; keys: string[]; weight: number };
+
+export type BladePackCommandName = "install" | "build" | "test" | "validate" | "start" | "stop" | "restart" | "deploy";
+
+export type BladePackCommands = Partial<Record<BladePackCommandName, string>> & {
+  /** @deprecated Use the canonical Phase 4 `start` command instead. */
+  run?: string;
+};
+
+export type BladePackImportantFileKind = "entrypoint" | "config" | "workflow" | "commandDirectory" | "packageManifest";
+
+export type BladePackImportantFilePattern = {
+  kind: BladePackImportantFileKind;
+  pattern: string;
+  label: string;
+  required?: boolean;
+};
+
+export type BladePackRepairSeverity = "info" | "warning" | "error" | "critical";
+
+export type BladePackRepairRule = {
+  id: string;
+  title: string;
+  severity: BladePackRepairSeverity;
+  evidencePattern: string;
+  safeAction: string;
+  commandHint?: BladePackCommandName;
+  affectedFiles?: string[];
+};
+
+export type BladePackSecretDetectorSource = "envExample" | "sourceReference" | "workflowCredentialReference" | "frameworkConvention";
+
+export type BladePackSecretDetector = {
+  source: BladePackSecretDetectorSource;
+  names: string[];
+  required: boolean;
+  evidencePattern?: string;
+  description?: string;
+};
+
+export type BladePackStarterFile = {
+  path: string;
+  description?: string;
+};
+
+export type BladePackTemplateOption = {
+  id: string;
+  label: string;
+  description: string;
+  runtime: BladePackRuntime["type"];
+  starterFiles?: BladePackStarterFile[];
+  backendTemplateRef?: string;
+};
+
+export type BladePackImportMode = "repository" | "zip" | "folder" | "workflow_json" | "template";
 
 export type BladePackSecret = {
   name: string;
@@ -39,17 +95,25 @@ export type BladePackSupportedImport = {
 };
 
 export type BladePack = {
+  schemaVersion?: BladePackSchemaVersion;
   id: string;
   name: string;
   version: string;
   license: string;
   runtime: BladePackRuntime;
   detectors: BladePackDetector[];
-  templates: string[];
-  commands: Partial<Record<"install" | "build" | "test" | "run" | "deploy", string>>;
+  /** @deprecated Use `templateOptions` for new Blade Pack template metadata. */
+  templates?: string[];
+  templateOptions?: BladePackTemplateOption[];
+  commands: BladePackCommands;
+  importantFilePatterns?: BladePackImportantFilePattern[];
+  repairRules?: BladePackRepairRule[];
   secrets: BladePackSecret[];
+  secretDetectors?: BladePackSecretDetector[];
   diagnostics: BladePackDiagnostic[];
   panels: string[];
   docs: BladePackDoc[];
-  supportedImports: BladePackSupportedImport[];
+  importModes?: BladePackImportMode[];
+  /** @deprecated Use `importModes` for canonical import support metadata. */
+  supportedImports?: BladePackSupportedImport[];
 };
