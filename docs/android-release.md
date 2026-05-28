@@ -94,7 +94,7 @@ Production launcher assets live in `app/src/main/res`:
 - Adaptive icons: `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml`.
 - Adaptive foreground: `drawable/ic_launcher_foreground.xml`.
 - Adaptive background color: `@color/ic_launcher_background`.
-- Legacy density PNGs: `mipmap-mdpi`, `mipmap-hdpi`, `mipmap-xhdpi`, `mipmap-xxhdpi`, and `mipmap-xxxhdpi`, each containing `ic_launcher.png` and `ic_launcher_round.png`.
+- Legacy density icon XML wrappers: `mipmap-mdpi`, `mipmap-hdpi`, `mipmap-xhdpi`, `mipmap-xxhdpi`, and `mipmap-xxxhdpi`, each containing `ic_launcher.xml` and `ic_launcher_round.xml` that point at the shared vector foreground.
 
 Verify icon density coverage and release/debug manifest policy with:
 
