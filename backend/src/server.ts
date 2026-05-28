@@ -5,6 +5,7 @@ import pathModule from "node:path";
 import { API_VERSION, SERVICE_NAME, SERVICE_VERSION } from "./models/project.js";
 import { AuditService } from "./services/auditService.js";
 import { assertExecutionAccess, assertGlobalAccess, assertProjectAccess, authenticateRequest, canAccessProject, hasGlobalProjectAccess } from "./services/authService.js";
+import { createAuthRotationPlan } from "./services/authRotation.js";
 import { BuildService } from "./services/buildService.js";
 import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./services/commandDefinitions.js";
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
@@ -100,6 +101,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
   if (method === "GET" && path === "/api/persistence/status") {
     assertGlobalAccess(actor, "persistence status");
     return writeJson(res, 200, persistence ? persistence.diagnostics() : { adapter: "memory", durable: false });
+  }
+
+  if (method === "POST" && path === "/api/auth/rotate") {
+    assertGlobalAccess(actor, "auth rotation");
+    const plan = createAuthRotationPlan(actor, await readJson(req) as Record<string, unknown>);
+    auditService.record({ action: "secret.rotate", actorId: actor.id, projectId: null, resourceType: "auth", resourceId: actor.tokenId, metadata: { nextTokenId: plan.nextTokenId, authMethod: plan.authMethod, environmentVariable: plan.environmentVariable }, requestId });
+    return writeJson(res, 201, plan);
   }
 
   if (method === "GET" && path === "/api/audit-events") {
