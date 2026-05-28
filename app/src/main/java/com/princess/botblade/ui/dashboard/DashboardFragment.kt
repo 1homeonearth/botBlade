@@ -31,10 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.princess.botblade.MainActivity
-import com.princess.botblade.R
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.shell.BotBladeDestination
 import com.princess.botblade.ui.theme.BotBladeTheme
 import com.princess.botblade.ui.theme.isDynamicColorEnabled
 import kotlinx.coroutines.launch
@@ -54,11 +53,11 @@ class DashboardFragment : Fragment() {
                         vm = viewModel,
                         started = started,
                         onCreateProject = ::openAddProjectFlow,
-                        onOpenProjects = { navigateTo(R.id.navigation_projects) },
-                        onOpenEditor = { navigateTo(R.id.navigation_editor) },
-                        onOpenBuild = { navigateTo(R.id.navigation_deployments) },
+                        onOpenProjects = { navigateTo(BotBladeDestination.Projects) },
+                        onOpenEditor = { navigateTo(BotBladeDestination.Editor) },
+                        onOpenBuild = { navigateTo(BotBladeDestination.Deployments) },
                         onOpenOps = { openOpsForProject(activeProjectId) },
-                        onOpenSettings = { navigateTo(R.id.navigation_settings) },
+                        onOpenSettings = { navigateTo(BotBladeDestination.Settings) },
                         onLogs = { (activity as? MainActivity)?.openLogsScreen() },
                     )
                 }
@@ -91,14 +90,13 @@ class DashboardFragment : Fragment() {
         activeProjectId = activeProjectStore.getActiveProjectId()
     }
 
-
     private fun openOpsForProject(selectedProjectId: String?) {
         val resolvedProjectId = selectedProjectId ?: activeProjectId
         val activity = activity as? MainActivity
         if (activity != null) {
             activity.openDeploymentsForProject(resolvedProjectId, activeProjectStore.getActiveProjectName())
         } else {
-            navigateTo(R.id.navigation_deployments)
+            navigateTo(BotBladeDestination.Deployments)
         }
     }
 
@@ -108,11 +106,11 @@ class DashboardFragment : Fragment() {
             .edit()
             .putBoolean(KEY_OPEN_ADD_PROJECT, true)
             .apply()
-        navigateTo(R.id.navigation_projects)
+        navigateTo(BotBladeDestination.Projects)
     }
 
-    private fun navigateTo(itemId: Int) {
-        activity?.findViewById<BottomNavigationView>(R.id.bottom_navigation)?.selectedItemId = itemId
+    private fun navigateTo(destination: BotBladeDestination) {
+        (activity as? MainActivity)?.openDestination(destination)
     }
 
     private companion object {
