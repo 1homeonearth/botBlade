@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -74,16 +75,17 @@ class MainActivity : AppCompatActivity() {
     private fun installComposeShell(savedInstanceState: Bundle?) {
         val shouldOpenDashboard = savedInstanceState == null
         setContent {
+            val runtimeOnline by BotEngineBindingState.serviceRunning.collectAsState()
             BotBladeTheme(useDynamicColor = isDynamicColorEnabled(this)) {
                 BotBladeAppShell(
                     selectedDestination = selectedDestination,
-                    runtimeOnline = BotEngineBindingState.serviceRunning.value,
+                    runtimeOnline = runtimeOnline,
                     fragmentContainerId = R.id.fragment_container,
-                    onDestinationSelected = ::navigateTo,
+                    onDestinationSelected = ::openDestination,
                     contentReady = {
                         shellReady = true
                         if (shouldOpenDashboard && supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
-                            navigateTo(BotBladeDestination.Dashboard)
+                            openDestination(BotBladeDestination.Dashboard)
                         }
                     },
                 )
@@ -108,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun navigateTo(destination: BotBladeDestination) {
+    fun openDestination(destination: BotBladeDestination) {
         selectedDestination = destination
         if (!shellReady) return
         showFragmentSafely { destination.createFragment() }
@@ -153,7 +155,7 @@ class MainActivity : AppCompatActivity() {
         if (projectId != null) {
             ActiveProjectStore(this).setActiveProject(projectId, projectName)
         }
-        navigateTo(BotBladeDestination.Editor)
+        openDestination(BotBladeDestination.Editor)
     }
 
     fun openDeploymentsForProject(projectId: String?, projectName: String?) {
