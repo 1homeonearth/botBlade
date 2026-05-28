@@ -12,10 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeveloperBoard
 import androidx.compose.material.icons.filled.Folder
@@ -24,11 +25,11 @@ import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -60,6 +61,7 @@ fun BotBladeAppShell(
     @IdRes fragmentContainerId: Int,
     onDestinationSelected: (BotBladeDestination) -> Unit,
     contentReady: () -> Unit,
+    commandActions: List<CommandPaletteAction> = emptyList(),
 ) {
     var commandPaletteOpen by remember { mutableStateOf(false) }
     val statusLabel = when (runtimeOnline) {
@@ -126,10 +128,15 @@ fun BotBladeAppShell(
     if (commandPaletteOpen) {
         CommandPaletteDialog(
             selectedDestination = selectedDestination,
+            commandActions = defaultDestinationActions(onDestinationSelected) + commandActions,
             onDismiss = { commandPaletteOpen = false },
             onDestinationSelected = { destination ->
                 commandPaletteOpen = false
                 onDestinationSelected(destination)
+            },
+            onActionSelected = { action ->
+                commandPaletteOpen = false
+                action.run()
             },
         )
     }
@@ -165,8 +172,10 @@ private fun FragmentHost(
 @Composable
 private fun CommandPaletteDialog(
     selectedDestination: BotBladeDestination,
+    commandActions: List<CommandPaletteAction>,
     onDismiss: () -> Unit,
     onDestinationSelected: (BotBladeDestination) -> Unit,
+    onActionSelected: (CommandPaletteAction) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -175,45 +184,74 @@ private fun CommandPaletteDialog(
         },
         title = { Text("Command palette") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Jump between BotBlade workbench surfaces while Phase 1 migrates the chrome to Compose.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    BotBladeDestination.entries.forEach { destination ->
-                        FilterChip(
-                            selected = selectedDestination == destination,
-                            onClick = { onDestinationSelected(destination) },
-                            label = { Text(destination.label) },
-                            leadingIcon = { Icon(destination.icon(), contentDescription = null, modifier = Modifier.size(18.dp)) },
-                        )
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Text(
+                        "Jump between BotBlade workbench surfaces and run screen-aware commands.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        BotBladeDestination.entries.forEach { destination ->
+                            FilterChip(
+                                selected = selectedDestination == destination,
+                                onClick = { onDestinationSelected(destination) },
+                                label = { Text(destination.label) },
+                                leadingIcon = { Icon(destination.icon(), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            )
+                        }
                     }
                 }
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Phase 1 target", fontWeight = FontWeight.Bold)
-                        Text(
-                            "Compose shell, four-tab navigation, command overlay, and fragment-safe migration path.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Phase 1 target", fontWeight = FontWeight.Bold)
+                            Text(
+                                "Compose shell, reusable actions, command overlay, and fragment-safe migration path.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-                Button(onClick = { onDestinationSelected(BotBladeDestination.Settings) }) {
-                    Icon(Icons.Filled.Settings, contentDescription = null)
-                    Text("Open Settings", modifier = Modifier.padding(start = 8.dp))
+                items(commandActions, key = { it.id }) { action ->
+                    Surface(
+                        onClick = { onActionSelected(action) },
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        ListItem(
+                            headlineContent = { Text(action.title, fontWeight = FontWeight.Bold) },
+                            supportingContent = { Text(action.detail) },
+                            leadingContent = action.icon?.let { icon ->
+                                { Icon(icon, contentDescription = null) }
+                            },
+                        )
+                    }
                 }
             }
         },
     )
 }
+
+private fun defaultDestinationActions(onDestinationSelected: (BotBladeDestination) -> Unit): List<CommandPaletteAction> =
+    BotBladeDestination.entries.map { destination ->
+        CommandPaletteAction(
+            id = "open-${destination.name.lowercase()}",
+            title = destination.commandLabel,
+            detail = "Jump to ${destination.label}.",
+            icon = destination.icon(),
+            run = { onDestinationSelected(destination) },
+        )
+    }
 
 private fun BotBladeDestination.icon(): ImageVector = when (this) {
     BotBladeDestination.Dashboard -> Icons.Filled.DeveloperBoard
