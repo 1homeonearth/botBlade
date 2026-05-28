@@ -89,5 +89,16 @@ function isEnobufsError(error: unknown): boolean {
 }
 
 export function redactCredentialUrl(url: string): string {
-  return url.replace(/:\/\/([^/@\s]+)@/g, "://[REDACTED]@");
+  const userInfoRedacted = url.replace(/:\/\/([^/@\s]+)@/g, "://[REDACTED]@");
+  const [base, queryAndFragment] = userInfoRedacted.split("?", 2);
+  if (!queryAndFragment) return userInfoRedacted;
+  const [query, fragment = ""] = queryAndFragment.split("#", 2);
+  const sensitive = /(?:token|secret|password|passwd|signature|sig|auth|key|credential)/i;
+  const redactedQuery = query.split("&").map((pair) => {
+    const eq = pair.indexOf("=");
+    if (eq < 0) return pair;
+    const key = pair.slice(0, eq);
+    return sensitive.test(decodeURIComponent(key)) ? `${key}=[REDACTED]` : pair;
+  }).join("&");
+  return `${base}?${redactedQuery}${fragment ? `#${fragment}` : ""}`;
 }

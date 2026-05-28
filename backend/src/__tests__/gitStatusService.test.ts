@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { GitStatusService } from "../services/gitStatusService.js";
+import { GitStatusService, redactCredentialUrl } from "../services/gitStatusService.js";
 
 async function tempDir(prefix: string): Promise<string> {
   const dir = path.join(os.tmpdir(), `${prefix}-${randomUUID()}`);
@@ -87,4 +87,20 @@ test("git status safe mode reports dirty when git status exceeds buffer", async 
   assert.equal(status.available, true);
   assert.equal(status.clean, false);
   assert.equal(status.note, "too many changed files to display");
+});
+
+
+test("redactCredentialUrl redacts sensitive query parameters", () => {
+  const input = "https://host/repo.git?access_token=abc123&expires=123&X-Amz-Signature=sig987";
+  const output = redactCredentialUrl(input);
+  assert.equal(output.includes("abc123"), false);
+  assert.equal(output.includes("sig987"), false);
+  assert.equal(output.includes("expires=123"), true);
+});
+
+test("redactCredentialUrl redacts both userinfo and query credentials", () => {
+  const input = "https://user:pass@example.com/repo.git?auth=topsecret";
+  const output = redactCredentialUrl(input);
+  assert.equal(output.includes("user:pass"), false);
+  assert.equal(output.includes("topsecret"), false);
 });
