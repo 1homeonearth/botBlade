@@ -77,8 +77,11 @@ class CodeEditorComposeFragment : Fragment() {
         var editorText by remember { mutableStateOf("") }
         var terminalLines by remember { mutableStateOf(listOf("Editor terminal ready.")) }
         var scanSummary by remember { mutableStateOf("Scan has not run yet.") }
+        var expandedFolders by remember { mutableStateOf<Set<String>>(emptySet()) }
         val dirty = selectedFile?.editable == true && selectedFile?.content != editorText
         val visibleFiles = if (query.isBlank()) files else files.filter { it.path.contains(query, ignoreCase = true) }
+        val fileTree = remember(visibleFiles) { buildEditorTree(visibleFiles) }
+        val visibleTree = remember(fileTree, expandedFolders, query) { flattenEditorTree(fileTree, expandedFolders, forceExpanded = query.isNotBlank()) }
 
         fun appendTerminal(line: String) {
             terminalLines = (terminalLines + line).takeLast(250)
@@ -90,6 +93,7 @@ class CodeEditorComposeFragment : Fragment() {
             when (val result = repository.listFiles(id)) {
                 is ApiResult.Success -> {
                     files = result.data.sortedBy { it.path }
+                    expandedFolders = defaultExpandedFolders(result.data)
                     status = "Loaded ${result.data.size} file(s)."
                 }
                 is ApiResult.Error -> status = "File load failed: ${result.message}"
@@ -103,6 +107,7 @@ class CodeEditorComposeFragment : Fragment() {
             when (val result = repository.generateProject(id)) {
                 is ApiResult.Success -> {
                     files = result.data.sortedBy { it.path }
+                    expandedFolders = defaultExpandedFolders(result.data)
                     status = "Generated ${result.data.size} file(s)."
                     appendTerminal(status)
                 }
@@ -216,14 +221,35 @@ class CodeEditorComposeFragment : Fragment() {
                 }
             }
 
-            if (visibleFiles.isNotEmpty()) {
-                item { SectionTitle("Files") }
-                items(visibleFiles.take(80), key = { it.path }) { file ->
-                    WorkstationCard(accent = if (file.path == selectedFile?.path) BotBladeTokens.Success else BotBladeTokens.BabyBlue) {
-                        Text(file.path, color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
-                        Text("${if (file.editable) "editable" else "preview only"} • ${file.size} bytes", color = BotBladeTokens.Muted)
+            if (visibleTree.isNotEmpty()) {
+                item { SectionTitle("File tree") }
+                items(visibleTree.take(120), key = { "${it.node.type}:${it.node.path}" }) { visibleNode ->
+                    val node = visibleNode.node
+                    WorkstationCard(accent = if (node.path == selectedFile?.path) BotBladeTokens.Success else if (node.type == EditorNodeType.Directory) BotBladeTokens.GlitterGold else BotBladeTokens.BabyBlue) {
+                        val prefix = "  ".repeat(visibleNode.depth)
+                        val marker = if (node.type == EditorNodeType.Directory) {
+                            if (node.path in expandedFolders || query.isNotBlank()) "▾" else "▸"
+                        } else {
+                            "•"
+                        }
+                        Text("$prefix$marker ${node.name}", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                        if (node.type == EditorNodeType.File) {
+                            val file = node.file
+                            Text("$prefix${if (file?.editable == true) "editable" else "preview only"} • ${file?.size ?: 0} bytes", color = BotBladeTokens.Muted)
+                        } else {
+                            Text("$prefix${node.children.size} item(s)", color = BotBladeTokens.Muted)
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                            AssistChip(onClick = { openFile(file.path) }, label = { Text("Open") })
+                            if (node.type == EditorNodeType.Directory) {
+                                AssistChip(
+                                    onClick = {
+                                        expandedFolders = if (node.path in expandedFolders) expandedFolders - node.path else expandedFolders + node.path
+                                    },
+                                    label = { Text(if (node.path in expandedFolders || query.isNotBlank()) "Collapse" else "Expand") },
+                                )
+                            } else {
+                                AssistChip(onClick = { openFile(node.path) }, label = { Text("Open") })
+                            }
                         }
                     }
                 }
@@ -262,3 +288,71 @@ class CodeEditorComposeFragment : Fragment() {
         }
     }
 }
+
+private enum class EditorNodeType { Directory, File }
+
+private data class EditorTreeNode(
+    val name: String,
+    val path: String,
+    val type: EditorNodeType,
+    val file: ProjectFileSummary? = null,
+    val children: List<EditorTreeNode> = emptyList(),
+)
+
+private data class VisibleEditorNode(val node: EditorTreeNode, val depth: Int)
+
+private data class MutableEditorTreeNode(
+    val name: String,
+    val path: String,
+    val type: EditorNodeType,
+    var file: ProjectFileSummary? = null,
+    val children: MutableList<MutableEditorTreeNode> = mutableListOf(),
+)
+
+private fun buildEditorTree(files: List<ProjectFileSummary>): List<EditorTreeNode> {
+    val roots = mutableListOf<MutableEditorTreeNode>()
+    files.forEach { file ->
+        val segments = file.path.replace('\\', '/').trim('/').split('/').filter { it.isNotBlank() }
+        var children = roots
+        var currentPath = ""
+        segments.forEachIndexed { index, segment ->
+            currentPath = if (currentPath.isBlank()) segment else "$currentPath/$segment"
+            val isFile = index == segments.lastIndex
+            val existing = children.firstOrNull { it.name == segment }
+            if (isFile) {
+                if (existing == null) {
+                    children += MutableEditorTreeNode(segment, currentPath, EditorNodeType.File, file)
+                } else {
+                    existing.file = file
+                }
+            } else {
+                val directory = existing ?: MutableEditorTreeNode(segment, currentPath, EditorNodeType.Directory).also { children += it }
+                children = directory.children
+            }
+        }
+    }
+    return roots.map { it.freeze() }.sortedWith(editorTreeComparator)
+}
+
+private fun MutableEditorTreeNode.freeze(): EditorTreeNode = EditorTreeNode(
+    name = name,
+    path = path,
+    type = type,
+    file = file,
+    children = children.map { it.freeze() }.sortedWith(editorTreeComparator),
+)
+
+private val editorTreeComparator = compareBy<EditorTreeNode> { if (it.type == EditorNodeType.Directory) 0 else 1 }.thenBy { it.name.lowercase() }
+
+private fun flattenEditorTree(nodes: List<EditorTreeNode>, expandedFolders: Set<String>, forceExpanded: Boolean = false, depth: Int = 0): List<VisibleEditorNode> = nodes.flatMap { node ->
+    val current = VisibleEditorNode(node, depth)
+    if (node.type == EditorNodeType.Directory && (forceExpanded || node.path in expandedFolders)) listOf(current) + flattenEditorTree(node.children, expandedFolders, forceExpanded, depth + 1) else listOf(current)
+}
+
+private fun defaultExpandedFolders(files: List<ProjectFileSummary>): Set<String> = files
+    .flatMap { file ->
+        val segments = file.path.replace('\\', '/').trim('/').split('/').filter { it.isNotBlank() }
+        segments.dropLast(1).scan("") { prefix, segment -> if (prefix.isBlank()) segment else "$prefix/$segment" }.drop(1)
+    }
+    .take(40)
+    .toSet()
