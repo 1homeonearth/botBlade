@@ -31,9 +31,9 @@ class DownloadsLogMirror(private val context: Context) {
         }
     }
 
-    fun captureNow(reason: String) {
+    fun captureNow(reason: String, startupCrashArtifact: String? = null) {
         scope.launch {
-            runCatching { mirrorNow(reason) }
+            runCatching { mirrorNow(reason, startupCrashArtifact) }
         }
     }
 
@@ -44,8 +44,8 @@ class DownloadsLogMirror(private val context: Context) {
         scope.cancel()
     }
 
-    private fun mirrorNow(reason: String) {
-        val payload = buildPayload(reason)
+    private fun mirrorNow(reason: String, startupCrashArtifact: String?) {
+        val payload = buildPayload(reason, startupCrashArtifact)
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
         val existingId = resolver.query(collection, arrayOf(MediaStore.Downloads._ID), "${MediaStore.Downloads.DISPLAY_NAME}=?", arrayOf(FILE_NAME), null)
@@ -67,7 +67,7 @@ class DownloadsLogMirror(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) resolver.update(targetUri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
     }
 
-    private fun buildPayload(reason: String): String {
+    private fun buildPayload(reason: String, startupCrashArtifact: String?): String {
         val logcat = runCatching {
             ProcessBuilder("logcat", "-d", "-v", "threadtime", "-T", "5m").start().inputStream.bufferedReader().use { it.readText() }
         }.getOrElse { "logcat_unavailable: ${it.message}" }
@@ -77,6 +77,9 @@ class DownloadsLogMirror(private val context: Context) {
             appendLine("updatedAtUtc=${Instant.now()}")
             appendLine("reason=$reason")
             appendLine("note=Android app logcat snapshot written automatically to Downloads")
+            appendLine()
+            appendLine("=== startup_crash_artifact.json ===")
+            appendLine(startupCrashArtifact?.ifBlank { "(no startup crash artifact yet)" } ?: "(no startup crash artifact yet)")
             appendLine()
             appendLine(logcat)
         }

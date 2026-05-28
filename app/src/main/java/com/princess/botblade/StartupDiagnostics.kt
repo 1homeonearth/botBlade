@@ -10,11 +10,13 @@ import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.time.Instant
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
 
 object StartupDiagnostics {
     private const val ARTIFACT_FILE = "startup_crash_artifact.json"
     private val latestMilestone = AtomicReference("process_start")
+    private val crashObservers = CopyOnWriteArrayList<(Throwable) -> Unit>()
 
     fun install(application: Application, appVersion: String, buildType: String, gitSha: String?) {
         mark("application_on_create_start")
@@ -30,11 +32,17 @@ object StartupDiagnostics {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             runCatching { writeArtifact(application, thread, throwable, appVersion, buildType, gitSha) }
+            crashObservers.forEach { observer -> runCatching { observer(throwable) } }
             previous?.uncaughtException(thread, throwable) ?: throw throwable
         }
     }
 
     fun mark(milestone: String) { latestMilestone.set("${milestone}@${Instant.now()}") }
+
+
+    fun addCrashObserver(observer: (Throwable) -> Unit) {
+        crashObservers.add(observer)
+    }
 
     fun readLatest(application: Application): String? {
         val file = File(application.filesDir, ARTIFACT_FILE)
