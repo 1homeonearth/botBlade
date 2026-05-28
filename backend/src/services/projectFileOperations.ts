@@ -29,27 +29,31 @@ export interface FileRenameInput {
 }
 
 export function buildProjectTree(files: ProjectFileSummary[]): ProjectTreeNode[] {
-  const roots = new Map<string, ProjectTreeNode>();
+  const roots: ProjectTreeNode[] = [];
   for (const file of files) {
     const segments = normalizeInputPath(file.path, "path").split("/").filter(Boolean);
-    let current = roots;
+    let children = roots;
     let currentPath = "";
     for (const [index, segment] of segments.entries()) {
       currentPath = currentPath ? `${currentPath}/${segment}` : segment;
       const isFile = index === segments.length - 1;
-      const existing = current.get(segment);
-      if (existing) {
-        if (!isFile && existing.children) current = childMap(existing.children);
+      const existingIndex = children.findIndex((child) => child.name === segment);
+      const existing = existingIndex >= 0 ? children[existingIndex] : undefined;
+      if (isFile) {
+        const node: ProjectTreeNode = { name: segment, path: currentPath, type: "file", file };
+        if (existingIndex >= 0) children[existingIndex] = node;
+        else children.push(node);
         continue;
       }
-      const node: ProjectTreeNode = isFile
-        ? { name: segment, path: currentPath, type: "file", file }
+      const directory: ProjectTreeNode = existing?.type === "directory"
+        ? existing
         : { name: segment, path: currentPath, type: "directory", children: [] };
-      current.set(segment, node);
-      if (!isFile) current = childMap(node.children ?? []);
+      if (existingIndex < 0) children.push(directory);
+      else if (existing?.type !== "directory") children[existingIndex] = directory;
+      children = directory.children ?? (directory.children = []);
     }
   }
-  return sortNodes([...roots.values()]);
+  return sortNodes(roots);
 }
 
 export async function createProjectFile(fileService: ProjectFileService, projectId: string, input: unknown): Promise<ProjectFileSummary> {
@@ -92,10 +96,6 @@ export async function deleteProjectPath(fileService: ProjectFileService, project
   if (!await exists(target)) throw notFound(relativePath);
   await fs.rm(target, { recursive: true, force: true });
   return { path: relativePath, deleted: true };
-}
-
-function childMap(children: ProjectTreeNode[]): Map<string, ProjectTreeNode> {
-  return new Map(children.map((node) => [node.name, node]));
 }
 
 function sortNodes(nodes: ProjectTreeNode[]): ProjectTreeNode[] {
