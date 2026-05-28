@@ -31,7 +31,7 @@ export interface FileRenameInput {
 export function buildProjectTree(files: ProjectFileSummary[]): ProjectTreeNode[] {
   const roots: ProjectTreeNode[] = [];
   for (const file of files) {
-    const segments = normalizeInputPath(file.path, "path").split("/").filter(Boolean);
+    const segments = normalizeSummaryPath(file.path).split("/").filter(Boolean);
     let children = roots;
     let currentPath = "";
     for (const [index, segment] of segments.entries()) {
@@ -115,6 +115,10 @@ function normalizeInputPath(value: unknown, field: string): string {
   const normalized = decodeURIComponent(value).replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
   if (!normalized || normalized === "." || normalized.includes("\0")) throw new RequestValidationError([{ field, message: "Path is invalid." }]);
   return normalized;
+}
+
+function normalizeSummaryPath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
 async function exists(filePath: string): Promise<boolean> {
