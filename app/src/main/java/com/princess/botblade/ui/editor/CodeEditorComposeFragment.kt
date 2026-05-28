@@ -1,0 +1,264 @@
+package com.princess.botblade.ui.editor
+
+import android.os.Bundle
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.fragment.app.Fragment
+import com.princess.botblade.MainActivity
+import com.princess.botblade.data.api.ApiResult
+import com.princess.botblade.data.model.ProjectFileContent
+import com.princess.botblade.data.model.ProjectFileSummary
+import com.princess.botblade.data.repository.EditorRepository
+import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.components.BladeButton
+import com.princess.botblade.ui.components.BotBladeTokens
+import com.princess.botblade.ui.components.FlowLane
+import com.princess.botblade.ui.components.SectionTitle
+import com.princess.botblade.ui.components.StatusChip
+import com.princess.botblade.ui.components.StatusTone
+import com.princess.botblade.ui.components.TerminalView
+import com.princess.botblade.ui.components.WorkstationCard
+import com.princess.botblade.ui.shell.BotBladeDestination
+import com.princess.botblade.ui.theme.BotBladeTheme
+import com.princess.botblade.ui.theme.isDynamicColorEnabled
+import kotlinx.coroutines.launch
+
+class CodeEditorComposeFragment : Fragment() {
+    private val repository = EditorRepository()
+
+    override fun onCreateView(
+        inflater: android.view.LayoutInflater,
+        container: android.view.ViewGroup?,
+        savedInstanceState: Bundle?,
+    ) = ComposeView(requireContext()).apply {
+        val activeProjectStore = ActiveProjectStore(requireContext())
+        val projectId = activeProjectStore.getActiveProjectId()
+        val projectName = activeProjectStore.getActiveProjectName()
+        setContent {
+            BotBladeTheme(useDynamicColor = isDynamicColorEnabled(requireContext())) {
+                EditorScreen(projectId = projectId, projectName = projectName)
+            }
+        }
+    }
+
+    @Composable
+    private fun EditorScreen(projectId: String?, projectName: String?) {
+        val scope = rememberCoroutineScope()
+        var status by remember { mutableStateOf(if (projectId == null) "Select a project before editing." else "Editor ready.") }
+        var files by remember { mutableStateOf<List<ProjectFileSummary>>(emptyList()) }
+        var query by remember { mutableStateOf("") }
+        var selectedFile by remember { mutableStateOf<ProjectFileContent?>(null) }
+        var editorText by remember { mutableStateOf("") }
+        var terminalLines by remember { mutableStateOf(listOf("Editor terminal ready.")) }
+        var scanSummary by remember { mutableStateOf("Scan has not run yet.") }
+        val dirty = selectedFile?.editable == true && selectedFile?.content != editorText
+        val visibleFiles = if (query.isBlank()) files else files.filter { it.path.contains(query, ignoreCase = true) }
+
+        fun appendTerminal(line: String) {
+            terminalLines = (terminalLines + line).takeLast(250)
+        }
+
+        fun loadFiles() = scope.launch {
+            val id = projectId ?: return@launch
+            status = "Loading project files…"
+            when (val result = repository.listFiles(id)) {
+                is ApiResult.Success -> {
+                    files = result.data.sortedBy { it.path }
+                    status = "Loaded ${result.data.size} file(s)."
+                }
+                is ApiResult.Error -> status = "File load failed: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun generateProject() = scope.launch {
+            val id = projectId ?: return@launch
+            status = "Generating project files…"
+            when (val result = repository.generateProject(id)) {
+                is ApiResult.Success -> {
+                    files = result.data.sortedBy { it.path }
+                    status = "Generated ${result.data.size} file(s)."
+                    appendTerminal(status)
+                }
+                is ApiResult.Error -> status = "Generate failed: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun openFile(path: String) = scope.launch {
+            val id = projectId ?: return@launch
+            status = "Opening $path…"
+            when (val result = repository.getFile(id, path)) {
+                is ApiResult.Success -> {
+                    selectedFile = result.data
+                    editorText = result.data.content
+                    status = "Opened ${result.data.path}."
+                }
+                is ApiResult.Error -> status = "Open failed: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun saveFile() = scope.launch {
+            val id = projectId ?: return@launch
+            val file = selectedFile ?: return@launch
+            status = "Saving ${file.path}…"
+            when (val result = repository.saveFile(id, file.path, editorText)) {
+                is ApiResult.Success -> {
+                    selectedFile = result.data
+                    editorText = result.data.content
+                    status = "Saved ${result.data.path}."
+                    appendTerminal(status)
+                }
+                is ApiResult.Error -> status = "Save failed: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun scanProject() = scope.launch {
+            val id = projectId ?: return@launch
+            status = "Scanning project…"
+            when (val result = repository.scanProject(id)) {
+                is ApiResult.Success -> {
+                    val top = result.data.matches.firstOrNull { it.id == result.data.recommendedPackId } ?: result.data.matches.firstOrNull()
+                    scanSummary = if (top == null) {
+                        "No Blade Pack match found."
+                    } else {
+                        "${top.name}: ${top.confidence} confidence (${top.score}). Secrets: ${top.requiredSecrets.joinToString().ifBlank { "none" }}."
+                    }
+                    status = "Scan complete."
+                    appendTerminal(scanSummary)
+                }
+                is ApiResult.Error -> status = "Scan failed: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        fun startBuild() = scope.launch {
+            val id = projectId ?: return@launch
+            status = "Starting build…"
+            when (val result = repository.createBuild(id)) {
+                is ApiResult.Success -> {
+                    status = "Build ${result.data.buildId}: ${result.data.status}"
+                    appendTerminal(status)
+                    (activity as? MainActivity)?.openDestination(BotBladeDestination.Deployments)
+                }
+                is ApiResult.Error -> status = "Build failed to start: ${result.message}"
+                ApiResult.Loading -> Unit
+            }
+        }
+
+        LaunchedEffect(projectId) {
+            if (projectId != null) loadFiles()
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BotBladeTokens.Black)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                WorkstationCard(accent = BotBladeTokens.HotPink) {
+                    Text("Forge Editor", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("Project: ${projectName ?: projectId ?: "none selected"}", color = BotBladeTokens.Muted)
+                    Text(status, color = BotBladeTokens.Muted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
+                        StatusChip("Files ${files.size}", if (files.isEmpty()) StatusTone.Warning else StatusTone.Success)
+                        StatusChip("Dirty", if (dirty) StatusTone.Warning else StatusTone.Neutral)
+                        StatusChip("Scan", if (scanSummary.startsWith("Scan has")) StatusTone.Neutral else StatusTone.Info)
+                    }
+                }
+            }
+
+            item {
+                FlowLane("First check", "Scan, generate missing starter files, save edits, then build.", BotBladeTokens.BabyBlue) {
+                    BladeButton("Scan", onClick = ::scanProject, enabled = projectId != null, modifier = Modifier.weight(1f))
+                    BladeButton("Build", onClick = ::startBuild, enabled = projectId != null, modifier = Modifier.weight(1f))
+                }
+            }
+
+            item {
+                WorkstationCard(accent = BotBladeTokens.GlitterGold) {
+                    Text("Project explorer", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Filter files") }, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 10.dp)) {
+                        BladeButton("Reload", onClick = ::loadFiles, enabled = projectId != null, modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = ::generateProject, enabled = projectId != null, modifier = Modifier.weight(1f)) { Text("Generate") }
+                    }
+                }
+            }
+
+            if (visibleFiles.isNotEmpty()) {
+                item { SectionTitle("Files") }
+                items(visibleFiles.take(80), key = { it.path }) { file ->
+                    WorkstationCard(accent = if (file.path == selectedFile?.path) BotBladeTokens.Success else BotBladeTokens.BabyBlue) {
+                        Text(file.path, color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                        Text("${if (file.editable) "editable" else "preview only"} • ${file.size} bytes", color = BotBladeTokens.Muted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                            AssistChip(onClick = { openFile(file.path) }, label = { Text("Open") })
+                        }
+                    }
+                }
+            }
+
+            item { SectionTitle("Open file") }
+            item {
+                WorkstationCard(accent = if (dirty) BotBladeTokens.GlitterGold else BotBladeTokens.HotPink) {
+                    Text(selectedFile?.path ?: "No file open", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                    Text(selectedFile?.let { "Updated: ${it.updatedAt} • ${it.size} bytes" } ?: "Open a file from the project explorer.", color = BotBladeTokens.Muted)
+                    OutlinedTextField(
+                        value = editorText,
+                        onValueChange = { editorText = it },
+                        enabled = selectedFile?.editable == true,
+                        label = { Text(if (selectedFile?.editable == true) "Code" else "Preview") },
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 260.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 10.dp)) {
+                        BladeButton("Save", onClick = ::saveFile, enabled = dirty, modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = { selectedFile?.let { editorText = it.content } }, enabled = dirty, modifier = Modifier.weight(1f)) { Text("Revert") }
+                    }
+                }
+            }
+
+            item {
+                WorkstationCard(accent = BotBladeTokens.BabyBlue) {
+                    Text("Problems / scan", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
+                    Text(scanSummary, color = BotBladeTokens.Muted)
+                }
+            }
+
+            item { TerminalView(title = "Editor output", lines = terminalLines) }
+        }
+    }
+}
