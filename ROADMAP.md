@@ -12,13 +12,33 @@
 - Add production startup checks for auth + secret-key safety.
 - Add integration tests proving protected-route auth enforcement.
 
-## Phase 2: Deployment credibility
-- Document runtime target model and production boundaries.
-- Harden local Docker adapter behavior and failure handling.
-- Add remote VPS/SSH adapter design.
-- Add deployment health checks.
+## Phase 2: Bot import intelligence (Codespaces-for-bots foundation)
+- Implement static import scanner + detector registry (no code execution).
+- Produce Bot Profile output (bot type, runtime, entrypoint, secrets checklist).
+- Add confidence scoring and unknown-bot fallback to generic app profile.
+- Add setup checklist UI backed by detector output.
 
-## Phase 3: Production posture
+## Phase 3: Runtime profiles and isolation modes
+- Add per-project run mode model: Local, Sandboxed Local, Remote, Read-only Inspect.
+- Wire start/stop/restart flows to runtime profile selection.
+- Add capability prompts and project-level policy visibility.
+
+## Phase 4: Mobile IDE and Git UX uplift
+- Command palette actions for common bot tasks.
+- File search, outlines, and logs/terminal drawer ergonomics.
+- Git branch/divergence status, staged hunks, and guided conflict handling.
+
+## Phase 5: Repair Import + incident guidance
+- Classify startup/build/install failures into known issue families.
+- Offer safe, previewable one-tap repair suggestions.
+- Add incident cards with root-cause hints and next-step actions.
+
+## Phase 6: Lock-in-free templates and catalog
+- Add curated template flows (Discord/Telegram/Slack/webhook/etc.).
+- Add import catalog metadata for known public bot repos.
+- Preserve lock-in-free behavior: everything remains normal git projects.
+
+## Phase 7: Production posture
 - External identity provider integration.
 - Vault-backed secret management.
 - Containerized build workers for untrusted code isolation.

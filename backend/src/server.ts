@@ -33,8 +33,12 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
   return summary && value !== undefined ? { id: summary.id, name: summary.name, value } : undefined;
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
-const host = "127.0.0.1";
-const port = 7432;
+const defaultHost = "127.0.0.1";
+const host = (process.env.BIND_HOST ?? process.env.HOST ?? defaultHost).trim() || defaultHost;
+const portValue = (process.env.PORT ?? "8000").trim();
+if (!/^[0-9]+$/.test(portValue)) throw new Error(`Invalid PORT value: ${portValue}`);
+const port = Number(portValue);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid PORT value: ${portValue}`);
 
 function createPersistence(): SqlitePersistence | undefined {
   if (process.env.NODE_ENV === "test" && !process.env.BOTBLADE_DATABASE_URL && !process.env.DATABASE_URL) return undefined;

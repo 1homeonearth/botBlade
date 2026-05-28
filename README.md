@@ -53,7 +53,7 @@ cd backend
 npm install
 npm run preflight:node
 npm run build
-BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) npm start
+BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) PORT=8000 HOST=127.0.0.1 npm start
 ```
 
 Health check:
@@ -61,6 +61,19 @@ Health check:
 ```bash
 curl http://localhost:8000/api/health
 ```
+
+For LAN testing from a physical device, bind to all interfaces explicitly:
+
+```bash
+BOTBLADE_SECRET_KEY=$(openssl rand -hex 32) PORT=8000 HOST=0.0.0.0 npm start
+```
+
+
+## Product direction (North Star)
+
+BotBlade is evolving toward a **mobile-native bot workbench**: import bot repos safely, detect what they need, generate a clear setup checklist, run them in explicit runtime modes, and provide phone-first editing + git workflows.
+
+See the implementation blueprint: `docs/design/mobile-bot-workbench-blueprint.md`.
 
 ## Project docs
 
