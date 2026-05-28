@@ -5,7 +5,7 @@ import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.editor.CodeEditorComposeFragment
 import com.princess.botblade.ui.importforge.ImportForgeFragment
-import com.princess.botblade.ui.settings.SettingsFragment
+import com.princess.botblade.ui.settings.SettingsComposeFragment
 
 enum class BotBladeDestination(val label: String, val commandLabel: String) {
     Dashboard("Home", "Open Dashboard"),
@@ -19,6 +19,6 @@ enum class BotBladeDestination(val label: String, val commandLabel: String) {
         Projects -> ImportForgeFragment()
         Editor -> CodeEditorComposeFragment()
         Deployments -> DeploymentsFragment.newInstance()
-        Settings -> SettingsFragment()
+        Settings -> SettingsComposeFragment()
     }
 }
