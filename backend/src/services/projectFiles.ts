@@ -352,15 +352,12 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 function normalizeRelativePath(value: string): string {
-  let decoded = value.trim();
-  for (let index = 0; index < 2; index += 1) {
-    try {
-      const next = decodeURIComponent(decoded);
-      if (next === decoded) break;
-      decoded = next;
-    } catch {
-      break;
-    }
+  const trimmed = value.trim();
+  let decoded = trimmed;
+  try {
+    decoded = decodeURIComponent(trimmed);
+  } catch {
+    decoded = trimmed;
   }
   return decoded.replace(/\\/g, "/").replace(/^\/+/, "");
 }
