@@ -16,6 +16,7 @@ import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
 import { scanAndGenerateBotbladeMetadata } from "./services/importScan/index.js";
+import { ImportStore } from "./services/imports/index.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
 const persistence = createPersistence();
@@ -33,6 +34,7 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
   return summary && value !== undefined ? { id: summary.id, name: summary.name, value } : undefined;
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
+const importStore = new ImportStore(persistence);
 const defaultHost = "127.0.0.1";
 const host = (process.env.BIND_HOST ?? process.env.HOST ?? defaultHost).trim() || defaultHost;
 const portValue = process.env.PORT ?? "8000";
@@ -273,6 +275,36 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const result = await scanAndGenerateBotbladeMetadata(workspacePath, { kind: "generated-project", url: project.github?.repo ? `https://github.com/${project.github.owner}/${project.github.repo}` : undefined });
       return writeJson(res, 200, result);
     }
+  }
+
+  const importIdMatch = path.match(/^\/api\/imports\/(?!git$|zip$|folder$)([^/]+)$/);
+  if (importIdMatch) {
+    if (method !== "GET") return writeJson(res, 404, { error: { code: "NOT_FOUND", message: "Route not found.", details: {}, requestId } });
+    const record = importStore.get(importIdMatch[1]);
+    if (!record) throw { statusCode: 404, code: "NOT_FOUND", message: `Import '${importIdMatch[1]}' was not found.`, details: {} };
+    return writeJson(res, 200, record);
+  }
+
+  if (method === "POST" && path === "/api/imports/git") {
+    const body = await readJson(req) as { repoUrl?: string; workspacePath?: string; ref?: string };
+    if (!body?.repoUrl || !body?.workspacePath) throw new RequestValidationError([{ field: "repoUrl|workspacePath", message: "repoUrl and workspacePath are required." }]);
+    const record = await importStore.createAndRun({ type: "git", repoUrl: body.repoUrl, ref: body.ref }, body.workspacePath, auditService, actor.id, requestId);
+    return writeJson(res, 201, record);
+  }
+  if (method === "POST" && path === "/api/imports/zip") {
+    const body = await readJson(req) as { archivePath?: string; workspacePath?: string };
+    if (!body?.archivePath || !body?.workspacePath) throw new RequestValidationError([{ field: "archivePath|workspacePath", message: "archivePath and workspacePath are required." }]);
+    const record = await importStore.createAndRun({ type: "zip", archivePath: body.archivePath }, body.workspacePath, auditService, actor.id, requestId);
+    return writeJson(res, 201, record);
+  }
+  if (method === "POST" && path === "/api/imports/folder") {
+    if (process.env.BOTBLADE_SAF_IMPORT_ENABLED !== "true") {
+      return writeJson(res, 403, { error: { code: "FEATURE_DISABLED", message: "Folder imports require SAF support.", details: { feature: "saf_import" }, requestId } });
+    }
+    const body = await readJson(req) as { folderPath?: string; workspacePath?: string };
+    if (!body?.folderPath || !body?.workspacePath) throw new RequestValidationError([{ field: "folderPath|workspacePath", message: "folderPath and workspacePath are required." }]);
+    const record = await importStore.createAndRun({ type: "folder", folderPath: body.folderPath }, body.workspacePath, auditService, actor.id, requestId);
+    return writeJson(res, 201, record);
   }
 
   const commandsMatch = path.match(/^\/api\/projects\/([^/]+)\/commands(?:\/([^/]+))?$/);

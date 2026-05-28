@@ -21,7 +21,10 @@ export type AuditAction =
   | "runtime.stop"
   | "runtime.restart"
   | "github.push"
-  | "discord.commands.register";
+  | "discord.commands.register"
+  | "import.start"
+  | "import.state_transition"
+  | "import.failure";
 
 export interface AuditEvent {
   id: string;
