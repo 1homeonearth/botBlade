@@ -48,6 +48,7 @@ function context(method: string, projectId: string, fileService: ProjectFileServ
     auditService: auditService(),
     readJson: readJson as never,
     writeJson: writeJson as never,
+    authorizeMutation: () => undefined,
   };
 }
 
