@@ -9,7 +9,7 @@ import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./s
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
 import { DeploymentTargetStore, deploymentTargetWithCapabilities, testDeploymentTarget } from "./services/deploymentTargets.js";
 import { GitHubIntegrationService } from "./services/githubIntegration.js";
-import { GitStatusService } from "./services/gitStatusService.js";
+import { GitStatusService, redactCredentialUrl } from "./services/gitStatusService.js";
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
 import { ProjectFileService, parseFileWriteInput } from "./services/projectFiles.js";
 import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUpdateProjectInput, ProjectStore, RequestValidationError } from "./services/projectStore.js";
@@ -381,7 +381,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const existingCards = Array.isArray(profile?.repairCards) ? profile?.repairCards as Array<Record<string, unknown>> : [];
       const repairCards = [...existingCards];
       if (!git.available) repairCards.push({ title: "Git metadata unavailable", safeAction: "Initialize Git in the workspace or verify repository access, then refresh profile." });
-      if (profile && typeof profile === "object") return writeJson(res, 200, { ...profile, git, repairCards });
+      if (profile && typeof profile === "object") return writeJson(res, 200, { ...sanitizeProfileImportSource(profile), git, repairCards });
       return writeJson(res, 200, { schemaVersion: "1.0.0", generatedBy: "botblade", generatedAt: new Date().toISOString(), project: { id: projectId }, git, repairCards });
     }
   }
@@ -487,6 +487,26 @@ function notFoundDeployment(deploymentId: string): never {
 
 function notFoundCommand(commandId: string): never {
   throw { statusCode: 404, code: "NOT_FOUND", message: `Command '${commandId}' was not found.`, details: {} };
+}
+
+
+function sanitizeProfileImportSource(profile: Record<string, unknown>): Record<string, unknown> {
+  const project = profile.project;
+  if (!project || typeof project !== "object" || Array.isArray(project)) return profile;
+  const source = (project as Record<string, unknown>).importSource;
+  if (!source || typeof source !== "object" || Array.isArray(source)) return profile;
+  const url = (source as Record<string, unknown>).url;
+  if (typeof url !== "string" || !url.trim()) return profile;
+  return {
+    ...profile,
+    project: {
+      ...(project as Record<string, unknown>),
+      importSource: {
+        ...(source as Record<string, unknown>),
+        url: redactCredentialUrl(url),
+      },
+    },
+  };
 }
 
 function isHttpError(value: unknown): value is { statusCode: number; code: string; message: string; details: unknown } {
