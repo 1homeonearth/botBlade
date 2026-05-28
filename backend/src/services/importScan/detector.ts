@@ -62,7 +62,7 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
         matchedEvidence: evidence,
         runtime: pack.runtime,
         commands: pack.commands,
-        requiredSecrets: pack.secrets.filter((s) => s.required).map((s) => s.name)
+        requiredSecrets: pack.secretDetectors.filter((s) => s.required).map((s) => s.name)
       });
     }
   }
@@ -74,13 +74,14 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     build: selectedPack?.commands.build ? [selectedPack.commands.build] : [],
     test: selectedPack?.commands.test ? [selectedPack.commands.test] : [],
     validate: ["botblade validate"],
-    start: selectedPack?.commands.run ? [selectedPack.commands.run] : [],
+    start: selectedPack?.commands.start ? [selectedPack.commands.start] : [],
     stop: ["botblade runtime stop"],
     restart: ["botblade runtime restart"],
     deploy: selectedPack?.commands.deploy ? [selectedPack.commands.deploy] : []
   };
-  const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
-  const optional = (selectedPack?.secrets ?? []).filter((s) => !s.required).map((s) => ({ name: s.name, required: false, configured: false }));
+  const declaredSecrets = selectedPack?.secretDetectors.length ? selectedPack.secretDetectors : selectedPack?.secrets ?? [];
+  const required = declaredSecrets.filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
+  const optional = declaredSecrets.filter((s) => !s.required).map((s) => ({ name: s.name, required: false, configured: false }));
   return {
     workspacePath,
     recommendedPackId: top && top.score >= 40 ? top.id : "unknown",
@@ -92,13 +93,39 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     fallbackNotes: top ? [] : ["No strong Blade Pack signals found. Open project in editor and configure commands manually."],
     commandPlan,
     secretRequirements: { required, optional },
-    importantFiles: [...ctx.files].filter((f) => /(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md)$/i.test(f)).slice(0, 20),
+    importantFiles: selectImportantFiles(ctx, selectedPack),
     detectedLanguages: top?.id.includes("python") ? ["python"] : ["javascript", "typescript"],
     detectedFrameworks: top ? [top.name] : [],
     permissions: ["read_workspace", "write_workspace"],
     capabilities: ["scan", "diagnose", "run_commands"],
     git: { branch: null, status: "unknown", remotes: [] }
   };
+}
+
+function selectImportantFiles(ctx: ScanContext, pack: BladePack | undefined): string[] {
+  const matches = new Set<string>();
+  const patterns = pack?.importantFilePatterns ?? [];
+  for (const file of ctx.files) {
+    if (/(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md)$/i.test(file)) matches.add(file);
+    if (patterns.some((pattern) => matchesImportantPattern(file, pattern.pattern))) matches.add(file);
+  }
+  return [...matches].slice(0, 20);
+}
+
+function matchesImportantPattern(file: string, pattern: string): boolean {
+  if (pattern.includes("**")) return globToRegExp(pattern).test(file);
+  if (pattern.includes("{") || pattern.includes("*")) return globToRegExp(pattern).test(file);
+  return file === pattern || file.startsWith(`${pattern}/`);
+}
+
+function globToRegExp(pattern: string): RegExp {
+  const expanded = pattern.replace(/\{([^}]+)\}/g, (_, choices: string) => `(${choices.split(",").map(escapeRegExp).join("|")})`);
+  const source = expanded.split("**").map((part) => part.split("*").map(escapeRegExp).join("[^/]*")).join(".*");
+  return new RegExp(`^${source}$`, "i");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
 }
 
 function scoreToConfidence(score: number): DetectorConfidence { if (score >= 80) return "high"; if (score >= 60) return "likely"; if (score >= 40) return "possible"; return "weak"; }
