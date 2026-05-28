@@ -21,6 +21,12 @@ declare class Buffer extends Uint8Array {
   toString(encoding?: string): string;
 }
 
+declare const process: {
+  env: Record<string, string | undefined>;
+  cwd(): string;
+  exitCode?: number;
+};
+
 
 declare const console: {
   info(message?: unknown, ...optionalParams: unknown[]): void;
