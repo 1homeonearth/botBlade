@@ -97,6 +97,7 @@ export class AuditService implements AuditServicePort {
   }
 
   private enforceRetention(): void {
+    const beforeIds = new Set(this.events.map((event) => event.id));
     const cutoff = this.retentionDays === undefined ? undefined : Date.now() - this.retentionDays * DAY_MS;
     if (cutoff !== undefined) {
       for (let index = this.events.length - 1; index >= 0; index -= 1) {
@@ -105,6 +106,9 @@ export class AuditService implements AuditServicePort {
       }
     }
     if (this.events.length > this.maxEvents) this.events.splice(this.maxEvents);
+    const afterIds = new Set(this.events.map((event) => event.id));
+    const pruned = [...beforeIds].some((id) => !afterIds.has(id));
+    if (pruned) this.persistence?.pruneAuditEvents?.(this.events.map((event) => event.id));
   }
 }
 
