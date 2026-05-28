@@ -81,7 +81,7 @@ class CodeEditorComposeFragment : Fragment() {
         val dirty = selectedFile?.editable == true && selectedFile?.content != editorText
         val visibleFiles = if (query.isBlank()) files else files.filter { it.path.contains(query, ignoreCase = true) }
         val fileTree = remember(visibleFiles) { buildEditorTree(visibleFiles) }
-        val visibleTree = remember(fileTree, expandedFolders) { flattenEditorTree(fileTree, expandedFolders) }
+        val visibleTree = remember(fileTree, expandedFolders, query) { flattenEditorTree(fileTree, expandedFolders, forceExpanded = query.isNotBlank()) }
 
         fun appendTerminal(line: String) {
             terminalLines = (terminalLines + line).takeLast(250)
@@ -228,7 +228,7 @@ class CodeEditorComposeFragment : Fragment() {
                     WorkstationCard(accent = if (node.path == selectedFile?.path) BotBladeTokens.Success else if (node.type == EditorNodeType.Directory) BotBladeTokens.GlitterGold else BotBladeTokens.BabyBlue) {
                         val prefix = "  ".repeat(visibleNode.depth)
                         val marker = if (node.type == EditorNodeType.Directory) {
-                            if (node.path in expandedFolders) "▾" else "▸"
+                            if (node.path in expandedFolders || query.isNotBlank()) "▾" else "▸"
                         } else {
                             "•"
                         }
@@ -245,7 +245,7 @@ class CodeEditorComposeFragment : Fragment() {
                                     onClick = {
                                         expandedFolders = if (node.path in expandedFolders) expandedFolders - node.path else expandedFolders + node.path
                                     },
-                                    label = { Text(if (node.path in expandedFolders) "Collapse" else "Expand") },
+                                    label = { Text(if (node.path in expandedFolders || query.isNotBlank()) "Collapse" else "Expand") },
                                 )
                             } else {
                                 AssistChip(onClick = { openFile(node.path) }, label = { Text("Open") })
@@ -344,9 +344,9 @@ private fun MutableEditorTreeNode.freeze(): EditorTreeNode = EditorTreeNode(
 
 private val editorTreeComparator = compareBy<EditorTreeNode> { if (it.type == EditorNodeType.Directory) 0 else 1 }.thenBy { it.name.lowercase() }
 
-private fun flattenEditorTree(nodes: List<EditorTreeNode>, expandedFolders: Set<String>, depth: Int = 0): List<VisibleEditorNode> = nodes.flatMap { node ->
+private fun flattenEditorTree(nodes: List<EditorTreeNode>, expandedFolders: Set<String>, forceExpanded: Boolean = false, depth: Int = 0): List<VisibleEditorNode> = nodes.flatMap { node ->
     val current = VisibleEditorNode(node, depth)
-    if (node.type == EditorNodeType.Directory && node.path in expandedFolders) listOf(current) + flattenEditorTree(node.children, expandedFolders, depth + 1) else listOf(current)
+    if (node.type == EditorNodeType.Directory && (forceExpanded || node.path in expandedFolders)) listOf(current) + flattenEditorTree(node.children, expandedFolders, forceExpanded, depth + 1) else listOf(current)
 }
 
 private fun defaultExpandedFolders(files: List<ProjectFileSummary>): Set<String> = files
