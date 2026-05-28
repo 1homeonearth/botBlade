@@ -13,7 +13,7 @@ test("AuditService enforces max event retention and list limits", () => {
   assert.equal(events.length, 2);
   assert.equal(events[0].requestId, "req_3");
   assert.equal(events[1].requestId, "req_2");
-  assert.deepEqual(service.list("project_a", { limit: 1 }).map((event) => event.requestId), ["req_3"]);
+  assert.equal(service.list("project_a", { limit: 1 }).map((event) => event.requestId).join(","), "req_3");
 });
 
 test("AuditService redacts metadata before storage", () => {
@@ -28,5 +28,5 @@ test("AuditService redacts metadata before storage", () => {
   });
 
   assert.equal(event.metadata.token, "[REDACTED]");
-  assert.deepEqual(event.metadata.nested, { password: "[REDACTED]" });
+  assert.equal(JSON.stringify(event.metadata.nested), JSON.stringify({ password: "[REDACTED]" }));
 });
