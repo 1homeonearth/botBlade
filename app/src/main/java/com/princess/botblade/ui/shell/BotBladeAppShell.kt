@@ -169,6 +169,7 @@ private fun FragmentHost(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommandPaletteDialog(
     selectedDestination: BotBladeDestination,
