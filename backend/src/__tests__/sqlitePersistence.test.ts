@@ -26,6 +26,8 @@ test("SqlitePersistence diagnostics report migrations and table counts", () => {
   assert.equal(diagnostics.databasePath, dbPath);
   assert.ok(diagnostics.appliedMigrations.includes("001_initial_persistence"));
   assert.ok(diagnostics.appliedMigrations.includes("002_import_records"));
+  assert.ok(diagnostics.appliedMigrations.includes("003_script_profiles"));
   assert.equal(diagnostics.tableCounts.projects, 0);
   assert.equal(diagnostics.tableCounts.imports, 0);
+  assert.equal(diagnostics.tableCounts.script_profiles, 0);
 });

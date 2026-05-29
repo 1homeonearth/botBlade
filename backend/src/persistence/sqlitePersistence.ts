@@ -8,7 +8,8 @@ import type { DeploymentJob } from "../services/deploymentJobs.js";
 import type { DeploymentTarget } from "../services/deploymentTargets.js";
 import type { BotProject } from "../models/project.js";
 import type { ImportRecord } from "../services/imports/index.js";
-import type { AuditServicePersistence, BuildServicePersistence, DeploymentJobStorePersistence, DeploymentTargetStorePersistence, ImportStorePersistence, ProjectStorePersistence, SecretRecord, SecretStorePersistence } from "../services/persistence.js";
+import type { ScriptProfileMetadata } from "../services/scriptProfiles/scriptProfileService.js";
+import type { AuditServicePersistence, BuildServicePersistence, DeploymentJobStorePersistence, DeploymentTargetStorePersistence, ImportStorePersistence, ProjectStorePersistence, ScriptProfileStorePersistence, SecretRecord, SecretStorePersistence } from "../services/persistence.js";
 
 const MIGRATION_DIR = fs.existsSync(path.resolve(process.cwd(), "migrations")) ? path.resolve(process.cwd(), "migrations") : path.resolve(process.cwd(), "backend/migrations");
 const DEFAULT_KEY_ID = "local-env";
@@ -21,7 +22,7 @@ export interface SqlitePersistenceDiagnostics {
   tableCounts: Record<string, number>;
 }
 
-export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence, ImportStorePersistence {
+export class SqlitePersistence implements ProjectStorePersistence, SecretStorePersistence, AuditServicePersistence, BuildServicePersistence, DeploymentTargetStorePersistence, DeploymentJobStorePersistence, ImportStorePersistence, ScriptProfileStorePersistence {
   private readonly key: Buffer;
 
   constructor(private readonly databasePath: string, secretKey = process.env.BOTBLADE_SECRET_KEY) {
@@ -41,7 +42,7 @@ export class SqlitePersistence implements ProjectStorePersistence, SecretStorePe
   }
 
   diagnostics(): SqlitePersistenceDiagnostics {
-    const tables = ["projects", "secret_metadata", "audit_events", "build_jobs", "deployment_targets", "deployment_jobs", "imports"];
+    const tables = ["projects", "secret_metadata", "audit_events", "build_jobs", "deployment_targets", "deployment_jobs", "imports", "script_profiles"];
     return {
       adapter: "sqlite",
       databasePath: this.databasePath,
@@ -88,6 +89,11 @@ COMMIT;`);
   loadDeploymentJobs(): Array<{ job: DeploymentJob; logs: string }> { return this.rows<{ data_json: string; logs: string }>("SELECT data_json, logs FROM deployment_jobs ORDER BY created_at DESC").map((row) => ({ job: JSON.parse(row.data_json) as DeploymentJob, logs: row.logs })); }
 
   loadImportRecords(): ImportRecord[] { return this.selectJson<ImportRecord>("SELECT data_json FROM imports ORDER BY updated_at DESC", "data_json"); }
+
+  loadScriptProfiles(): ScriptProfileMetadata[] { return this.selectJson<ScriptProfileMetadata>("SELECT data_json FROM script_profiles ORDER BY updated_at DESC", "data_json"); }
+  saveScriptProfile(profile: ScriptProfileMetadata): void { this.exec(`INSERT INTO script_profiles (id, project_id, source, runtime, updated_at, data_json) VALUES (${q(profile.id)}, ${q(profile.projectId)}, ${q(profile.source)}, ${q(profile.runtime)}, ${q(profile.updatedAt)}, ${q(JSON.stringify(profile))}) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id, source=excluded.source, runtime=excluded.runtime, updated_at=excluded.updated_at, data_json=excluded.data_json;`); }
+  deleteScriptProfile(profileId: string): void { this.exec(`DELETE FROM script_profiles WHERE id=${q(profileId)};`); }
+
   saveImportRecord(record: ImportRecord): void { this.exec(`INSERT INTO imports (id, source_type, state, updated_at, data_json) VALUES (${q(record.id)}, ${q(record.source.type)}, ${q(record.state)}, ${q(record.updatedAt)}, ${q(JSON.stringify(record))}) ON CONFLICT(id) DO UPDATE SET source_type=excluded.source_type, state=excluded.state, updated_at=excluded.updated_at, data_json=excluded.data_json;`); }
   saveDeploymentJob(job: DeploymentJob, logs: string): void { this.exec(`INSERT INTO deployment_jobs (id, project_id, target_id, build_id, status, created_at, updated_at, data_json, logs) VALUES (${q(job.deploymentId)}, ${q(job.projectId)}, ${q(job.targetId)}, ${q(job.buildId)}, ${q(job.status)}, ${q(job.createdAt)}, ${q(job.updatedAt)}, ${q(JSON.stringify(job))}, ${q(logs)}) ON CONFLICT(id) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at, data_json=excluded.data_json, logs=excluded.logs;`); }
 
