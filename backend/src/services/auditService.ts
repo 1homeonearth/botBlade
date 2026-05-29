@@ -27,7 +27,11 @@ export type AuditAction =
   | "file.delete"
   | "import.start"
   | "import.state_transition"
-  | "import.failure";
+  | "import.failure"
+  | "script.profile.detect"
+  | "script.profile.create"
+  | "script.profile.update"
+  | "script.profile.delete";
 
 export interface AuditEvent {
   id: string;

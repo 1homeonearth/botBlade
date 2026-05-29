@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import type { AuditService } from "../auditService.js";
 import { scanAndGenerateBotbladeMetadata } from "../importScan/index.js";
 import type { ImportStorePersistence } from "../persistence.js";
+import type { BotProfileScriptProfile } from "../../models/botProfile.js";
 import { extractZipFromPlan, validateZipArchive, type ZipViolation } from "./zipSecurity.js";
 
 export type ImportSource =
@@ -21,7 +22,7 @@ export interface CloneFailureDetails extends ImportFailureDetails { policyCode: 
 export interface SecurityCard { title: string; summary: string; remediation: string; violations: ZipViolation[] }
 export interface GitCloneMetadata { remoteUrl: string; ref: string | null; clonedAt: string; auditEventIds: string[] }
 export interface ImportRecord {
-  id: string; source: ImportSource; workspacePath: string; state: ImportState; createdAt: string; updatedAt: string; failure?: ImportFailureDetails; securityCards?: SecurityCard[]; clone?: GitCloneMetadata; managedProject?: { id: string; slug: string };
+  id: string; source: ImportSource; workspacePath: string; state: ImportState; createdAt: string; updatedAt: string; failure?: ImportFailureDetails; securityCards?: SecurityCard[]; clone?: GitCloneMetadata; managedProject?: { id: string; slug: string }; detectedScriptProfiles?: BotProfileScriptProfile[];
 }
 
 export class ImportStore {
@@ -42,6 +43,8 @@ export class ImportStore {
       this.transition(record, "scanning", auditService, actorId, requestId);
       this.transition(record, "detecting", auditService, actorId, requestId);
       const result = await scanAndGenerateBotbladeMetadata(effectiveWorkspacePath, { kind: source.type, url: source.type === "git" ? source.repoUrl : undefined });
+      record.detectedScriptProfiles = result.detection.scriptProfiles;
+      this.save(record);
       this.transition(record, "profile_ready", auditService, actorId, requestId);
       this.transition(record, (result.detection.matches[0]?.requiredSecrets.length ?? 0) > 0 ? "needs_secrets" : "ready", auditService, actorId, requestId);
     } catch (error) {

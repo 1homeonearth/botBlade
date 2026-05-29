@@ -6,6 +6,7 @@ import type { BotProject } from "../models/project.js";
 import type { CreateProjectInput, UpdateProjectInput } from "./projectStore.js";
 import type { CreateSecretInput, SecretSummary, UpdateSecretInput } from "./secretStore.js";
 import type { ImportRecord } from "./imports/index.js";
+import type { ScriptProfileMetadata } from "./scriptProfiles/scriptProfileService.js";
 
 export interface ProjectStorePort {
   list(): BotProject[];
@@ -74,4 +75,10 @@ export interface AuditServicePersistence {
 export interface ImportStorePersistence {
   loadImportRecords(): ImportRecord[];
   saveImportRecord(record: ImportRecord): void;
+}
+
+export interface ScriptProfileStorePersistence {
+  loadScriptProfiles(): ScriptProfileMetadata[];
+  saveScriptProfile(profile: ScriptProfileMetadata): void;
+  deleteScriptProfile(profileId: string): void;
 }

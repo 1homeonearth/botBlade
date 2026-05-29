@@ -21,6 +21,7 @@ import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput,
 import { validateProject } from "./services/projectValidation.js";
 import { scanAndGenerateBotbladeMetadata } from "./services/importScan/index.js";
 import { ImportStore } from "./services/imports/index.js";
+import { ScriptProfileService } from "./services/scriptProfiles/scriptProfileService.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
 const persistence = createPersistence();
@@ -39,6 +40,7 @@ const deploymentStore = new DeploymentJobStore(buildService, targetStore, runtim
 });
 const githubService = new GitHubIntegrationService((secretId) => secretStore.has(secretId), (secretId) => secretStore.getValue(secretId), (input) => auditService.record(input));
 const importStore = new ImportStore(persistence);
+const scriptProfileService = new ScriptProfileService(persistence, auditService);
 const gitStatusService = new GitStatusService();
 const defaultHost = "127.0.0.1";
 const host = (process.env.BIND_HOST ?? process.env.HOST ?? defaultHost).trim() || defaultHost;
@@ -318,6 +320,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       assertExecutionAccess(actor, "project scan");
       const workspacePath = fileService.workspace(projectId);
       const result = await scanAndGenerateBotbladeMetadata(workspacePath, { kind: "generated-project", url: project.github?.repo ? `https://github.com/${project.github.owner}/${project.github.repo}` : undefined });
+      scriptProfileService.upsertDetected(projectId, result.detection.scriptProfiles, { actorId: actor.id, requestId });
       return writeJson(res, 200, result);
     }
   }
@@ -344,6 +347,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
       await fs.rm(workspace, { recursive: true, force: true });
       await copyDirectory(record.workspacePath, workspace);
+      scriptProfileService.upsertDetected(project.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
     }
     return writeJson(res, 201, record);
   }
@@ -351,6 +355,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     const body = await readJson(req) as { archivePath?: string; workspacePath?: string };
     if (!body?.archivePath || !body?.workspacePath) throw new RequestValidationError([{ field: "archivePath|workspacePath", message: "archivePath and workspacePath are required." }]);
     const record = await importStore.createAndRun({ type: "zip", archivePath: body.archivePath }, body.workspacePath, auditService, actor.id, requestId);
+    if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
+      scriptProfileService.upsertDetected(record.managedProject?.id ?? record.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
+    }
     return writeJson(res, 201, record);
   }
   if (method === "POST" && path === "/api/imports/folder") {
@@ -360,7 +367,37 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     const body = await readJson(req) as { folderPath?: string; workspacePath?: string };
     if (!body?.folderPath || !body?.workspacePath) throw new RequestValidationError([{ field: "folderPath|workspacePath", message: "folderPath and workspacePath are required." }]);
     const record = await importStore.createAndRun({ type: "folder", folderPath: body.folderPath }, body.workspacePath, auditService, actor.id, requestId);
+    if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
+      scriptProfileService.upsertDetected(record.managedProject?.id ?? record.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
+    }
     return writeJson(res, 201, record);
+  }
+
+  const scriptProfilesMatch = path.match(/^\/api\/projects\/([^/]+)\/script-profiles(?:\/([^/]+))?$/);
+  if (scriptProfilesMatch) {
+    const [, projectId, profileId] = scriptProfilesMatch;
+    assertProjectAccess(actor, projectId);
+    if (!projectStore.get(projectId)) throw notFoundProject(projectId);
+    if (method === "GET" && !profileId) return writeJson(res, 200, { scriptProfiles: scriptProfileService.list(projectId) });
+    if (method === "GET" && profileId) {
+      const profile = scriptProfileService.get(projectId, profileId);
+      if (!profile) throw { statusCode: 404, code: "NOT_FOUND", message: `Script profile '${profileId}' was not found.`, details: {} };
+      return writeJson(res, 200, profile);
+    }
+    if (method === "POST" && !profileId) {
+      const profile = scriptProfileService.create(projectId, await readJson(req), { actorId: actor.id, requestId });
+      return writeJson(res, 201, profile);
+    }
+    if ((method === "PATCH" || method === "PUT") && profileId) {
+      const profile = scriptProfileService.update(projectId, profileId, await readJson(req), { actorId: actor.id, requestId });
+      if (!profile) throw { statusCode: 404, code: "NOT_FOUND", message: `Script profile '${profileId}' was not found.`, details: {} };
+      return writeJson(res, 200, profile);
+    }
+    if (method === "DELETE" && profileId) {
+      const deleted = scriptProfileService.delete(projectId, profileId, { actorId: actor.id, requestId });
+      if (!deleted) throw { statusCode: 404, code: "NOT_FOUND", message: `Script profile '${profileId}' was not found.`, details: {} };
+      return writeJson(res, 204, {});
+    }
   }
 
   const gitStatusMatch = path.match(/^\/api\/projects\/([^/]+)\/git\/status$/);
