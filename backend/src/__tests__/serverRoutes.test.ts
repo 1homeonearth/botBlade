@@ -364,6 +364,36 @@ test("project git status route returns safe non-git summary", async () => {
 
 
 
+
+test("profile route preserves stored Git metadata while refreshing current status", async () => {
+  const created = await request("POST", "/api/projects", { name: "Profile Git Metadata" });
+  const workspace = path.join(process.cwd(), "generated-projects", created.body.id);
+  await fs.mkdir(workspace, { recursive: true });
+  await fs.writeFile(path.join(workspace, "botblade.json"), JSON.stringify({
+    schemaVersion: "1.0.0",
+    generatedBy: "botblade",
+    generatedAt: new Date().toISOString(),
+    project: { importSource: { kind: "local" } },
+    git: {
+      branch: "main",
+      status: "dirty",
+      dirtyFileCount: 7,
+      remotes: [{ name: "origin", url: "https://example.com/repo.git" }],
+      importCommit: "abc123",
+    },
+    repairCards: []
+  }), "utf8");
+
+  const response = await request("GET", `/api/projects/${created.body.id}/profile`);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.git.importCommit, "abc123");
+  assert.equal(response.body.git.status, "unknown");
+  assert.equal(response.body.git.branch, null);
+  assert.deepStrictEqual(response.body.git.remotes, []);
+  assert.equal("dirtyFileCount" in response.body.git, false);
+});
+
 test("profile route redacts importSource url credentials", async () => {
   const created = await request("POST", "/api/projects", { name: "Profile Redaction" });
   const workspace = path.join(process.cwd(), "generated-projects", created.body.id);

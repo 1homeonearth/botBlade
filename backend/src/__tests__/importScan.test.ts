@@ -145,17 +145,17 @@ test("mixed Node Python shell repositories produce deterministic profile signals
         ].includes(file),
       ),
       [
-        ".botpress/bot.json",
-        ".github/workflows/ci.yml",
         "botpress.config.json",
-        "docker-compose.yml",
-        "Dockerfile",
         "justfile",
         "Makefile",
         "package.json",
         "requirements.txt",
-        "scripts/deploy.sh",
         "Taskfile.yml",
+        "docker-compose.yml",
+        "Dockerfile",
+        ".github/workflows/ci.yml",
+        ".botpress/bot.json",
+        "scripts/deploy.sh",
       ],
     );
   } finally {
@@ -242,12 +242,83 @@ test("dependency prefix does not trigger exact package detector", async () => {
   assert.equal(result.recommendedPackId, "unknown");
 });
 
+
+test("important files prioritize root manifests before bulk generated entries", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-important-priority-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+
+  try {
+    await fs.mkdir(path.join(workspace, ".github", "workflows"), { recursive: true });
+    await fs.mkdir(path.join(workspace, ".botpress"), { recursive: true });
+    await fs.writeFile(path.join(workspace, "package.json"), JSON.stringify({ scripts: { start: "node index.js" } }), "utf8");
+    await fs.writeFile(path.join(workspace, "requirements.txt"), "pytest\n", "utf8");
+    await fs.writeFile(path.join(workspace, "pyproject.toml"), "[project]\nname = \"priority\"\n", "utf8");
+    for (let index = 0; index < 18; index += 1) {
+      await fs.writeFile(path.join(workspace, ".github", "workflows", `early-${String(index).padStart(2, "0")}.yml`), "name: ci\n", "utf8");
+      await fs.writeFile(path.join(workspace, ".botpress", `early-${String(index).padStart(2, "0")}.json`), "{}\n", "utf8");
+    }
+
+    const detection = await scanWorkspaceForBladePacks(workspace);
+
+    assert.equal(detection.importantFiles.length, 20);
+    assert.ok(detection.importantFiles.includes("package.json"));
+    assert.ok(detection.importantFiles.includes("requirements.txt"));
+    assert.ok(detection.importantFiles.includes("pyproject.toml"));
+    assert.deepStrictEqual(detection.importantFiles.slice(0, 3), [
+      "package.json",
+      "pyproject.toml",
+      "requirements.txt",
+    ]);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("missing workspace path returns unknown instead of throwing", async () => {
   const result = await scanWorkspaceForBladePacks(
     path.join(fixturesRoot, "does-not-exist"),
   );
   assert.equal(result.recommendedPackId, "unknown");
   assert.equal(result.matches.length, 0);
+  assert.deepStrictEqual(result.git, { branch: null, status: "unknown", remotes: [] });
+});
+
+
+test("scan detection includes redacted Git branch status and remote metadata", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-git-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "package.json"), JSON.stringify({ dependencies: { "discord.js": "^14.0.0" } }), "utf8");
+    await fs.writeFile(path.join(workspace, "index.js"), "console.log('bot')\n", "utf8");
+    const { execFileSync } = await import("node:child_process");
+    execFileSync("git", ["-C", workspace, "init"]);
+    execFileSync("git", ["-C", workspace, "symbolic-ref", "HEAD", "refs/heads/main"]);
+    execFileSync("git", [
+      "-C",
+      workspace,
+      "remote",
+      "add",
+      "origin",
+      "https://user:pass@example.com/repo.git?access_token=abc123&expires=1",
+    ]);
+
+    const detection = await scanWorkspaceForBladePacks(workspace);
+
+    assert.equal(detection.git.branch, "main");
+    assert.equal(detection.git.status, "dirty");
+    assert.equal(detection.git.dirtyFileCount, 2);
+    assert.equal(detection.git.remotes[0]?.name, "origin");
+    assert.equal(detection.git.remotes[0]?.url?.includes("user:pass"), false);
+    assert.equal(detection.git.remotes[0]?.url?.includes("abc123"), false);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test("botblade metadata persists script profiles and only secret metadata without raw values", async () => {

@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { BLADE_PACKS } from "../../bladepacks/packs.js";
 import type { BladePack, BladePackDetector, BladePackRuntime } from "../../bladepacks/schema.js";
 import type { BotProfileCommandPlan, BotProfileScriptProfile, PackageManager } from "../../models/botProfile.js";
+import { gitStatusToMetadata, GitStatusService, type GitStatusMetadata } from "../gitStatusService.js";
 import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js";
 
 export type DetectorConfidence = "weak" | "possible" | "likely" | "high";
@@ -44,7 +45,7 @@ export type ScanDetectionResult = {
   detectedFrameworks: string[];
   permissions: string[];
   capabilities: string[];
-  git: { branch: string | null; status: "clean" | "dirty" | "unknown"; remotes: Array<{ name: string; url: string | null }> };
+  git: GitStatusMetadata;
   packageManager: PackageManager;
 };
 
@@ -90,6 +91,7 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
   };
   const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
   const optional = (selectedPack?.secrets ?? []).filter((s) => !s.required).map((s) => ({ name: s.name, required: false, configured: false }));
+  const git = gitStatusToMetadata(await new GitStatusService().readStatusSafe(workspacePath));
   const { packageManager, profiles } = await detectScriptProfiles(workspacePath, {
     commandPlan,
     selectedPack,
@@ -113,7 +115,7 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     detectedFrameworks: matches.filter((match) => match.score >= DETECTED_FRAMEWORK_MIN_SCORE).map((match) => match.name),
     permissions: ["read_workspace", "write_workspace"],
     capabilities: ["scan", "diagnose", "run_commands"],
-    git: { branch: null, status: "unknown", remotes: [] },
+    git,
     packageManager
   };
 }
@@ -184,9 +186,29 @@ function detectLanguages(ctx: ScanContext): string[] {
 
 function detectImportantFiles(ctx: ScanContext): string[] {
   return [...ctx.files]
-    .sort((a, b) => a.localeCompare(b))
     .filter((file) => isImportantFile(file))
+    .sort(compareImportantFiles)
     .slice(0, 20);
+}
+
+function compareImportantFiles(a: string, b: string): number {
+  return importantFilePriority(a) - importantFilePriority(b) || a.localeCompare(b);
+}
+
+function importantFilePriority(file: string): number {
+  const normalized = file.toLowerCase();
+  const basename = normalized.split("/").pop() ?? normalized;
+  if (isManifestOrConfigFile(file, basename)) return 0;
+  if (/^(?:.*\/)?dockerfile$/i.test(file) || /^(?:.*\/)?docker-compose\.ya?ml$/i.test(file)) return 1;
+  if (/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(file)) return 2;
+  if (file.startsWith(".botpress/")) return 3;
+  if (file.startsWith("scripts/")) return 4;
+  return 5;
+}
+
+function isManifestOrConfigFile(file: string, basename = file.split("/").pop() ?? file): boolean {
+  if (file.includes("/")) return false;
+  return /^(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md|Makefile|Taskfile\.ya?ml|justfile|botpress\.config\.json|\.shellcheckrc)$/i.test(basename);
 }
 
 function isImportantFile(file: string): boolean {
@@ -196,7 +218,7 @@ function isImportantFile(file: string): boolean {
   if (/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(file)) return true;
   if (/^(?:.*\/)?Dockerfile$/i.test(file)) return true;
   if (/^(?:.*\/)?docker-compose\.ya?ml$/i.test(file)) return true;
-  return /^(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md|Makefile|Taskfile\.ya?ml|justfile|botpress\.config\.json|\.shellcheckrc)$/i.test(basename);
+  return isManifestOrConfigFile(file, basename);
 }
 
 function isStaticSourceFile(relativePath: string): boolean {
