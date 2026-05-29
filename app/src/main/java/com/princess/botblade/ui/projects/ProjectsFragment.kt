@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -103,6 +104,9 @@ class ProjectsFragment : Fragment() {
         var pendingFolderLane by rememberSaveable { mutableStateOf(SourceLane.OPEN_FOLDER.name) }
         var createActions by remember { mutableStateOf<List<PostCreateAction>>(emptyList()) }
         var onboardingSummary by remember { mutableStateOf<String?>(null) }
+        var favoriteRepoKeys by rememberSaveable { mutableStateOf(listOf<String>()) }
+        var favoriteSnippetIds by rememberSaveable { mutableStateOf(listOf<String>()) }
+        var snippetCategory by rememberSaveable { mutableStateOf(SnippetCategories.first()) }
         val editorRepo = remember { EditorRepository() }
         val scope = rememberCoroutineScope()
         val validName = name.isNotBlank() && name.matches(Regex("^[a-zA-Z0-9 _-]+$"))
@@ -182,6 +186,31 @@ class ProjectsFragment : Fragment() {
             ) {
                 item { Hero(banner, ::openWizard) }
                 item { FlowRail() }
+                item {
+                    DiscoveryGrove(
+                        favoriteRepoKeys = favoriteRepoKeys,
+                        onToggleFavorite = { key ->
+                            favoriteRepoKeys = if (key in favoriteRepoKeys) favoriteRepoKeys - key else favoriteRepoKeys + key
+                        },
+                        onStageImport = { repo ->
+                            gitRepoUrl = repo.url
+                            gitBranch = repo.branch.orEmpty()
+                            showGitModal = true
+                            banner = "Staged ${repo.ownerRepo} from the ${repo.category} tree. Review branch and import when ready."
+                        },
+                    )
+                }
+                item {
+                    SnippetMixer(
+                        selectedCategory = snippetCategory,
+                        favoriteSnippetIds = favoriteSnippetIds,
+                        onSelectCategory = { snippetCategory = it },
+                        onToggleFavorite = { snippet ->
+                            favoriteSnippetIds = if (snippet.id in favoriteSnippetIds) favoriteSnippetIds - snippet.id else favoriteSnippetIds + snippet.id
+                            banner = "${snippet.title} is ready for ${snippet.category} mix-and-match notes. Ask AI to adapt it after import."
+                        },
+                    )
+                }
                 item { SectionTitle("Workspaces") }
                 if (projects.isEmpty()) {
                     item { EmptyState(::openWizard) }
@@ -412,6 +441,109 @@ class ProjectsFragment : Fragment() {
         }
     }
 
+    @Composable private fun DiscoveryGrove(
+        favoriteRepoKeys: List<String>,
+        onToggleFavorite: (String) -> Unit,
+        onStageImport: (RecommendedRepo) -> Unit,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle("GitHub discovery grove")
+            WorkstationCard(accent = BotBladeTokens.GlitterGold) {
+                Text("Massive recommended repo trees", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Browse a big seeded forest of bot, workflow, AI-agent, template, and utility repos. Favorite finds, stage an import, then mix sources only after BotBlade scans them as untrusted code.", color = Muted)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {
+                    items(RepoCategories, key = { it.title }) { category ->
+                        StatusChip("${category.title} · ${category.repos.size}", StatusTone.Info)
+                    }
+                    item { StatusChip("Favorites · ${favoriteRepoKeys.size}", StatusTone.Success) }
+                }
+            }
+            RepoCategories.forEach { category ->
+                WorkstationCard(accent = category.accent) {
+                    Text(category.title, color = BabyBlue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(category.detail, color = Muted)
+                    category.repos.forEach { repo ->
+                        val key = repo.ownerRepo
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                            colors = CardDefaults.cardColors(containerColor = BotBlack),
+                            border = BorderStroke(1.dp, Stroke),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(repo.ownerRepo, color = OnSurface, fontWeight = FontWeight.Bold)
+                                        Text(repo.description, color = Muted)
+                                    }
+                                    Text(if (key in favoriteRepoKeys) "★" else "☆", color = HotPink, fontWeight = FontWeight.Bold)
+                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(repo.tags) { tag -> StatusChip(tag, StatusTone.Neutral) }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedButton(onClick = { onToggleFavorite(key) }, modifier = Modifier.weight(1f)) {
+                                        Text(if (key in favoriteRepoKeys) "Favorited" else "Favorite")
+                                    }
+                                    BladeButton("Stage import", onClick = { onStageImport(repo) }, modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable private fun SnippetMixer(
+        selectedCategory: String,
+        favoriteSnippetIds: List<String>,
+        onSelectCategory: (String) -> Unit,
+        onToggleFavorite: (SnippetSeed) -> Unit,
+    ) {
+        val snippets = SnippetSeeds.filter { it.category == selectedCategory }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle("Snippet mixboard")
+            WorkstationCard(accent = HotPink) {
+                Text("Favorite tiny GitHub-page ideas", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Save little code patterns by category before import: command handlers, webhook guards, workflow steps, prompts, env contracts, and deploy snippets. AI help is intentionally a guided adaptation step, not blind copy-paste.", color = Muted)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {
+                    items(SnippetCategories) { category ->
+                        FilterChip(selected = selectedCategory == category, onClick = { onSelectCategory(category) }, label = { Text(category) })
+                    }
+                }
+                snippets.forEach { snippet ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        colors = CardDefaults.cardColors(containerColor = BotBlack),
+                        border = BorderStroke(1.dp, Stroke),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(snippet.title, color = OnSurface, fontWeight = FontWeight.Bold)
+                                    Text(snippet.detail, color = Muted)
+                                }
+                                Text(if (snippet.id in favoriteSnippetIds) "★" else "☆", color = HotPink, fontWeight = FontWeight.Bold)
+                            }
+                            Text("Source hint: ${snippet.sourceHint}", color = Muted)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(onClick = { onToggleFavorite(snippet) }, modifier = Modifier.weight(1f)) {
+                                    Text(if (snippet.id in favoriteSnippetIds) "Saved" else "Save snippet")
+                                }
+                                OutlinedButton(onClick = { onToggleFavorite(snippet) }, modifier = Modifier.weight(1f)) {
+                                    Text("AI adapt")
+                                }
+                            }
+                        }
+                    }
+                }
+                Text("Saved snippets: ${favoriteSnippetIds.size}. Categories stay local to the project flow until a future snippet vault is wired.", color = Muted, modifier = Modifier.padding(top = 10.dp))
+            }
+        }
+    }
+
     @Composable private fun EmptyState(onAdd: () -> Unit) {
         WorkstationCard(accent = BabyBlue) {
             Text("No bots in the forge yet", color = BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -480,6 +612,19 @@ class ProjectsFragment : Fragment() {
 
     private data class Source(val title: String, val detail: String, val lane: SourceLane, val templateDir: String?)
 
+    private data class RecommendedRepo(
+        val ownerRepo: String,
+        val description: String,
+        val url: String,
+        val category: String,
+        val branch: String? = null,
+        val tags: List<String>,
+    )
+
+    private data class RepoCategory(val title: String, val detail: String, val accent: androidx.compose.ui.graphics.Color, val repos: List<RecommendedRepo>)
+
+    private data class SnippetSeed(val id: String, val category: String, val title: String, val detail: String, val sourceHint: String)
+
     private data class PostCreateAction(val title: String, val detail: String)
 
     private fun ApiResult<ProjectScanResponse>?.toScanSummary(): String = when (this) {
@@ -502,6 +647,80 @@ class ProjectsFragment : Fragment() {
         val HotPink = BotBladeTokens.HotPink
         val OnSurface = ColorToken.OnSurface
         val Muted = BotBladeTokens.Muted
+
+        val SnippetCategories = listOf("Commands", "Webhooks", "Workflows", "AI Prompts", "Secrets", "Deploy")
+        val SnippetSeeds = listOf(
+            SnippetSeed("cmd-slash-router", "Commands", "Slash command router", "Capture a minimal command registry shape that can be adapted after scan.", "discord.js guide command handling pages"),
+            SnippetSeed("cmd-permission-gate", "Commands", "Permission gate", "Save an admin/mod role guard pattern for later AI-assisted rewriting.", "Discord moderation bot examples"),
+            SnippetSeed("cmd-telegraf-scene", "Commands", "Telegraf scene step", "Track a conversational wizard step without importing a whole framework.", "telegraf/telegraf examples"),
+            SnippetSeed("hook-signature", "Webhooks", "Webhook signature verifier", "Favorite request verification notes for Slack, GitHub, Stripe, and generic HMAC flows.", "platform webhook docs and sample repos"),
+            SnippetSeed("hook-retry", "Webhooks", "Retry-safe handler", "Keep idempotency, queue, and replay notes for webhook workers.", "Fastify/Express worker examples"),
+            SnippetSeed("flow-n8n-github", "Workflows", "GitHub issue triage flow", "Mark workflow JSON ideas that turn repo events into notifications or tickets.", "n8n workflow collections"),
+            SnippetSeed("flow-approval", "Workflows", "Human approval step", "Save approval-loop ideas before adapting them into BotBlade tasks.", "Activepieces and n8n templates"),
+            SnippetSeed("ai-system-card", "AI Prompts", "System prompt card", "Store prompt role, safety rails, and expected JSON output as a reusable idea.", "agent template repositories"),
+            SnippetSeed("ai-rag-tool", "AI Prompts", "RAG tool call", "Favorite retrieval/tool-call snippets for later AI-assisted extraction.", "LangChain/LlamaIndex examples"),
+            SnippetSeed("sec-env-contract", "Secrets", "Environment contract", "Capture env var names and secret-reference metadata without copying values.", "README and .env.example files"),
+            SnippetSeed("sec-redaction", "Secrets", "Redaction helper", "Keep masking and audit-log ideas as a small adaptation note.", "security utility snippets"),
+            SnippetSeed("deploy-health", "Deploy", "Health check probe", "Save tiny status endpoint/deploy check ideas for later generated project hardening.", "worker and API templates"),
+        )
+        val RepoCategories = listOf(
+            RepoCategory("Discord command forests", "Slash commands, frameworks, ticketing, moderation, music, and multipurpose bot code.", BabyBlue, listOf(
+                RecommendedRepo("discordjs/discord.js", "Core Discord API library and examples for modern JavaScript and TypeScript bots.", "https://github.com/discordjs/discord.js", "Discord", tags = listOf("library", "slash", "gateway")),
+                RecommendedRepo("discordjs/guide", "Official guide source with command handling and project-structure examples.", "https://github.com/discordjs/guide", "Discord", tags = listOf("guide", "commands", "reference")),
+                RecommendedRepo("sapphiredev/framework", "Advanced Discord bot framework layered on discord.js with TypeScript-first patterns.", "https://github.com/sapphiredev/framework", "Discord", tags = listOf("framework", "typescript", "commands")),
+                RecommendedRepo("discord-akairo/discord-akairo", "Command and listener framework worth inspecting for older but clear architecture ideas.", "https://github.com/discord-akairo/discord-akairo", "Discord", tags = listOf("framework", "commands", "legacy")),
+                RecommendedRepo("AnIdiotsGuide/discordjs-bot-guide", "Community-written bot guide with practical snippets and setup notes.", "https://github.com/AnIdiotsGuide/discordjs-bot-guide", "Discord", tags = listOf("guide", "examples", "learning")),
+                RecommendedRepo("saiteja-madha/discord-js-bot", "Multipurpose Discord bot covering moderation, music, tickets, and utility features.", "https://github.com/saiteja-madha/discord-js-bot", "Discord", tags = listOf("multipurpose", "moderation", "music")),
+                RecommendedRepo("discord-tickets/bot", "Self-hosted ticket-management bot reference for support workflows.", "https://github.com/discord-tickets/bot", "Discord", tags = listOf("tickets", "support", "self-hosted")),
+                RecommendedRepo("Androz2091/discord-music-bot", "Music bot project useful for queue, player, and command organization ideas.", "https://github.com/Androz2091/discord-music-bot", "Discord", tags = listOf("music", "queue", "player")),
+            )),
+            RepoCategory("Telegram and chat agents", "Telegraf, grammY, Botkit, botpress-style, and chat-automation patterns.", HotPink, listOf(
+                RecommendedRepo("telegraf/telegraf", "Telegram bot framework with middleware and context patterns.", "https://github.com/telegraf/telegraf", "Telegram", tags = listOf("telegram", "middleware", "typescript")),
+                RecommendedRepo("grammyjs/grammY", "Modern Telegram Bot API framework with plugins and conversations.", "https://github.com/grammyjs/grammY", "Telegram", tags = listOf("telegram", "plugins", "conversations")),
+                RecommendedRepo("howdyai/botkit", "Cross-platform conversation toolkit reference for dialog and adapter structure.", "https://github.com/howdyai/botkit", "Telegram", tags = listOf("conversation", "adapters", "legacy")),
+                RecommendedRepo("botpress/botpress", "Botpress repository for bot-as-code and workflow-agent import references.", "https://github.com/botpress/botpress", "Telegram", tags = listOf("botpress", "workflow", "agent")),
+                RecommendedRepo("microsoft/BotBuilder-Samples", "Enterprise bot framework samples for future Blade Pack/template ideas.", "https://github.com/microsoft/BotBuilder-Samples", "Telegram", tags = listOf("samples", "enterprise", "adapters")),
+                RecommendedRepo("yagop/node-telegram-bot-api", "Node Telegram Bot API library with straightforward polling/webhook examples.", "https://github.com/yagop/node-telegram-bot-api", "Telegram", tags = listOf("telegram", "node", "webhooks")),
+            )),
+            RepoCategory("Slack, Teams, and collaboration", "Slack Bolt apps, manifests, approvals, notifications, and chatops starters.", BotBladeTokens.GlitterGold, listOf(
+                RecommendedRepo("slackapi/bolt-js", "Slack Bolt for JavaScript with event, command, OAuth, and receiver patterns.", "https://github.com/slackapi/bolt-js", "Slack", tags = listOf("slack", "bolt", "oauth")),
+                RecommendedRepo("slackapi/node-slack-sdk", "Slack Web API and platform SDK reference for focused integrations.", "https://github.com/slackapi/node-slack-sdk", "Slack", tags = listOf("sdk", "web-api", "events")),
+                RecommendedRepo("slackapi/bolt-python", "Python Bolt app examples useful for alternate runtime detection.", "https://github.com/slackapi/bolt-python", "Slack", tags = listOf("python", "bolt", "events")),
+                RecommendedRepo("microsoftgraph/msgraph-sdk-javascript", "Microsoft Graph SDK source for Teams-oriented future integration patterns.", "https://github.com/microsoftgraph/msgraph-sdk-javascript", "Slack", tags = listOf("teams", "graph", "sdk")),
+                RecommendedRepo("errbotio/errbot", "ChatOps bot framework for adapter and plugin architecture ideas.", "https://github.com/errbotio/errbot", "Slack", tags = listOf("chatops", "plugins", "python")),
+            )),
+            RepoCategory("Workflow and automation treasure", "n8n, Activepieces, Node-RED, Huginn, workflow JSON, and integration-piece references.", BabyBlue, listOf(
+                RecommendedRepo("activepieces/activepieces", "Modern integration-piece architecture reference for BotBlade workflow adapters.", "https://github.com/activepieces/activepieces", "Workflow", tags = listOf("pieces", "automation", "integrations")),
+                RecommendedRepo("n8n-io/n8n", "Workflow automation repository; import/reference-first because of license posture.", "https://github.com/n8n-io/n8n", "Workflow", tags = listOf("workflow", "json", "reference")),
+                RecommendedRepo("pxw3504k-web/awesome-n8n-workflows", "Large community n8n workflow collection for discovery and JSON import experiments.", "https://github.com/pxw3504k-web/awesome-n8n-workflows", "Workflow", tags = listOf("n8n", "templates", "json")),
+                RecommendedRepo("enescingoz/awesome-n8n-templates", "Curated n8n templates for AI, productivity, Telegram, Slack, and more.", "https://github.com/enescingoz/awesome-n8n-templates", "Workflow", tags = listOf("n8n", "templates", "ai")),
+                RecommendedRepo("node-red/node-red", "Legacy visual workflow reference for nodes, flows, and local editor ergonomics.", "https://github.com/node-red/node-red", "Workflow", tags = listOf("flows", "nodes", "legacy")),
+                RecommendedRepo("huginn/huginn", "Legacy agent/workflow compatibility reference with event-driven automations.", "https://github.com/huginn/huginn", "Workflow", tags = listOf("agents", "events", "legacy")),
+            )),
+            RepoCategory("AI agent workbenches", "Agent templates, tool calling, RAG starters, eval harnesses, and prompt workflow repos.", HotPink, listOf(
+                RecommendedRepo("langchain-ai/langchainjs", "JavaScript LangChain source for tools, agents, retrievers, and examples.", "https://github.com/langchain-ai/langchainjs", "AI Agents", tags = listOf("agents", "tools", "rag")),
+                RecommendedRepo("langchain-ai/langgraphjs", "Graph-style agent orchestration patterns for durable task planning.", "https://github.com/langchain-ai/langgraphjs", "AI Agents", tags = listOf("graphs", "agents", "orchestration")),
+                RecommendedRepo("openai/openai-node", "Official OpenAI Node SDK examples and type shapes for future adapters.", "https://github.com/openai/openai-node", "AI Agents", tags = listOf("openai", "sdk", "typescript")),
+                RecommendedRepo("openai/openai-cookbook", "Cookbook examples for structured outputs, tools, RAG, and evaluation ideas.", "https://github.com/openai/openai-cookbook", "AI Agents", tags = listOf("cookbook", "patterns", "examples")),
+                RecommendedRepo("run-llama/LlamaIndexTS", "TypeScript data-agent and indexing framework reference.", "https://github.com/run-llama/LlamaIndexTS", "AI Agents", tags = listOf("rag", "indexing", "typescript")),
+                RecommendedRepo("crewAIInc/crewAI", "Python multi-agent orchestration reference for future pack detectors.", "https://github.com/crewAIInc/crewAI", "AI Agents", tags = listOf("multi-agent", "python", "tasks")),
+            )),
+            RepoCategory("Webhooks, workers, and APIs", "Tiny services, webhook receivers, queue workers, serverless functions, and templates.", BabyBlue, listOf(
+                RecommendedRepo("fastify/fastify", "Fast Node.js framework with plugin and lifecycle patterns for webhook workers.", "https://github.com/fastify/fastify", "Workers", tags = listOf("fastify", "api", "plugins")),
+                RecommendedRepo("expressjs/express", "Minimal web framework reference for common bot dashboards and webhooks.", "https://github.com/expressjs/express", "Workers", tags = listOf("express", "webhooks", "api")),
+                RecommendedRepo("honojs/hono", "Tiny web framework for edge/serverless bot webhook handlers.", "https://github.com/honojs/hono", "Workers", tags = listOf("edge", "worker", "typescript")),
+                RecommendedRepo("cloudflare/workers-sdk", "Workers tooling reference for deploy adapters and edge bot endpoints.", "https://github.com/cloudflare/workers-sdk", "Workers", tags = listOf("cloudflare", "edge", "deploy")),
+                RecommendedRepo("vercel/examples", "Deployment examples for serverless handlers and framework adapters.", "https://github.com/vercel/examples", "Workers", tags = listOf("serverless", "examples", "deploy")),
+                RecommendedRepo("fastapi/full-stack-fastapi-template", "Python API template with modern structure for generic Python imports.", "https://github.com/fastapi/full-stack-fastapi-template", "Workers", tags = listOf("python", "api", "template")),
+            )),
+            RepoCategory("DevOps and repo robots", "GitHub apps, issue bots, release helpers, CI notifiers, and maintenance automation.", BotBladeTokens.GlitterGold, listOf(
+                RecommendedRepo("probot/probot", "GitHub App framework for issue, PR, and repo automation bots.", "https://github.com/probot/probot", "DevOps", tags = listOf("github-app", "automation", "webhooks")),
+                RecommendedRepo("actions/toolkit", "GitHub Actions toolkit source for workflow automation concepts.", "https://github.com/actions/toolkit", "DevOps", tags = listOf("actions", "toolkit", "ci")),
+                RecommendedRepo("semantic-release/semantic-release", "Automated release workflow reference for changelog and version bots.", "https://github.com/semantic-release/semantic-release", "DevOps", tags = listOf("release", "automation", "ci")),
+                RecommendedRepo("renovatebot/renovate", "Dependency update bot source for policy-heavy automation design.", "https://github.com/renovatebot/renovate", "DevOps", tags = listOf("dependencies", "policy", "bot")),
+                RecommendedRepo("dependabot/dependabot-core", "Dependency update engine reference for manifest scanning ideas.", "https://github.com/dependabot/dependabot-core", "DevOps", tags = listOf("dependencies", "security", "scanner")),
+            )),
+        )
         val Sources = listOf(
             Source("Discord TypeScript Starter", "slash-command bot with generated TypeScript project files", SourceLane.STARTER_TEMPLATE, "project_templates/simple_echo_bot"),
             Source("Moderation Toolkit", "moderation-oriented starter ready for rules and actions", SourceLane.STARTER_TEMPLATE, "project_templates/moderation_bot"),

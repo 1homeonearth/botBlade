@@ -41,6 +41,20 @@ import com.princess.botblade.data.model.ImportSummary
 import com.princess.botblade.data.model.GitStatusApiSummary
 import com.princess.botblade.data.model.GitRemoteSummary
 import com.princess.botblade.data.model.GitChangedFileSummary
+import com.princess.botblade.data.model.ProjectProfileBladePack
+import com.princess.botblade.data.model.ProjectProfileCommandPlan
+import com.princess.botblade.data.model.ProjectProfileGit
+import com.princess.botblade.data.model.ProjectProfileGitRemote
+import com.princess.botblade.data.model.ProjectProfileImportSource
+import com.princess.botblade.data.model.ProjectProfilePackEvidence
+import com.princess.botblade.data.model.ProjectProfileProject
+import com.princess.botblade.data.model.ProjectProfileResponse
+import com.princess.botblade.data.model.ProjectProfileRuntime
+import com.princess.botblade.data.model.ProjectProfileSecrets
+import com.princess.botblade.data.model.RepairCard
+import com.princess.botblade.data.model.ScriptEnvironmentRef
+import com.princess.botblade.data.model.ScriptProfileSummary
+import com.princess.botblade.data.model.ScriptSecretRef
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -138,6 +152,21 @@ class BotBladeApiClient(
     @Throws(IOException::class)
     fun getProject(projectId: String): BotProject =
         request(path = "/api/projects/${projectId.encodedPathSegment()}", method = "GET").toProjectResponse()
+
+    @Throws(IOException::class)
+    fun getProjectProfile(projectId: String): ProjectProfileResponse =
+        request(path = "/api/projects/${projectId.encodedPathSegment()}/profile", method = "GET").toProjectProfileResponse()
+
+    @Throws(IOException::class)
+    fun listScriptProfiles(projectId: String): List<ScriptProfileSummary> {
+        val body = request(path = "/api/projects/${projectId.encodedPathSegment()}/script-profiles", method = "GET")
+        val profiles = requireNotNull(body.asJsonOrNull()) { "Invalid script profiles response." }.optJSONArray("scriptProfiles") ?: JSONArray()
+        return profiles.toScriptProfileSummaries()
+    }
+
+    @Throws(IOException::class)
+    fun getScriptProfile(projectId: String, scriptProfileId: String): ScriptProfileSummary =
+        request(path = "/api/projects/${projectId.encodedPathSegment()}/script-profiles/${scriptProfileId.encodedPathSegment()}", method = "GET").toScriptProfileResponse()
 
     @Throws(IOException::class)
     fun updateProject(projectId: String, request: ProjectUpdateRequest): BotProject {
@@ -651,10 +680,168 @@ class BotBladeApiClient(
         return ProjectScanResponse(detection.optString("recommendedPackId", "unknown"), matches, warnings)
     }
 
+    private fun String.toProjectProfileResponse(): ProjectProfileResponse = requireNotNull(asJsonOrNull()) { "Invalid project profile response." }.toProjectProfileResponse()
+
+    private fun JSONObject.toProjectProfileResponse(): ProjectProfileResponse {
+        val projectJson = optJSONObject("project")
+        val importSourceJson = projectJson?.optJSONObject("importSource")
+        val runtimeJson = optJSONObject("runtime")
+        val bladePackJson = optJSONObject("bladePack")
+        val detectedPacks = bladePackJson?.optJSONArray("detected") ?: JSONArray()
+        val secretsJson = optJSONObject("secrets") ?: JSONObject()
+        val gitJson = optJSONObject("git")
+        return ProjectProfileResponse(
+            schemaVersion = optString("schemaVersion"),
+            generatedBy = optString("generatedBy"),
+            generatedAt = optString("generatedAt"),
+            project = projectJson?.let {
+                ProjectProfileProject(
+                    id = it.optionalString("id"),
+                    name = it.optString("name"),
+                    type = it.optString("type"),
+                    root = it.optString("root"),
+                    importSource = importSourceJson?.let { source ->
+                        ProjectProfileImportSource(
+                            kind = source.optString("kind"),
+                            url = source.optionalString("url"),
+                        )
+                    },
+                )
+            },
+            runtime = runtimeJson?.let {
+                ProjectProfileRuntime(
+                    type = it.optString("type"),
+                    version = it.optString("version"),
+                    packageManager = it.optionalString("packageManager") ?: "unknown",
+                    detectedLanguages = it.optStringArray("detectedLanguages"),
+                    detectedFrameworks = it.optStringArray("detectedFrameworks"),
+                )
+            },
+            bladePack = bladePackJson?.let {
+                ProjectProfileBladePack(
+                    selected = it.optString("selected"),
+                    version = it.optString("version"),
+                    detected = (0 until detectedPacks.length()).map { index -> detectedPacks.getJSONObject(index).toProjectProfilePackEvidence() },
+                )
+            },
+            commandPlan = (optJSONObject("commandPlan") ?: JSONObject()).toProjectProfileCommandPlan(),
+            scriptProfiles = (optJSONArray("scriptProfiles") ?: JSONArray()).toScriptProfileSummaries(),
+            secrets = ProjectProfileSecrets(
+                required = (secretsJson.optJSONArray("required") ?: JSONArray()).toScriptSecretRefs(),
+                optional = (secretsJson.optJSONArray("optional") ?: JSONArray()).toScriptSecretRefs(),
+            ),
+            permissions = optStringArray("permissions"),
+            capabilities = optStringArray("capabilities"),
+            importantFiles = optStringArray("importantFiles"),
+            warnings = optStringArray("warnings"),
+            repairCards = (optJSONArray("repairCards") ?: JSONArray()).toRepairCards(),
+            git = gitJson?.toProjectProfileGit(),
+        )
+    }
+
+    private fun JSONObject.toProjectProfilePackEvidence(): ProjectProfilePackEvidence = ProjectProfilePackEvidence(
+        id = optString("id"),
+        name = optString("name"),
+        score = optInt("score"),
+        confidence = optString("confidence"),
+        matchedEvidence = optStringArray("matchedEvidence"),
+    )
+
+    private fun JSONObject.toProjectProfileCommandPlan(): ProjectProfileCommandPlan = ProjectProfileCommandPlan(
+        install = optStringArray("install"),
+        build = optStringArray("build"),
+        test = optStringArray("test"),
+        validate = optStringArray("validate"),
+        start = optStringArray("start"),
+        stop = optStringArray("stop"),
+        restart = optStringArray("restart"),
+        deploy = optStringArray("deploy"),
+    )
+
+    private fun String.toScriptProfileResponse(): ScriptProfileSummary = requireNotNull(asJsonOrNull()) { "Invalid script profile response." }.toScriptProfileSummary()
+
+    private fun JSONArray.toScriptProfileSummaries(): List<ScriptProfileSummary> =
+        (0 until length()).map { index -> getJSONObject(index).toScriptProfileSummary() }
+
+    private fun JSONObject.toScriptProfileSummary(): ScriptProfileSummary = ScriptProfileSummary(
+        id = optString("id"),
+        projectId = optionalString("projectId"),
+        name = optString("name"),
+        description = optionalString("description"),
+        source = optString("source"),
+        runtime = optString("runtime"),
+        command = optStringArray("command"),
+        workingDirectory = optionalString("workingDirectory") ?: ".",
+        envRefs = (optJSONArray("envRefs") ?: JSONArray()).toScriptEnvironmentRefs(),
+        secretRefs = (optJSONArray("secretRefs") ?: JSONArray()).toScriptSecretRefs(),
+        timeoutSeconds = optInt("timeoutSeconds", 300),
+        requiresConfirmation = optBoolean("requiresConfirmation", false),
+        tags = optStringArray("tags"),
+        createdAt = optString("createdAt"),
+        updatedAt = optString("updatedAt"),
+    )
+
+    private fun JSONArray.toScriptEnvironmentRefs(): List<ScriptEnvironmentRef> = (0 until length()).mapNotNull { index ->
+        when (val value = opt(index)) {
+            is JSONObject -> {
+                val name = value.optionalString("name") ?: value.optionalString("key")
+                name?.let { ScriptEnvironmentRef(name = it, source = value.optionalString("source")) }
+            }
+            is String -> value.takeIf { it.isNotBlank() }?.let { ScriptEnvironmentRef(name = it) }
+            else -> null
+        }
+    }
+
+    private fun JSONArray.toScriptSecretRefs(): List<ScriptSecretRef> = (0 until length()).mapNotNull { index ->
+        when (val value = opt(index)) {
+            is JSONObject -> {
+                val id = value.optionalString("id") ?: value.optionalString("secretRef") ?: value.optionalString("name")
+                id?.let {
+                    ScriptSecretRef(
+                        id = it,
+                        name = value.optionalString("name"),
+                        required = value.optionalBoolean("required"),
+                        configured = value.optionalBoolean("configured"),
+                    )
+                }
+            }
+            is String -> value.takeIf { it.isNotBlank() }?.let { ScriptSecretRef(id = it) }
+            else -> null
+        }
+    }
+
+    private fun JSONArray.toRepairCards(): List<RepairCard> = (0 until length()).map { index ->
+        val card = getJSONObject(index)
+        RepairCard(
+            title = card.optString("title"),
+            evidence = card.optionalString("evidence"),
+            safeAction = card.optString("safeAction"),
+        )
+    }
+
+    private fun JSONObject.toProjectProfileGit(): ProjectProfileGit {
+        val remotesJson = optJSONArray("remotes") ?: JSONArray()
+        return ProjectProfileGit(
+            branch = optionalString("branch"),
+            status = optionalString("status") ?: "unknown",
+            dirtyFileCount = optInt("dirtyFileCount", 0),
+            remotes = (0 until remotesJson.length()).map { index ->
+                val remote = remotesJson.getJSONObject(index)
+                ProjectProfileGitRemote(name = remote.optString("name"), url = remote.optionalString("url"))
+            },
+        )
+    }
+
     private fun String.asJsonOrNull(): JSONObject? = runCatching { JSONObject(this) }.getOrNull()
 
     private fun JSONObject.optionalString(name: String): String? = if (has(name) && !isNull(name)) {
         optString(name).takeIf { it.isNotBlank() }
+    } else {
+        null
+    }
+
+    private fun JSONObject.optionalBoolean(name: String): Boolean? = if (has(name) && !isNull(name)) {
+        optBoolean(name)
     } else {
         null
     }
