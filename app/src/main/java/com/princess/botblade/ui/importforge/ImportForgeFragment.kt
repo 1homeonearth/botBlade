@@ -100,12 +100,32 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel, openExternal: (Str
     ) {
         item {
             WorkstationCard(accent = BotBladeTokens.HotPink) {
-                Text("GitHub Discovery", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                Text("Find useful bot code, inspect what it is, and import the repository without dumping you into a cramped web page.", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 14.dp)) {
-                    StatusChip("Native browse", StatusTone.Success)
-                    StatusChip("Git import", StatusTone.Info)
-                    StatusChip("Repo-first", StatusTone.Warning)
+                Text("Import Forge", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                Text("Move through Source, Detect, Configure, then Build, Run & Script preview without executing imported code during analysis.", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 14.dp)) {
+                    items(ImportForgeStep.entries.toList()) { step ->
+                        StatusChip(step.title, if (step == state.step) StatusTone.Success else StatusTone.Neutral)
+                    }
+                }
+            }
+        }
+
+        item { SectionTitle("Source") }
+        item {
+            WorkstationCard(accent = BotBladeTokens.GlitterGold) {
+                Text("Choose an import source", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Git URLs, ZIP archives, SAF folders, workflow JSON, and first-party templates share the same preview-first wizard.", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 12.dp)) {
+                    state.sourceOptions.forEach { option ->
+                        SourceOptionCard(
+                            option = option,
+                            selected = option.type == state.selectedSourceType,
+                            onSelect = {
+                                viewModel.selectSource(option.type)
+                                message = "Selected ${option.title}. Continue through detection and configuration before saving a profile."
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -140,7 +160,7 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel, openExternal: (Str
 
         item {
             WorkstationCard(accent = BotBladeTokens.GlitterGold) {
-                Text("Import source", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Git URL source", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(message, color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 6.dp))
                 OutlinedTextField(
                     value = gitUrl,
@@ -178,14 +198,57 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel, openExternal: (Str
             )
         }
 
-        item { SectionTitle("Other import paths") }
+        item { SectionTitle("Detect") }
         item {
             WorkstationCard(accent = BotBladeTokens.BabyBlue) {
-                Text("ZIP and local folder imports", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
-                Text("Use these when the project is already on-device. These are hooks until Android file pickers are fully wired.", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    OutlinedButton(onClick = { viewModel.startImport(sourceType = "zip", source = "/sdcard/Download/import.zip", workspacePath = "imports/zip") }, modifier = Modifier.weight(1f)) { Text("Import ZIP") }
-                    OutlinedButton(onClick = { viewModel.startImport(sourceType = "folder", source = "/sdcard/Download/import-folder", workspacePath = "imports/folder") }, modifier = Modifier.weight(1f)) { Text("Import folder") }
+                Text("Recommended Blade Pack", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(state.recommendedBladePack.name, color = Color.White, modifier = Modifier.padding(top = 8.dp), fontWeight = FontWeight.Bold)
+                Text("Confidence score: ${state.recommendedBladePack.confidenceScore}%", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 4.dp))
+                Text("Matched evidence", color = BotBladeTokens.BabyBlue, modifier = Modifier.padding(top = 12.dp), fontWeight = FontWeight.Bold)
+                state.recommendedBladePack.matchedEvidence.forEach { evidence ->
+                    Text("• $evidence", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 4.dp))
+                }
+                OutlinedButton(onClick = { viewModel.continueToConfigure() }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Configure") }
+            }
+        }
+
+        item { SectionTitle("Configure") }
+        item {
+            WorkstationCard(accent = BotBladeTokens.GlitterGold) {
+                Text("Secrets", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Only secret references and configured flags are shown here. Secret values are never displayed.", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 6.dp))
+                SecretGroup("Required", state.requiredSecrets)
+                SecretGroup("Optional", state.optionalSecrets)
+                Text("Command plan", color = BotBladeTokens.BabyBlue, modifier = Modifier.padding(top = 14.dp), fontWeight = FontWeight.Bold)
+                state.commandPlan.forEach { group ->
+                    Text(group.source, color = Color.White, modifier = Modifier.padding(top = 8.dp), fontWeight = FontWeight.Bold)
+                    group.commands.forEach { command -> Text("• $command", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 3.dp)) }
+                }
+                BladeButton("Preview script profile", icon = Icons.Default.Code, onClick = { viewModel.previewScriptProfile() }, modifier = Modifier.fillMaxWidth().padding(top = 14.dp))
+            }
+        }
+
+        item { SectionTitle("Repair cards") }
+        items(state.repairCards) { card ->
+            WorkstationCard(accent = BotBladeTokens.Danger) {
+                Text(card.title, color = BotBladeTokens.Danger, fontWeight = FontWeight.Bold)
+                Text(card.evidence, color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 6.dp))
+                Text(card.safeAction, color = Color.White, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+
+        item { SectionTitle("Build, Run & Script preview") }
+        item {
+            WorkstationCard(accent = BotBladeTokens.HotPink) {
+                Text("Script-profile preview grouped by source", color = BotBladeTokens.BabyBlue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Review build, validation, and runtime-profile commands before saving. This phase previews profiles and does not execute commands.", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 6.dp))
+                state.scriptProfilePreview.forEach { group ->
+                    Text(group.source, color = Color.White, modifier = Modifier.padding(top = 12.dp), fontWeight = FontWeight.Bold)
+                    group.profiles.forEach { profile -> Text("• $profile", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 3.dp)) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                    BladeButton("Preview script profile", icon = Icons.Default.Code, onClick = { viewModel.previewScriptProfile() }, modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { viewModel.saveProfile() }, modifier = Modifier.weight(1f)) { Text("Save profile") }
                 }
             }
         }
@@ -195,7 +258,7 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel, openExternal: (Str
             item {
                 WorkstationCard(accent = BotBladeTokens.Stroke) {
                     Text("No import started yet", color = BotBladeTokens.BabyBlue, fontWeight = FontWeight.Bold)
-                    Text("Choose a repository card or paste a Git URL to begin.", color = BotBladeTokens.Muted)
+                    Text("Choose a source to begin detection.", color = BotBladeTokens.Muted)
                 }
             }
         } else {
@@ -217,6 +280,45 @@ private fun ImportForgeRoute(viewModel: ImportForgeViewModel, openExternal: (Str
                     Text(policy, color = BotBladeTokens.Muted)
                 }
             }
+        }
+    }
+}
+
+
+@Composable
+private fun SourceOptionCard(
+    option: ImportForgeSourceOption,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Surface(
+        color = BotBladeTokens.Panel,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, if (selected) BotBladeTokens.HotPink else BotBladeTokens.Stroke),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                StatusChip(option.title, if (selected) StatusTone.Success else StatusTone.Info)
+                if (!option.enabled) StatusChip("SAF disabled", StatusTone.Warning)
+            }
+            Text(option.detail, color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 8.dp))
+            OutlinedButton(onClick = onSelect, enabled = option.enabled, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                Text(if (selected) "Selected source" else "Select source")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecretGroup(title: String, secrets: List<ImportForgeSecretPreview>) {
+    Text(title, color = BotBladeTokens.BabyBlue, modifier = Modifier.padding(top = 12.dp), fontWeight = FontWeight.Bold)
+    if (secrets.isEmpty()) {
+        Text("None", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 4.dp))
+    } else {
+        secrets.forEach { secret ->
+            val flag = if (secret.configured) "configured=true" else "configured=false"
+            Text("• ${secret.name} ($flag)", color = BotBladeTokens.Muted, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
