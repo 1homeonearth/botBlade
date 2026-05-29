@@ -3,6 +3,13 @@ import path from "node:path";
 
 export interface GitStatusRemote { name: string; url: string | null }
 export interface GitChangedFileSummary { path: string; status: string }
+export type GitMetadataStatus = "clean" | "dirty" | "unknown";
+export interface GitStatusMetadata {
+  branch: string | null;
+  status: GitMetadataStatus;
+  dirtyFileCount?: number;
+  remotes: GitStatusRemote[];
+}
 export interface GitStatusSummary {
   available: boolean;
   branch: string | null;
@@ -50,6 +57,10 @@ export class GitStatusService {
 
   private currentBranch(workspacePath: string): string | null {
     try {
+      const symbolic = this.git(workspacePath, ["symbolic-ref", "--quiet", "--short", "HEAD"]).trim();
+      if (symbolic) return symbolic;
+    } catch {}
+    try {
       const value = this.git(workspacePath, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
       return value && value !== "HEAD" ? value : null;
     } catch {
@@ -78,8 +89,20 @@ export class GitStatusService {
       "-c", "core.fsmonitor=false",
       "-c", "core.hooksPath=/dev/null",
       ...args,
-    ], { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 } as any);
+    ], { encoding: "utf8", env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, maxBuffer: 10 * 1024 * 1024 } as any);
   }
+}
+
+export function gitStatusToMetadata(summary: GitStatusSummary): GitStatusMetadata {
+  const metadata: GitStatusMetadata = {
+    branch: summary.branch,
+    status: summary.available ? (summary.clean ? "clean" : "dirty") : "unknown",
+    remotes: summary.remotes,
+  };
+  if (summary.available && summary.note !== "too many changed files to display") {
+    metadata.dirtyFileCount = summary.dirtyFileCount;
+  }
+  return metadata;
 }
 
 function isEnobufsError(error: unknown): boolean {

@@ -65,6 +65,7 @@ export interface BotProfileScriptProfile {
 export interface BotProfileGitMetadata {
   branch: string | null;
   status: "clean" | "dirty" | "unknown";
+  dirtyFileCount?: number;
   remotes: Array<{ name: string; url: string | null }>;
 }
 

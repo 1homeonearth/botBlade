@@ -11,7 +11,7 @@ import { parseCommandDefinition, parseCommandPatch, validateCommands } from "./s
 import { DeploymentJobStore } from "./services/deploymentJobs.js";
 import { DeploymentTargetStore, deploymentTargetWithCapabilities, testDeploymentTarget } from "./services/deploymentTargets.js";
 import { GitHubIntegrationService } from "./services/githubIntegration.js";
-import { GitStatusService, redactCredentialUrl } from "./services/gitStatusService.js";
+import { GitStatusService, gitStatusToMetadata, redactCredentialUrl } from "./services/gitStatusService.js";
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
 import { handleFileOperationRoute, handleFolderOperationRoute } from "./services/fileOperationRoutes.js";
 import { ProjectFileService } from "./services/projectFiles.js";
@@ -431,10 +431,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const metadataPath = `${fileService.workspace(projectId)}/botblade.json`;
       let profile: Record<string, unknown> | null = null;
       try { profile = JSON.parse(await fs.readFile(metadataPath, "utf8")) as Record<string, unknown>; } catch {}
-      const git = await gitStatusService.readStatusSafe(fileService.workspace(projectId));
+      const gitStatus = await gitStatusService.readStatusSafe(fileService.workspace(projectId));
+      const git = mergeProfileGitMetadata(profile?.git, gitStatusToMetadata(gitStatus));
       const existingCards = Array.isArray(profile?.repairCards) ? profile?.repairCards as Array<Record<string, unknown>> : [];
       const repairCards = [...existingCards];
-      if (!git.available) repairCards.push({ title: "Git metadata unavailable", safeAction: "Initialize Git in the workspace or verify repository access, then refresh profile." });
+      if (!gitStatus.available) repairCards.push({ title: "Git metadata unavailable", safeAction: "Initialize Git in the workspace or verify repository access, then refresh profile." });
       if (profile && typeof profile === "object") return writeJson(res, 200, { ...sanitizeProfileImportSource(profile), git, repairCards });
       return writeJson(res, 200, { schemaVersion: "1.0.0", generatedBy: "botblade", generatedAt: new Date().toISOString(), project: { id: projectId }, git, repairCards });
     }
@@ -555,6 +556,15 @@ function notFoundCommand(commandId: string): never {
   throw { statusCode: 404, code: "NOT_FOUND", message: `Command '${commandId}' was not found.`, details: {} };
 }
 
+
+function mergeProfileGitMetadata(existing: unknown, current: object): Record<string, unknown> {
+  const currentMetadata = current as Record<string, unknown>;
+  const merged = !existing || typeof existing !== "object" || Array.isArray(existing)
+    ? { ...currentMetadata }
+    : { ...(existing as Record<string, unknown>), ...currentMetadata };
+  if (!("dirtyFileCount" in currentMetadata)) delete merged.dirtyFileCount;
+  return merged;
+}
 
 function sanitizeProfileImportSource(profile: Record<string, unknown>): Record<string, unknown> {
   const project = profile.project;

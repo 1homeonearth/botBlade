@@ -37,6 +37,31 @@ test("git status service returns dirty summary for modified repo", async () => {
   assert.ok(status.changedFiles.some((entry) => entry.path === "file.txt"));
 });
 
+
+test("git status service redacts remote URLs before returning metadata", async () => {
+  const dir = await tempDir("botblade-git-remote-redaction");
+  execFileSync("git", ["-C", dir, "init"]);
+  execFileSync("git", [
+    "-C",
+    dir,
+    "remote",
+    "add",
+    "origin",
+    "https://user:pass@example.com/repo.git?access_token=abc123&expires=1",
+  ]);
+
+  const status = await new GitStatusService().readStatus(dir);
+
+  assert.equal(status.remotes.length, 1);
+  assert.equal(status.remotes[0]?.name, "origin");
+  assert.equal(status.remotes[0]?.url?.includes("user:pass"), false);
+  assert.equal(status.remotes[0]?.url?.includes("abc123"), false);
+  assert.equal(
+    status.remotes[0]?.url,
+    "https://[REDACTED]@example.com/repo.git?access_token=[REDACTED]&expires=1",
+  );
+});
+
 test("git status service safe mode returns unavailable for non-git workspace", async () => {
   const dir = await tempDir("botblade-git-none");
   const status = await new GitStatusService().readStatusSafe(dir);
@@ -51,7 +76,7 @@ test("git status service tolerates unborn HEAD and still reports changed files",
   await fs.writeFile(path.join(dir, "fresh.txt"), "hello\n", "utf8");
   const status = await new GitStatusService().readStatus(dir);
   assert.equal(status.available, true);
-  assert.equal(status.branch, null);
+  assert.equal(typeof status.branch, "string");
   assert.equal(status.clean, false);
   assert.ok(status.changedFiles.some((entry) => entry.path === "fresh.txt"));
 });
