@@ -201,6 +201,35 @@ Body: `{ "value": "<new-placeholder>" }`. Returns metadata plus `auditEventId`; 
 
 Deletes the secret and returns `204`.
 
+
+## Script profiles
+
+Script profile endpoints are CRUD endpoints for per-project command metadata discovered during scans or created by users. They do not execute commands; they only persist and return metadata for preview, setup, and later explicit execution flows. All routes require access to the target project.
+
+Script profile shape: `id`, `projectId`, `name`, optional `description`, `source` (`package_json`, `file`, `blade_pack`, `repair_card`, `user`, or `codex`), `runtime` (`node`, `python`, `shell`, `powershell`, `docker`, `workflow`, or `custom`), `command[]`, `workingDirectory`, `envRefs[]`, `secretRefs[]`, `timeoutSeconds`, `requiresConfirmation`, `tags[]`, `createdAt`, and `updatedAt`.
+
+Security notes: `command[]` values are metadata-only previews and are never run by these endpoints. Do not send secret values in `command[]`, `envRefs[]`, `tags[]`, or `workingDirectory`; use `secretRefs[]` for references only. The API rejects likely secret values in `command[]` and `secretRefs[]`, normalizes project-relative working directories, records create/update/delete/detect audit events, and never returns raw secret values.
+
+### `GET /api/projects/:projectId/script-profiles`
+
+Returns `{ "scriptProfiles": ScriptProfile[] }` sorted by most recently updated profile.
+
+### `POST /api/projects/:projectId/script-profiles`
+
+Body: `{ "name": "Start bot", "runtime": "node", "command": ["npm", "run", "start"], "workingDirectory": ".", "secretRefs": ["secret_discord_token"], "requiresConfirmation": true }`. Creates a user-authored metadata profile and returns it with status `201`.
+
+### `GET /api/projects/:projectId/script-profiles/:scriptProfileId`
+
+Returns one script profile or `404` when the profile does not belong to the project.
+
+### `PATCH /api/projects/:projectId/script-profiles/:scriptProfileId`
+
+Patchable fields: `name`, `description`, `source`, `runtime`, `command`, `workingDirectory`, `envRefs`, `secretRefs`, `timeoutSeconds`, `requiresConfirmation`, and `tags`. Returns the updated metadata profile.
+
+### `DELETE /api/projects/:projectId/script-profiles/:scriptProfileId`
+
+Deletes the script profile metadata and returns `204`.
+
 ## Builds
 
 ### `POST /api/projects/:projectId/builds`
@@ -307,13 +336,14 @@ Returns a GitHub Actions workflow file path and content.
 
 Returns `{ "detection", "botbladeJsonPath" }` where `botblade.json` contains the shipped Bot Profile schema:
 
-- `schemaVersion`: `"1.0.0"`
+- `schemaVersion`: `"1.1.0"`
 - `generatedBy`, `generatedAt`
 - `project`: `name`, `type`, `root`, `importSource`
 - `runtime`: `type`, `version`, `packageManager`, `detectedLanguages[]`, `detectedFrameworks[]`
 - `bladePack`: `selected`, `version`, `detected[]` (`id`, `name`, `score`, `confidence`, `matchedEvidence[]`)
 - `commandPlan`: `install[]`, `build[]`, `test[]`, `validate[]`, `start[]`, `stop[]`, `restart[]`, `deploy[]`
+- `scriptProfiles[]`: metadata-only command previews with `id`, `source`, `runtime`, `command[]`, `workingDirectory`, `envRefs[]`, `secretRefs[]`, confirmation, tags, and timestamps
 - `secrets.required[]` / `secrets.optional[]`: `name`, `required`, `configured`
 - `permissions[]`, `capabilities[]`, `importantFiles[]`, `warnings[]`, `repairCards[]`, `git` (`branch`, `status`, `remotes[]`)
 
-Secret safety guarantee: profile metadata stores only secret requirement metadata and configured flags. Secret values are never serialized.
+Secret safety guarantee: profile metadata stores only secret requirement metadata, configured flags, and script-profile secret references. Secret values are never serialized. Phase 4 scan/import behavior detects, previews, and persists script profile metadata only; it does not run commands.

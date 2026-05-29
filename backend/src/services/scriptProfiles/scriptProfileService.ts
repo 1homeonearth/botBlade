@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { AuditService } from "../auditService.js";
 import type { ScriptProfileStorePersistence } from "../persistence.js";
 import { RequestValidationError } from "../projectStore.js";
@@ -260,6 +260,22 @@ function withoutUndefined(input: Record<string, unknown>): Record<string, unknow
 }
 
 function looksLikeSecretValue(value: string): boolean {
-  if (value.startsWith("secret_")) return false;
-  return createHash("sha256").update(value).digest("hex").length > 0 && /(?:=|^sk-|^gh[pousr]_|^xox[baprs]-|[A-Za-z0-9_.-]{32,})/i.test(value);
+  const trimmed = value.trim();
+  if (trimmed.startsWith("secret_")) return false;
+  const assignment = trimmed.match(/^([^=]{1,128})=(.+)$/);
+  if (assignment) {
+    const key = assignment[1] ?? "";
+    const assignedValue = assignment[2] ?? "";
+    if (isSensitiveKey(key)) return true;
+    return explicitSecretPattern.test(assignedValue);
+  }
+
+  return explicitSecretPattern.test(trimmed);
+}
+
+const explicitSecretPattern = /^(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]{16,}|xox[baprs]-[A-Za-z0-9-]{16,}|[A-Za-z0-9_.-]{48,})$/i;
+const sensitiveKeyPattern = /(?:token|secret|password|passwd|api[_-]?key|auth|credential)/i;
+
+function isSensitiveKey(key: string): boolean {
+  return sensitiveKeyPattern.test(key.replace(/^--?/, ""));
 }

@@ -48,7 +48,16 @@ n8n pack is **import-only**: detect workflow JSON, extract credentials reference
 ## 5) `botblade.json` specification
 `botblade.json` is BotBlade-local metadata that complements native project manifests (`package.json`, `pyproject.toml`, workflow JSON, framework config). It stores detector results and operational metadata without secret values.
 
-Stored fields (schema `1.0.0`): `schemaVersion`, `generatedBy`, `generatedAt`, `project`, `runtime.detectedLanguages`, `runtime.detectedFrameworks`, `runtime.packageManager`, `bladePack.selected`, `bladePack.detected[]` (including `matchedEvidence`), `commandPlan` (`install/build/test/validate/start/stop/restart/deploy`), `secrets.required[]`, `secrets.optional[]` (configured flags only), `permissions`, `capabilities`, `importantFiles`, `warnings`, `repairCards`, and `git` (`branch/status/remotes`).
+Stored fields (schema `1.1.0`): `schemaVersion`, `generatedBy`, `generatedAt`, `project`, `runtime.detectedLanguages`, `runtime.detectedFrameworks`, `runtime.packageManager`, `bladePack.selected`, `bladePack.detected[]` (including `matchedEvidence`), `commandPlan` (`install/build/test/validate/start/stop/restart/deploy`), `scriptProfiles[]`, `secrets.required[]`, `secrets.optional[]` (configured flags only), `permissions`, `capabilities`, `importantFiles`, `warnings`, `repairCards`, and `git` (`branch/status/remotes`).
+
+`scriptProfiles[]` entries are detected or user-authored command metadata used for review, preview, setup checklists, and later explicit execution flows. Each profile stores: `id`, optional `projectId`, `name`, optional `description`, `source` (`package_json`, `file`, `blade_pack`, `repair_card`, `user`, or `codex`), `runtime` (`node`, `python`, `shell`, `powershell`, `docker`, `workflow`, or `custom`), `command[]`, project-relative `workingDirectory`, `envRefs[]`, `secretRefs[]`, `timeoutSeconds`, `requiresConfirmation`, `tags[]`, `createdAt`, and `updatedAt`. `command[]` is a tokenized command preview, not a permission to run it; importing or scanning a project records script profiles only as metadata.
+
+Security requirements for `scriptProfiles[]`:
+- Phase 4 detects, previews, and persists script profiles only; it does not execute detected commands.
+- `command[]`, `workingDirectory`, `envRefs[]`, and `tags[]` must not contain secret values.
+- `secretRefs[]` stores references such as secret IDs or names only, never raw secret values.
+- `workingDirectory` must stay normalized and project-relative so profiles cannot escape the workspace.
+- Any future execution path must require an explicit user action, policy gating, audit logging, and log redaction; profile persistence alone is metadata-only.
 
 Never persist secret values in `botblade.json`. The writer must create the workspace directory before writing metadata so a fresh scan cannot fail with `ENOENT`.
 

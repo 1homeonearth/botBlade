@@ -20,7 +20,10 @@ BotBlade is a mobile-first Android app plus local backend for importing, creatin
 - Connect to a local backend API with token-based protected routes.
 - Generate TypeScript Discord bot projects and edit files directly in-app.
 - Scan imported workspaces with Blade Packs for Discord.js, Telegraf, Slack Bolt, generic Node, generic Python, n8n workflow JSON, and Botpress-style projects.
+- Browse a much larger in-app GitHub discovery grove covering awesome lists, Discord, Telegram, Slack/Teams, Session, workflows, AI agents, workers, DevOps bots, DuckyScript lab references, OSINT, red-team, blue-team, and root-aware Android references.
+- Detect, preview, and persist per-project script profiles as metadata-only command plans without executing them during import scanning.
 - Use native Git groundwork powered by JGit for repository-aware project workflows.
+- Register root workspace and root repair anchors for monorepos, Git-root alignment, backup/restore boundaries, and safer audit scoping without requesting device-root privileges.
 - Run project validation, local builds, runtime start/stop/restart, and deployment actions.
 - Store projects, encrypted secrets, build/deploy job history, and audit logs in SQLite.
 

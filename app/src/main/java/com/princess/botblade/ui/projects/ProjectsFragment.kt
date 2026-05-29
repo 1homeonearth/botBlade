@@ -140,19 +140,29 @@ class ProjectsFragment : Fragment() {
 
         fun runFolderAction(uri: Uri?, lane: SourceLane) {
             if (uri == null) {
-                banner = if (lane == SourceLane.OPEN_FOLDER) "Folder selection canceled." else "Repair workspace selection canceled."
+                banner = when (lane) {
+                    SourceLane.OPEN_FOLDER -> "Folder selection canceled."
+                    SourceLane.OPEN_ROOT_FOLDER -> "Root workspace selection canceled."
+                    SourceLane.REPAIR_EXISTING -> "Repair workspace selection canceled."
+                    SourceLane.REPAIR_ROOT -> "Root repair selection canceled."
+                    else -> "Folder action canceled."
+                }
                 return
             }
             showWizard = false
             banner = when (lane) {
                 SourceLane.OPEN_FOLDER -> "Open Folder: registering workspace root…"
+                SourceLane.OPEN_ROOT_FOLDER -> "Root Workspace: registering top-level anchor…"
                 SourceLane.REPAIR_EXISTING -> "Repair Existing: creating repair shell…"
+                SourceLane.REPAIR_ROOT -> "Root Repair: creating root-aware repair shell…"
                 else -> banner
             }
             scope.launch {
                 when (lane) {
                     SourceLane.OPEN_FOLDER -> openCreatedProject(repo.registerWorkspaceFolder(uri))
+                    SourceLane.OPEN_ROOT_FOLDER -> openCreatedProject(repo.registerRootWorkspace(uri))
                     SourceLane.REPAIR_EXISTING -> openCreatedProject(repo.repairWorkspace(uri))
+                    SourceLane.REPAIR_ROOT -> openCreatedProject(repo.repairRootWorkspace(uri))
                     else -> Unit
                 }
             }
@@ -293,7 +303,7 @@ class ProjectsFragment : Fragment() {
                                         SourceLane.STARTER_TEMPLATE -> step = 2
                                         SourceLane.IMPORT_GIT -> showGitModal = true
                                         SourceLane.IMPORT_ZIP -> zipPicker.launch(arrayOf("application/zip", "application/octet-stream"))
-                                        SourceLane.OPEN_FOLDER, SourceLane.REPAIR_EXISTING -> {
+                                        SourceLane.OPEN_FOLDER, SourceLane.OPEN_ROOT_FOLDER, SourceLane.REPAIR_EXISTING, SourceLane.REPAIR_ROOT -> {
                                             pendingFolderLane = selected.lane.name
                                             folderPicker.launch(null)
                                         }
@@ -608,7 +618,7 @@ class ProjectsFragment : Fragment() {
         return candidate
     }
 
-    private enum class SourceLane { STARTER_TEMPLATE, IMPORT_GIT, IMPORT_ZIP, OPEN_FOLDER, REPAIR_EXISTING }
+    private enum class SourceLane { STARTER_TEMPLATE, IMPORT_GIT, IMPORT_ZIP, OPEN_FOLDER, OPEN_ROOT_FOLDER, REPAIR_EXISTING, REPAIR_ROOT }
 
     private data class Source(val title: String, val detail: String, val lane: SourceLane, val templateDir: String?)
 
@@ -664,38 +674,69 @@ class ProjectsFragment : Fragment() {
             SnippetSeed("deploy-health", "Deploy", "Health check probe", "Save tiny status endpoint/deploy check ideas for later generated project hardening.", "worker and API templates"),
         )
         val RepoCategories = listOf(
+            RepoCategory("Awesome bot-builder lists", "Large catalogs to seed safe import discovery without vendoring upstream projects.", BotBladeTokens.GlitterGold, listOf(
+                RecommendedRepo("sindresorhus/awesome", "Master awesome-list index for finding focused bot, workflow, AI, and security lists.", "https://github.com/sindresorhus/awesome", "Awesome", tags = listOf("awesome-list", "index", "discovery")),
+                RecommendedRepo("sorrycc/awesome-javascript", "JavaScript ecosystem index for Node bot dependencies and utility choices.", "https://github.com/sorrycc/awesome-javascript", "Awesome", tags = listOf("javascript", "node", "catalog")),
+                RecommendedRepo("vinta/awesome-python", "Python ecosystem index for bot, automation, security, and data tooling.", "https://github.com/vinta/awesome-python", "Awesome", tags = listOf("python", "catalog", "libraries")),
+                RecommendedRepo("avelino/awesome-go", "Go catalog for future tiny webhook workers, scanners, and single-binary utilities.", "https://github.com/avelino/awesome-go", "Awesome", tags = listOf("go", "workers", "catalog")),
+                RecommendedRepo("trimstray/the-book-of-secret-knowledge", "Broad operator reference for networking, CLI, web, and security learning paths.", "https://github.com/trimstray/the-book-of-secret-knowledge", "Awesome", tags = listOf("reference", "ops", "security")),
+                RecommendedRepo("meirwah/awesome-incident-response", "Incident-response catalog for future blue-team repair cards and runbooks.", "https://github.com/meirwah/awesome-incident-response", "Awesome", tags = listOf("incident-response", "blue-team", "runbooks")),
+                RecommendedRepo("lorien/awesome-web-scraping", "Scraping and automation reference for authorized data collection projects.", "https://github.com/lorien/awesome-web-scraping", "Awesome", tags = listOf("scraping", "automation", "catalog")),
+                RecommendedRepo("mfornos/awesome-microservices", "Microservice patterns for webhook bots, queues, and API workers.", "https://github.com/mfornos/awesome-microservices", "Awesome", tags = listOf("microservices", "workers", "patterns")),
+            )),
             RepoCategory("Discord command forests", "Slash commands, frameworks, ticketing, moderation, music, and multipurpose bot code.", BabyBlue, listOf(
                 RecommendedRepo("discordjs/discord.js", "Core Discord API library and examples for modern JavaScript and TypeScript bots.", "https://github.com/discordjs/discord.js", "Discord", tags = listOf("library", "slash", "gateway")),
                 RecommendedRepo("discordjs/guide", "Official guide source with command handling and project-structure examples.", "https://github.com/discordjs/guide", "Discord", tags = listOf("guide", "commands", "reference")),
                 RecommendedRepo("sapphiredev/framework", "Advanced Discord bot framework layered on discord.js with TypeScript-first patterns.", "https://github.com/sapphiredev/framework", "Discord", tags = listOf("framework", "typescript", "commands")),
-                RecommendedRepo("discord-akairo/discord-akairo", "Command and listener framework worth inspecting for older but clear architecture ideas.", "https://github.com/discord-akairo/discord-akairo", "Discord", tags = listOf("framework", "commands", "legacy")),
-                RecommendedRepo("AnIdiotsGuide/discordjs-bot-guide", "Community-written bot guide with practical snippets and setup notes.", "https://github.com/AnIdiotsGuide/discordjs-bot-guide", "Discord", tags = listOf("guide", "examples", "learning")),
+                RecommendedRepo("discordeno/discordeno", "Discord API library with modular gateway/rest patterns and TypeScript support.", "https://github.com/discordeno/discordeno", "Discord", tags = listOf("typescript", "gateway", "library")),
+                RecommendedRepo("abalabahaha/eris", "Established Node Discord library for alternate gateway and sharding ideas.", "https://github.com/abalabahaha/eris", "Discord", tags = listOf("library", "gateway", "sharding")),
+                RecommendedRepo("discord-player/discord-player", "Music playback framework useful for queue and audio-command structure ideas.", "https://github.com/discord-player/discord-player", "Discord", tags = listOf("music", "audio", "queues")),
                 RecommendedRepo("saiteja-madha/discord-js-bot", "Multipurpose Discord bot covering moderation, music, tickets, and utility features.", "https://github.com/saiteja-madha/discord-js-bot", "Discord", tags = listOf("multipurpose", "moderation", "music")),
                 RecommendedRepo("discord-tickets/bot", "Self-hosted ticket-management bot reference for support workflows.", "https://github.com/discord-tickets/bot", "Discord", tags = listOf("tickets", "support", "self-hosted")),
                 RecommendedRepo("Androz2091/discord-music-bot", "Music bot project useful for queue, player, and command organization ideas.", "https://github.com/Androz2091/discord-music-bot", "Discord", tags = listOf("music", "queue", "player")),
+                RecommendedRepo("AnIdiotsGuide/discordjs-bot-guide", "Community-written bot guide with practical snippets and setup notes.", "https://github.com/AnIdiotsGuide/discordjs-bot-guide", "Discord", tags = listOf("guide", "examples", "learning")),
             )),
-            RepoCategory("Telegram and chat agents", "Telegraf, grammY, Botkit, botpress-style, and chat-automation patterns.", HotPink, listOf(
+            RepoCategory("Telegram and chat agents", "Telegraf, grammY, aiogram, Botkit, and Telegram bot templates across Node and Python.", HotPink, listOf(
                 RecommendedRepo("telegraf/telegraf", "Telegram bot framework with middleware and context patterns.", "https://github.com/telegraf/telegraf", "Telegram", tags = listOf("telegram", "middleware", "typescript")),
                 RecommendedRepo("grammyjs/grammY", "Modern Telegram Bot API framework with plugins and conversations.", "https://github.com/grammyjs/grammY", "Telegram", tags = listOf("telegram", "plugins", "conversations")),
-                RecommendedRepo("howdyai/botkit", "Cross-platform conversation toolkit reference for dialog and adapter structure.", "https://github.com/howdyai/botkit", "Telegram", tags = listOf("conversation", "adapters", "legacy")),
-                RecommendedRepo("botpress/botpress", "Botpress repository for bot-as-code and workflow-agent import references.", "https://github.com/botpress/botpress", "Telegram", tags = listOf("botpress", "workflow", "agent")),
-                RecommendedRepo("microsoft/BotBuilder-Samples", "Enterprise bot framework samples for future Blade Pack/template ideas.", "https://github.com/microsoft/BotBuilder-Samples", "Telegram", tags = listOf("samples", "enterprise", "adapters")),
+                RecommendedRepo("python-telegram-bot/python-telegram-bot", "Popular Python Telegram bot framework for async handlers and examples.", "https://github.com/python-telegram-bot/python-telegram-bot", "Telegram", tags = listOf("python", "telegram", "async")),
+                RecommendedRepo("aiogram/aiogram", "Async Python Telegram framework with router and FSM patterns.", "https://github.com/aiogram/aiogram", "Telegram", tags = listOf("python", "fsm", "async")),
                 RecommendedRepo("yagop/node-telegram-bot-api", "Node Telegram Bot API library with straightforward polling/webhook examples.", "https://github.com/yagop/node-telegram-bot-api", "Telegram", tags = listOf("telegram", "node", "webhooks")),
+                RecommendedRepo("tdlib/telegram-bot-api", "Official Telegram Bot API server for self-hosted API compatibility research.", "https://github.com/tdlib/telegram-bot-api", "Telegram", tags = listOf("bot-api", "server", "reference")),
+                RecommendedRepo("howdyai/botkit", "Cross-platform conversation toolkit reference for dialog and adapter structure.", "https://github.com/howdyai/botkit", "Telegram", tags = listOf("conversation", "adapters", "legacy")),
+                RecommendedRepo("TediCross/TediCross", "Telegram-to-Discord bridge showing multi-platform chat relay patterns.", "https://github.com/TediCross/TediCross", "Telegram", tags = listOf("bridge", "discord", "telegram")),
+                RecommendedRepo("erkcet/awesome-telegram-bots", "Fresh awesome list for Telegram bot frameworks, libraries, Mini Apps, and examples.", "https://github.com/erkcet/awesome-telegram-bots", "Telegram", tags = listOf("awesome-list", "telegram", "examples")),
+                RecommendedRepo("telegram-bot-sdk/awesome-telegram-bots", "Curated Telegram bot examples and resources for broad idea discovery.", "https://github.com/telegram-bot-sdk/awesome-telegram-bots", "Telegram", tags = listOf("awesome-list", "bots", "resources")),
             )),
-            RepoCategory("Slack, Teams, and collaboration", "Slack Bolt apps, manifests, approvals, notifications, and chatops starters.", BotBladeTokens.GlitterGold, listOf(
+            RepoCategory("Slack, Teams, and collaboration", "Slack Bolt apps, Teams samples, chatops frameworks, approvals, notifications, and meeting bots.", BotBladeTokens.GlitterGold, listOf(
                 RecommendedRepo("slackapi/bolt-js", "Slack Bolt for JavaScript with event, command, OAuth, and receiver patterns.", "https://github.com/slackapi/bolt-js", "Slack", tags = listOf("slack", "bolt", "oauth")),
                 RecommendedRepo("slackapi/node-slack-sdk", "Slack Web API and platform SDK reference for focused integrations.", "https://github.com/slackapi/node-slack-sdk", "Slack", tags = listOf("sdk", "web-api", "events")),
                 RecommendedRepo("slackapi/bolt-python", "Python Bolt app examples useful for alternate runtime detection.", "https://github.com/slackapi/bolt-python", "Slack", tags = listOf("python", "bolt", "events")),
+                RecommendedRepo("microsoft/BotBuilder-Samples", "Enterprise bot framework samples for future Blade Pack/template ideas.", "https://github.com/microsoft/BotBuilder-Samples", "Slack", tags = listOf("samples", "enterprise", "adapters")),
+                RecommendedRepo("microsoft/botframework-sdk", "Bot Framework SDK source for Teams and enterprise adapter planning.", "https://github.com/microsoft/botframework-sdk", "Slack", tags = listOf("bot-framework", "teams", "sdk")),
                 RecommendedRepo("microsoftgraph/msgraph-sdk-javascript", "Microsoft Graph SDK source for Teams-oriented future integration patterns.", "https://github.com/microsoftgraph/msgraph-sdk-javascript", "Slack", tags = listOf("teams", "graph", "sdk")),
                 RecommendedRepo("errbotio/errbot", "ChatOps bot framework for adapter and plugin architecture ideas.", "https://github.com/errbotio/errbot", "Slack", tags = listOf("chatops", "plugins", "python")),
+                RecommendedRepo("Vexa-ai/vexa", "Self-hostable meeting transcription bot API for Meet, Teams, and Zoom workflows.", "https://github.com/Vexa-ai/vexa", "Slack", tags = listOf("meeting-bot", "transcripts", "self-hosted")),
+            )),
+            RepoCategory("Session and private messengers", "Session is early enough that BotBlade should track SDKs, docs, and likely write first-party starter templates.", BabyBlue, listOf(
+                RecommendedRepo("sessionjs/client", "Session.js client library for programmatic Session messenger usage and bot experiments.", "https://github.com/sessionjs/client", "Session", tags = listOf("session", "sdk", "typescript")),
+                RecommendedRepo("sessionjs/docs", "Session.js documentation mirror for future BotBlade Session starter planning.", "https://github.com/sessionjs/docs", "Session", tags = listOf("docs", "session", "reference")),
+                RecommendedRepo("VityaSchel/session-nodejs-bot", "Session Node.js bot mirror; useful as a compatibility signal while BotBlade designs its own starter.", "https://github.com/VityaSchel/session-nodejs-bot", "Session", tags = listOf("session", "bot", "node")),
+                RecommendedRepo("VityaSchel/session-random-chat-bot", "Session chatbot mirror to inspect static project shape and detector clues.", "https://github.com/VityaSchel/session-random-chat-bot", "Session", tags = listOf("session", "chatbot", "reference")),
+                RecommendedRepo("session-foundation/session-docs", "Official Session docs mirror for protocol, account, and privacy model research.", "https://github.com/session-foundation/session-docs", "Session", tags = listOf("session", "docs", "privacy")),
+                RecommendedRepo("oxen-io/session-desktop", "Session desktop app source for reference-only UX and protocol research; do not vendor.", "https://github.com/oxen-io/session-desktop", "Session", tags = listOf("reference-only", "desktop", "privacy")),
+                RecommendedRepo("signalapp/libsignal", "Private messaging crypto library reference for threat-model vocabulary, not direct bot import.", "https://github.com/signalapp/libsignal", "Session", tags = listOf("crypto", "privacy", "reference")),
+                RecommendedRepo("matrix-org/matrix-js-sdk", "Matrix JavaScript SDK for federated chat adapter ideas and import contrast.", "https://github.com/matrix-org/matrix-js-sdk", "Session", tags = listOf("matrix", "chat", "sdk")),
             )),
             RepoCategory("Workflow and automation treasure", "n8n, Activepieces, Node-RED, Huginn, workflow JSON, and integration-piece references.", BabyBlue, listOf(
                 RecommendedRepo("activepieces/activepieces", "Modern integration-piece architecture reference for BotBlade workflow adapters.", "https://github.com/activepieces/activepieces", "Workflow", tags = listOf("pieces", "automation", "integrations")),
                 RecommendedRepo("n8n-io/n8n", "Workflow automation repository; import/reference-first because of license posture.", "https://github.com/n8n-io/n8n", "Workflow", tags = listOf("workflow", "json", "reference")),
+                RecommendedRepo("Zie619/n8n-workflows", "Large searchable n8n workflow collection for JSON import experiments.", "https://github.com/Zie619/n8n-workflows", "Workflow", tags = listOf("n8n", "templates", "json")),
                 RecommendedRepo("pxw3504k-web/awesome-n8n-workflows", "Large community n8n workflow collection for discovery and JSON import experiments.", "https://github.com/pxw3504k-web/awesome-n8n-workflows", "Workflow", tags = listOf("n8n", "templates", "json")),
                 RecommendedRepo("enescingoz/awesome-n8n-templates", "Curated n8n templates for AI, productivity, Telegram, Slack, and more.", "https://github.com/enescingoz/awesome-n8n-templates", "Workflow", tags = listOf("n8n", "templates", "ai")),
                 RecommendedRepo("node-red/node-red", "Legacy visual workflow reference for nodes, flows, and local editor ergonomics.", "https://github.com/node-red/node-red", "Workflow", tags = listOf("flows", "nodes", "legacy")),
                 RecommendedRepo("huginn/huginn", "Legacy agent/workflow compatibility reference with event-driven automations.", "https://github.com/huginn/huginn", "Workflow", tags = listOf("agents", "events", "legacy")),
+                RecommendedRepo("apache/airflow", "Workflow scheduling reference for DAG vocabulary and future import warnings.", "https://github.com/apache/airflow", "Workflow", tags = listOf("dag", "scheduling", "python")),
             )),
             RepoCategory("AI agent workbenches", "Agent templates, tool calling, RAG starters, eval harnesses, and prompt workflow repos.", HotPink, listOf(
                 RecommendedRepo("langchain-ai/langchainjs", "JavaScript LangChain source for tools, agents, retrievers, and examples.", "https://github.com/langchain-ai/langchainjs", "AI Agents", tags = listOf("agents", "tools", "rag")),
@@ -704,6 +745,9 @@ class ProjectsFragment : Fragment() {
                 RecommendedRepo("openai/openai-cookbook", "Cookbook examples for structured outputs, tools, RAG, and evaluation ideas.", "https://github.com/openai/openai-cookbook", "AI Agents", tags = listOf("cookbook", "patterns", "examples")),
                 RecommendedRepo("run-llama/LlamaIndexTS", "TypeScript data-agent and indexing framework reference.", "https://github.com/run-llama/LlamaIndexTS", "AI Agents", tags = listOf("rag", "indexing", "typescript")),
                 RecommendedRepo("crewAIInc/crewAI", "Python multi-agent orchestration reference for future pack detectors.", "https://github.com/crewAIInc/crewAI", "AI Agents", tags = listOf("multi-agent", "python", "tasks")),
+                RecommendedRepo("microsoft/autogen", "Multi-agent conversation framework for adapter and orchestration research.", "https://github.com/microsoft/autogen", "AI Agents", tags = listOf("multi-agent", "python", "orchestration")),
+                RecommendedRepo("microsoft/semantic-kernel", "Agent/plugin framework reference for skills, planners, and connectors.", "https://github.com/microsoft/semantic-kernel", "AI Agents", tags = listOf("plugins", "agents", "sdk")),
+                RecommendedRepo("modelcontextprotocol/typescript-sdk", "MCP TypeScript SDK for future tool/agent connector planning.", "https://github.com/modelcontextprotocol/typescript-sdk", "AI Agents", tags = listOf("mcp", "tools", "typescript")),
             )),
             RepoCategory("Webhooks, workers, and APIs", "Tiny services, webhook receivers, queue workers, serverless functions, and templates.", BabyBlue, listOf(
                 RecommendedRepo("fastify/fastify", "Fast Node.js framework with plugin and lifecycle patterns for webhook workers.", "https://github.com/fastify/fastify", "Workers", tags = listOf("fastify", "api", "plugins")),
@@ -712,6 +756,8 @@ class ProjectsFragment : Fragment() {
                 RecommendedRepo("cloudflare/workers-sdk", "Workers tooling reference for deploy adapters and edge bot endpoints.", "https://github.com/cloudflare/workers-sdk", "Workers", tags = listOf("cloudflare", "edge", "deploy")),
                 RecommendedRepo("vercel/examples", "Deployment examples for serverless handlers and framework adapters.", "https://github.com/vercel/examples", "Workers", tags = listOf("serverless", "examples", "deploy")),
                 RecommendedRepo("fastapi/full-stack-fastapi-template", "Python API template with modern structure for generic Python imports.", "https://github.com/fastapi/full-stack-fastapi-template", "Workers", tags = listOf("python", "api", "template")),
+                RecommendedRepo("nestjs/nest", "Structured Node backend framework with modules, guards, and dependency injection.", "https://github.com/nestjs/nest", "Workers", tags = listOf("node", "framework", "modules")),
+                RecommendedRepo("microsoft/TypeScript-Node-Starter", "Classic TypeScript Node starter for generated worker layout comparisons.", "https://github.com/microsoft/TypeScript-Node-Starter", "Workers", tags = listOf("typescript", "starter", "node")),
             )),
             RepoCategory("DevOps and repo robots", "GitHub apps, issue bots, release helpers, CI notifiers, and maintenance automation.", BotBladeTokens.GlitterGold, listOf(
                 RecommendedRepo("probot/probot", "GitHub App framework for issue, PR, and repo automation bots.", "https://github.com/probot/probot", "DevOps", tags = listOf("github-app", "automation", "webhooks")),
@@ -719,6 +765,55 @@ class ProjectsFragment : Fragment() {
                 RecommendedRepo("semantic-release/semantic-release", "Automated release workflow reference for changelog and version bots.", "https://github.com/semantic-release/semantic-release", "DevOps", tags = listOf("release", "automation", "ci")),
                 RecommendedRepo("renovatebot/renovate", "Dependency update bot source for policy-heavy automation design.", "https://github.com/renovatebot/renovate", "DevOps", tags = listOf("dependencies", "policy", "bot")),
                 RecommendedRepo("dependabot/dependabot-core", "Dependency update engine reference for manifest scanning ideas.", "https://github.com/dependabot/dependabot-core", "DevOps", tags = listOf("dependencies", "security", "scanner")),
+                RecommendedRepo("github/docs", "GitHub docs source for workflow, auth, and integration copy references.", "https://github.com/github/docs", "DevOps", tags = listOf("docs", "github", "workflows")),
+                RecommendedRepo("googleapis/release-please", "Release PR automation reference for changelog and versioning flows.", "https://github.com/googleapis/release-please", "DevOps", tags = listOf("release", "automation", "changelog")),
+                RecommendedRepo("argoproj/argo-workflows", "Workflow orchestration reference for build/deploy job concepts.", "https://github.com/argoproj/argo-workflows", "DevOps", tags = listOf("workflows", "kubernetes", "deploy")),
+            )),
+            RepoCategory("Ducky scripts and authorized labs", "BadUSB/HID payload libraries are import-only references for defensive training, lab testing, and detector design.", HotPink, listOf(
+                RecommendedRepo("hak5/usbrubberducky-payloads", "Official USB Rubber Ducky payload library; inspect only in authorized labs.", "https://github.com/hak5/usbrubberducky-payloads", "Ducky", tags = listOf("ducky-script", "authorized-lab", "reference")),
+                RecommendedRepo("hak5/bashbunny-payloads", "Official Bash Bunny payload repository for payload-shape detection and lab awareness.", "https://github.com/hak5/bashbunny-payloads", "Ducky", tags = listOf("badusb", "authorized-lab", "reference")),
+                RecommendedRepo("hak5/omg-payloads", "Official O.MG payload repository for defensive review and metadata-only import experiments.", "https://github.com/hak5/omg-payloads", "Ducky", tags = listOf("hid", "authorized-lab", "metadata-only")),
+                RecommendedRepo("hak5/sharkjack-payloads", "Official Shark Jack payload repository for network-lab detector research.", "https://github.com/hak5/sharkjack-payloads", "Ducky", tags = listOf("network-lab", "authorized", "reference")),
+                RecommendedRepo("hak5/packetsquirrel-payloads", "Official Packet Squirrel payload repository for controlled network lab references.", "https://github.com/hak5/packetsquirrel-payloads", "Ducky", tags = listOf("network", "authorized-lab", "payloads")),
+                RecommendedRepo("I-Am-Jakoby/Flipper-Zero-BadUSB", "Community BadUSB payload collection for lab-only static scanning and warnings.", "https://github.com/I-Am-Jakoby/Flipper-Zero-BadUSB", "Ducky", tags = listOf("flipper", "badusb", "lab-only")),
+            )),
+            RepoCategory("OSINT and threat intel", "Public-source intelligence, asset discovery, and threat-intel repos for authorized investigations and blue-team workflows.", BabyBlue, listOf(
+                RecommendedRepo("jivoi/awesome-osint", "Curated OSINT tools and resources across search, social, threat intel, and research.", "https://github.com/jivoi/awesome-osint", "OSINT", tags = listOf("awesome-list", "osint", "threat-intel")),
+                RecommendedRepo("lockfale/OSINT-Framework", "Interactive OSINT framework source for organizing public-source investigation links.", "https://github.com/lockfale/OSINT-Framework", "OSINT", tags = listOf("framework", "osint", "links")),
+                RecommendedRepo("sherlock-project/sherlock", "Username search tool useful for authorized identity and brand-protection investigations.", "https://github.com/sherlock-project/sherlock", "OSINT", tags = listOf("username", "investigation", "python")),
+                RecommendedRepo("soxoj/maigret", "Username enumeration tool with report output for authorized OSINT workflows.", "https://github.com/soxoj/maigret", "OSINT", tags = listOf("username", "reports", "osint")),
+                RecommendedRepo("megadose/holehe", "Email-account presence checker for authorized exposure reviews.", "https://github.com/megadose/holehe", "OSINT", tags = listOf("email", "exposure", "authorized")),
+                RecommendedRepo("lanmaster53/recon-ng", "Recon framework for controlled OSINT and reconnaissance workflows.", "https://github.com/lanmaster53/recon-ng", "OSINT", tags = listOf("recon", "framework", "authorized")),
+                RecommendedRepo("projectdiscovery/subfinder", "Subdomain discovery tool for owned-domain asset inventory.", "https://github.com/projectdiscovery/subfinder", "OSINT", tags = listOf("subdomains", "asset-inventory", "go")),
+                RecommendedRepo("owasp-amass/amass", "OWASP Amass attack-surface mapping for authorized external asset discovery.", "https://github.com/owasp-amass/amass", "OSINT", tags = listOf("attack-surface", "owasp", "authorized")),
+            )),
+            RepoCategory("Cybersecurity red-team references", "Offensive-security references stay metadata-only and should be used only in owned or explicitly authorized environments.", HotPink, listOf(
+                RecommendedRepo("infosecn1nja/Red-Teaming-Toolkit", "Red-team tool catalog for authorized lab planning and detector taxonomy.", "https://github.com/infosecn1nja/Red-Teaming-Toolkit", "Red Team", tags = listOf("red-team", "awesome-list", "authorized")),
+                RecommendedRepo("swisskyrepo/PayloadsAllTheThings", "Web security payload/reference catalog for authorized appsec labs and parser tests.", "https://github.com/swisskyrepo/PayloadsAllTheThings", "Red Team", tags = listOf("appsec", "payloads", "authorized")),
+                RecommendedRepo("OWASP/wstg", "OWASP Web Security Testing Guide for ethical, scoped testing workflows.", "https://github.com/OWASP/wstg", "Red Team", tags = listOf("owasp", "testing-guide", "appsec")),
+                RecommendedRepo("mitre/caldera", "Adversary-emulation platform reference for policy-gated lab workflows.", "https://github.com/mitre/caldera", "Red Team", tags = listOf("adversary-emulation", "lab", "mitre")),
+                RecommendedRepo("redcanaryco/atomic-red-team", "Small atomic security tests for controlled detection engineering labs.", "https://github.com/redcanaryco/atomic-red-team", "Red Team", tags = listOf("atomic-tests", "detection", "authorized")),
+                RecommendedRepo("carlospolop/PEASS-ng", "Privilege-escalation audit scripts; import only for authorized lab review.", "https://github.com/carlospolop/PEASS-ng", "Red Team", tags = listOf("audit", "privilege", "authorized")),
+                RecommendedRepo("projectdiscovery/nuclei", "Template-driven scanner for owned assets and CI security checks.", "https://github.com/projectdiscovery/nuclei", "Red Team", tags = listOf("scanner", "templates", "authorized")),
+                RecommendedRepo("Orange-Cyberdefense/arsenal", "Command notebook reference for training labs; do not auto-execute imports.", "https://github.com/Orange-Cyberdefense/arsenal", "Red Team", tags = listOf("notebook", "training", "metadata-only")),
+            )),
+            RepoCategory("Cybersecurity blue-team defense", "Defensive detection, hardening, DFIR, SIEM content, and audit tooling for BotBlade repair-card inspiration.", BabyBlue, listOf(
+                RecommendedRepo("fabacab/awesome-cybersecurity-blueteam", "Curated blue-team tools and resources for detection and defensive operations.", "https://github.com/fabacab/awesome-cybersecurity-blueteam", "Blue Team", tags = listOf("awesome-list", "blue-team", "defense")),
+                RecommendedRepo("SigmaHQ/sigma", "Generic SIEM detection rule format and public rules for detection engineering.", "https://github.com/SigmaHQ/sigma", "Blue Team", tags = listOf("sigma", "detections", "siem")),
+                RecommendedRepo("Yara-Rules/rules", "YARA rule collection for malware-analysis and file-scanning research.", "https://github.com/Yara-Rules/rules", "Blue Team", tags = listOf("yara", "malware", "rules")),
+                RecommendedRepo("Neo23x0/Loki", "IOC scanner reference for defensive host triage and rule-driven scanning.", "https://github.com/Neo23x0/Loki", "Blue Team", tags = listOf("ioc", "scanner", "dfir")),
+                RecommendedRepo("Velocidex/velociraptor", "Endpoint visibility and DFIR platform reference for incident workflows.", "https://github.com/Velocidex/velociraptor", "Blue Team", tags = listOf("dfir", "endpoint", "visibility")),
+                RecommendedRepo("wazuh/wazuh", "Open-source security platform reference for agents, alerts, and hardening checks.", "https://github.com/wazuh/wazuh", "Blue Team", tags = listOf("siem", "hardening", "alerts")),
+                RecommendedRepo("osquery/osquery", "SQL-powered endpoint visibility reference for inventory and posture checks.", "https://github.com/osquery/osquery", "Blue Team", tags = listOf("endpoint", "inventory", "sql")),
+                RecommendedRepo("Security-Onion-Solutions/securityonion", "Defensive monitoring distribution reference for SOC workflows and detections.", "https://github.com/Security-Onion-Solutions/securityonion", "Blue Team", tags = listOf("soc", "monitoring", "detections")),
+            )),
+            RepoCategory("Root-aware Android and terminals", "Root and terminal references are benefits-driven options: better local diagnostics, repo ownership fixes, package managers, and logs, but only with explicit user consent and policy gates.", BotBladeTokens.GlitterGold, listOf(
+                RecommendedRepo("termux/termux-app", "External app integration reference for terminal and package-manager workflows; do not vendor GPL app code.", "https://github.com/termux/termux-app", "Root", tags = listOf("terminal", "external-app", "reference-only")),
+                RecommendedRepo("termux/termux-api", "Termux API add-on reference for future intent-mediated Android integrations.", "https://github.com/termux/termux-api", "Root", tags = listOf("android", "intents", "reference")),
+                RecommendedRepo("topjohnwu/Magisk", "Root ecosystem reference for understanding rooted-device capabilities and risk prompts.", "https://github.com/topjohnwu/Magisk", "Root", tags = listOf("root", "android", "reference-only")),
+                RecommendedRepo("RikkaApps/Shizuku", "Android privileged API bridge reference for consent-gated local power-user flows.", "https://github.com/RikkaApps/Shizuku", "Root", tags = listOf("android", "privileged", "consent")),
+                RecommendedRepo("topjohnwu/libsu", "Android root-shell library reference for future policy-gated root adapters, not current execution.", "https://github.com/topjohnwu/libsu", "Root", tags = listOf("root", "shell", "policy-gated")),
+                RecommendedRepo("junrar/junrar", "Archive handling reference for root/backups and import edge-case planning.", "https://github.com/junrar/junrar", "Root", tags = listOf("archives", "backup", "reference")),
             )),
         )
         val Sources = listOf(
@@ -728,7 +823,9 @@ class ProjectsFragment : Fragment() {
             Source("Import from Git", "register a Git repository as a BotBlade project", SourceLane.IMPORT_GIT, null),
             Source("Import ZIP", "register a ZIP archive as a managed BotBlade project", SourceLane.IMPORT_ZIP, null),
             Source("Open Folder", "register an Android workspace folder as a BotBlade project", SourceLane.OPEN_FOLDER, null),
+            Source("Root Workspace", "anchor the selected repo/workspace root for monorepos, Git alignment, backups, and clearer audit boundaries", SourceLane.OPEN_ROOT_FOLDER, null),
             Source("Repair Existing", "create metadata and repair notes for an existing workspace", SourceLane.REPAIR_EXISTING, null),
+            Source("Root Repair", "create a root-aware repair shell without device-root privileges or command execution", SourceLane.REPAIR_ROOT, null),
         )
     }
 
