@@ -20,6 +20,7 @@ import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
 import { scanAndGenerateBotbladeMetadata } from "./services/importScan/index.js";
+import { appendGitMetadataUnavailableRepairCard } from "./services/importScan/repairCards.js";
 import { ImportStore, knownImportTemplateIds } from "./services/imports/index.js";
 import { ScriptProfileService } from "./services/scriptProfiles/scriptProfileService.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
@@ -517,8 +518,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const gitStatus = await gitStatusService.readStatusSafe(fileService.workspace(projectId));
       const git = mergeProfileGitMetadata(profile?.git, gitStatusToMetadata(gitStatus));
       const existingCards = Array.isArray(profile?.repairCards) ? profile?.repairCards as Array<Record<string, unknown>> : [];
-      const repairCards = [...existingCards];
-      if (!gitStatus.available) repairCards.push({ title: "Git metadata unavailable", safeAction: "Initialize Git in the workspace or verify repository access, then refresh profile." });
+      const repairCards = appendGitMetadataUnavailableRepairCard(existingCards, git);
       if (profile && typeof profile === "object") return writeJson(res, 200, { ...sanitizeProfileImportSource(profile), git, repairCards });
       return writeJson(res, 200, { schemaVersion: "1.0.0", generatedBy: "botblade", generatedAt: new Date().toISOString(), project: { id: projectId }, git, repairCards });
     }
