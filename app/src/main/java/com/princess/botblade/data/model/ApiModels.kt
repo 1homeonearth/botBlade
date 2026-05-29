@@ -224,6 +224,123 @@ data class DeploymentCreateRequest(
     val buildId: String,
 )
 
+data class ScriptEnvironmentRef(
+    val name: String,
+    val source: String? = null,
+)
+
+data class ScriptSecretRef(
+    val id: String,
+    val name: String? = null,
+    val required: Boolean? = null,
+    val configured: Boolean? = null,
+)
+
+data class ScriptProfileSummary(
+    val id: String,
+    val projectId: String? = null,
+    val name: String,
+    val description: String? = null,
+    val source: String,
+    val runtime: String,
+    val command: List<String> = emptyList(),
+    val workingDirectory: String = ".",
+    val envRefs: List<ScriptEnvironmentRef> = emptyList(),
+    val secretRefs: List<ScriptSecretRef> = emptyList(),
+    val timeoutSeconds: Int = 300,
+    val requiresConfirmation: Boolean = false,
+    val tags: List<String> = emptyList(),
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+data class RepairCard(
+    val title: String,
+    val evidence: String? = null,
+    val safeAction: String,
+)
+
+data class ProjectProfileImportSource(
+    val kind: String,
+    val url: String? = null,
+)
+
+data class ProjectProfileProject(
+    val id: String? = null,
+    val name: String,
+    val type: String,
+    val root: String,
+    val importSource: ProjectProfileImportSource? = null,
+)
+
+data class ProjectProfileRuntime(
+    val type: String,
+    val version: String,
+    val packageManager: String = "unknown",
+    val detectedLanguages: List<String> = emptyList(),
+    val detectedFrameworks: List<String> = emptyList(),
+)
+
+data class ProjectProfilePackEvidence(
+    val id: String,
+    val name: String,
+    val score: Int,
+    val confidence: String,
+    val matchedEvidence: List<String> = emptyList(),
+)
+
+data class ProjectProfileBladePack(
+    val selected: String,
+    val version: String,
+    val detected: List<ProjectProfilePackEvidence> = emptyList(),
+)
+
+data class ProjectProfileCommandPlan(
+    val install: List<String> = emptyList(),
+    val build: List<String> = emptyList(),
+    val test: List<String> = emptyList(),
+    val validate: List<String> = emptyList(),
+    val start: List<String> = emptyList(),
+    val stop: List<String> = emptyList(),
+    val restart: List<String> = emptyList(),
+    val deploy: List<String> = emptyList(),
+)
+
+data class ProjectProfileSecrets(
+    val required: List<ScriptSecretRef> = emptyList(),
+    val optional: List<ScriptSecretRef> = emptyList(),
+)
+
+data class ProjectProfileGitRemote(
+    val name: String,
+    val url: String? = null,
+)
+
+data class ProjectProfileGit(
+    val branch: String? = null,
+    val status: String = "unknown",
+    val dirtyFileCount: Int = 0,
+    val remotes: List<ProjectProfileGitRemote> = emptyList(),
+)
+
+data class ProjectProfileResponse(
+    val schemaVersion: String,
+    val generatedBy: String,
+    val generatedAt: String,
+    val project: ProjectProfileProject? = null,
+    val runtime: ProjectProfileRuntime? = null,
+    val bladePack: ProjectProfileBladePack? = null,
+    val commandPlan: ProjectProfileCommandPlan = ProjectProfileCommandPlan(),
+    val scriptProfiles: List<ScriptProfileSummary> = emptyList(),
+    val secrets: ProjectProfileSecrets = ProjectProfileSecrets(),
+    val permissions: List<String> = emptyList(),
+    val capabilities: List<String> = emptyList(),
+    val importantFiles: List<String> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    val repairCards: List<RepairCard> = emptyList(),
+    val git: ProjectProfileGit? = null,
+)
+
 data class GitHubStatusResponse(
     val connected: Boolean,
     val tokenSecretRef: String? = null,
