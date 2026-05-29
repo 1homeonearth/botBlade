@@ -1,4 +1,4 @@
-export const BOT_PROFILE_SCHEMA_VERSION = "1.0.0";
+export const BOT_PROFILE_SCHEMA_VERSION = "1.1.0";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "pip" | "unknown";
 
@@ -51,7 +51,7 @@ export interface BotProfileScriptProfile {
   description?: string;
   source: ScriptProfileSource;
   runtime: ScriptProfileRuntime;
-  command: string;
+  command: string[];
   workingDirectory: string;
   envRefs: string[];
   secretRefs: string[];

@@ -1,0 +1,1 @@
+{"scripts":{"build":"tsc","start":"node index.js","test":"node --test","deploy":"wrangler deploy"}}
