@@ -76,10 +76,10 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     install: selectedPack?.commands.install ? [selectedPack.commands.install] : [],
     build: selectedPack?.commands.build ? [selectedPack.commands.build] : [],
     test: selectedPack?.commands.test ? [selectedPack.commands.test] : [],
-    validate: selectedPack?.commands.validate ? [selectedPack.commands.validate] : ["botblade validate"],
+    validate: selectedPack ? (selectedPack.commands.validate ? [selectedPack.commands.validate] : []) : ["botblade validate"],
     start: selectedPack?.commands.start ? [selectedPack.commands.start] : selectedPack?.commands.run ? [selectedPack.commands.run] : [],
-    stop: selectedPack?.commands.stop ? [selectedPack.commands.stop] : ["botblade runtime stop"],
-    restart: selectedPack?.commands.restart ? [selectedPack.commands.restart] : ["botblade runtime restart"],
+    stop: selectedPack ? (selectedPack.commands.stop ? [selectedPack.commands.stop] : []) : ["botblade runtime stop"],
+    restart: selectedPack ? (selectedPack.commands.restart ? [selectedPack.commands.restart] : []) : ["botblade runtime restart"],
     deploy: selectedPack?.commands.deploy ? [selectedPack.commands.deploy] : []
   };
   const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
@@ -102,8 +102,8 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     commandPlan,
     scriptProfiles,
     secretRequirements: { required, optional },
-    importantFiles: [...ctx.files].filter((f) => /(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md)$/i.test(f)).slice(0, 20),
-    detectedLanguages: top?.id.includes("python") ? ["python"] : ["javascript", "typescript"],
+    importantFiles: [...ctx.files].filter((f) => /(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md|Makefile|Taskfile\.yml|justfile|\.shellcheckrc)$/i.test(f) || f.startsWith("scripts/")).slice(0, 20),
+    detectedLanguages: detectedLanguagesForPack(top?.id),
     detectedFrameworks: top ? [top.name] : [],
     permissions: ["read_workspace", "write_workspace"],
     capabilities: ["scan", "diagnose", "run_commands"],
@@ -137,6 +137,20 @@ function normalizeWorkingDirectory(workingDirectory: string): string {
 
 function scoreToConfidence(score: number): DetectorConfidence { if (score >= 80) return "high"; if (score >= 60) return "likely"; if (score >= 40) return "possible"; return "weak"; }
 
+function detectedLanguagesForPack(packId: string | undefined): string[] {
+  if (!packId) return ["javascript", "typescript"];
+  if (packId.includes("python")) return ["python"];
+  if (packId === "generic-shell") return ["shell"];
+  if (packId.includes("workflow")) return ["workflow"];
+  return ["javascript", "typescript"];
+}
+
+function isStaticSourceFile(relativePath: string): boolean {
+  if (/\.(ts|js|tsx|jsx|py|json|sh|bash)$/i.test(relativePath)) return true;
+  if (relativePath.startsWith("scripts/") && !(relativePath.split("/").pop() ?? "").includes(".")) return true;
+  return false;
+}
+
 type ScanContext = {
   root: string; files: Set<string>; directories: Set<string>; packageJson: Record<string, unknown> | null; packageDeps: Set<string>; packageScripts: Set<string>; envText: string; sourceText: string; workflowJson: Record<string, unknown> | null; packageManager: "npm" | "pnpm" | "yarn" | "pip" | "unknown";
 };
@@ -150,7 +164,7 @@ async function buildContext(workspacePath: string): Promise<ScanContext> {
   const packageDeps = new Set<string>([...Object.keys((packageJson?.dependencies as Record<string, unknown>) ?? {}), ...Object.keys((packageJson?.devDependencies as Record<string, unknown>) ?? {})]);
   const packageScripts = new Set<string>(Object.keys((packageJson?.scripts as Record<string, unknown>) ?? {}));
   const envText = await readTextIfExists(path.join(workspacePath, ".env.example")) + "\n" + await readTextIfExists(path.join(workspacePath, ".env.local"));
-  const sourceFiles = [...files].filter((f) => /\.(ts|js|tsx|jsx|py|json)$/.test(f)).slice(0, 80);
+  const sourceFiles = [...files].filter(isStaticSourceFile).slice(0, 80);
   const sourceText = (await Promise.all(sourceFiles.map((f) => readTextIfExists(path.join(workspacePath, f))))).join("\n");
   const workflowJson = await readJsonIfExists(path.join(workspacePath, "workflow.json"));
   const packageManager = files.has("pnpm-lock.yaml") ? "pnpm" : files.has("yarn.lock") ? "yarn" : files.has("package-lock.json") ? "npm" : files.has("requirements.txt") ? "pip" : "unknown";
