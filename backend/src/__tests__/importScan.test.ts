@@ -61,6 +61,63 @@ test("detects generic-python", async () => {
   assert.equal(result.recommendedPackId, "generic-python");
 });
 
+test("detects generic-shell from scripts and shell task metadata", async () => {
+  const result = await scanWorkspaceForBladePacks(
+    path.join(fixturesRoot, "shell"),
+  );
+
+  assert.equal(result.recommendedPackId, "generic-shell");
+  assert.equal(result.commandPlan.start.length, 0);
+  assert.equal(result.commandPlan.stop.length, 0);
+  assert.equal(result.commandPlan.restart.length, 0);
+  assert.equal(result.commandPlan.validate.length, 0);
+  assert.deepStrictEqual(result.detectedLanguages, ["shell"]);
+  assert.ok(
+    result.matches
+      .find((match) => match.id === "generic-shell")
+      ?.matchedEvidence.includes("dir:scripts"),
+  );
+  assert.ok(result.importantFiles.includes("Makefile"));
+  assert.ok(result.importantFiles.includes("Taskfile.yml"));
+  assert.ok(result.importantFiles.includes("justfile"));
+});
+
+test("detects generic-shell from a standalone Makefile", async () => {
+  const result = await scanWorkspaceForBladePacks(
+    path.join(fixturesRoot, "makefile"),
+  );
+
+  assert.equal(result.recommendedPackId, "generic-shell");
+  assert.ok(
+    result.matches
+      .find((match) => match.id === "generic-shell")
+      ?.matchedEvidence.includes("file:Makefile"),
+  );
+});
+
+test("generic-shell evidence does not displace stronger framework packs", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-stronger-pack-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await copyFixture("discord", workspace);
+    await fs.mkdir(path.join(workspace, "scripts"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, "scripts", "validate.sh"),
+      "#!/usr/bin/env bash\necho validate\n",
+      "utf8",
+    );
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.equal(result.recommendedPackId, "discord-js");
+    assert.ok(result.matches.some((match) => match.id === "generic-shell"));
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("detects n8n workflow", async () => {
   const result = await scanWorkspaceForBladePacks(
     path.join(fixturesRoot, "n8n"),

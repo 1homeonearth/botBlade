@@ -1,0 +1,5 @@
+version: '3'
+tasks:
+  validate:
+    cmds:
+      - shellcheck scripts/build.sh

@@ -187,6 +187,41 @@ export const BLADE_PACKS: BladePack[] = [
     importModes: [...repositoryImportModes],
     supportedImports: [{ kind: "repository", notes: "Generic Python bots and scripts." }]
   },
+
+  {
+    schemaVersion: "0.2.0",
+    id: "generic-shell",
+    name: "Generic Shell Project",
+    version: "0.1.0",
+    license: "MIT",
+    runtime: { type: "unknown" },
+    detectors: [
+      { kind: "knownDirectory", path: "scripts", weight: 20 },
+      { kind: "knownFilename", path: "Makefile", weight: 40 },
+      { kind: "knownFilename", path: "Taskfile.yml", weight: 40 },
+      { kind: "knownFilename", path: "justfile", weight: 40 },
+      { kind: "knownFilename", path: ".shellcheckrc", weight: 20 },
+      { kind: "sourceImport", pattern: "(^|\\n)#!\\s*(?:/usr/bin/env\\s+bash|/bin/(?:ba)?sh)", weight: 25 }
+    ],
+    templates: [],
+    templateOptions: [],
+    commands: {},
+    importantFilePatterns: [
+      { kind: "commandDirectory", pattern: "scripts", label: "Shell script directory" },
+      { kind: "config", pattern: "Makefile", label: "Make task file" },
+      { kind: "config", pattern: "Taskfile.yml", label: "Task taskfile" },
+      { kind: "config", pattern: "justfile", label: "Just command file" },
+      { kind: "config", pattern: ".shellcheckrc", label: "ShellCheck configuration" }
+    ],
+    repairRules: [],
+    secrets: [],
+    secretDetectors: [{ source: "envExample", names: [], required: false, evidencePattern: "^[A-Z][A-Z0-9_]+=" }],
+    diagnostics: [],
+    panels: sharedPanels,
+    docs: [],
+    importModes: [...repositoryImportModes],
+    supportedImports: [{ kind: "repository", notes: "Generic shell scripts and command metadata; no shell runtime execution is implied." }]
+  },
   {
     schemaVersion: "0.2.0",
     id: "n8n-workflow",
