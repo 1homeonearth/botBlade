@@ -7,6 +7,11 @@ import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js
 
 export type DetectorConfidence = "weak" | "possible" | "likely" | "high";
 
+const DETECTED_FRAMEWORK_MIN_SCORE = 40;
+const SUPPLEMENTAL_SHELL_SCORE_WITH_LANGUAGE_MANIFEST = 15;
+const LANGUAGE_ORDER = ["javascript", "typescript", "python", "shell", "workflow"] as const;
+const TRACKED_FILE_EXTENSIONS = new Set([".js", ".ts", ".jsx", ".tsx", ".py", ".sh", ".bash", ".json", ".yml", ".yaml"]);
+
 export type DetectionMatch = {
   id: string;
   name: string;
@@ -57,11 +62,12 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
       }
     }
     if (score > 0) {
+      const adjustedScore = adjustScoreForContext(pack, score, ctx);
       matches.push({
         id: pack.id,
         name: pack.name,
-        score: Math.min(score, 100),
-        confidence: scoreToConfidence(score),
+        score: adjustedScore,
+        confidence: scoreToConfidence(adjustedScore),
         matchedEvidence: evidence,
         runtime: pack.runtime,
         commands: pack.commands,
@@ -69,7 +75,7 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
       });
     }
   }
-  matches.sort((a, b) => b.score - a.score);
+  matches.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
   const top = matches[0];
   const selectedPack = BLADE_PACKS.find((pack) => pack.id === top?.id);
   const commandPlan = {
@@ -102,14 +108,32 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     commandPlan,
     scriptProfiles,
     secretRequirements: { required, optional },
-    importantFiles: [...ctx.files].filter((f) => /(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md|Makefile|Taskfile\.yml|justfile|\.shellcheckrc)$/i.test(f) || f.startsWith("scripts/")).slice(0, 20),
-    detectedLanguages: detectedLanguagesForPack(top?.id),
-    detectedFrameworks: top ? [top.name] : [],
+    importantFiles: detectImportantFiles(ctx),
+    detectedLanguages: detectLanguages(ctx),
+    detectedFrameworks: matches.filter((match) => match.score >= DETECTED_FRAMEWORK_MIN_SCORE).map((match) => match.name),
     permissions: ["read_workspace", "write_workspace"],
     capabilities: ["scan", "diagnose", "run_commands"],
     git: { branch: null, status: "unknown", remotes: [] },
     packageManager
   };
+}
+
+function adjustScoreForContext(pack: BladePack, score: number, ctx: ScanContext): number {
+  const normalizedScore = Math.min(score, 100);
+  if (pack.id === "generic-shell" && hasLanguageManifest(ctx)) {
+    return Math.min(normalizedScore, SUPPLEMENTAL_SHELL_SCORE_WITH_LANGUAGE_MANIFEST);
+  }
+  return normalizedScore;
+}
+
+function hasLanguageManifest(ctx: ScanContext): boolean {
+  return Boolean(
+    ctx.packageJson ||
+      ctx.files.has("requirements.txt") ||
+      ctx.files.has("pyproject.toml") ||
+      ctx.workflowJson ||
+      ctx.files.has("botpress.config.json"),
+  );
 }
 
 function dedupeScriptProfiles(profiles: BotProfileScriptProfile[]): BotProfileScriptProfile[] {
@@ -137,38 +161,84 @@ function normalizeWorkingDirectory(workingDirectory: string): string {
 
 function scoreToConfidence(score: number): DetectorConfidence { if (score >= 80) return "high"; if (score >= 60) return "likely"; if (score >= 40) return "possible"; return "weak"; }
 
-function detectedLanguagesForPack(packId: string | undefined): string[] {
-  if (!packId) return ["javascript", "typescript"];
-  if (packId.includes("python")) return ["python"];
-  if (packId === "generic-shell") return ["shell"];
-  if (packId.includes("workflow")) return ["workflow"];
-  return ["javascript", "typescript"];
+function detectLanguages(ctx: ScanContext): string[] {
+  const languages = new Set<string>();
+  if (ctx.fileExtensions.has(".js") || ctx.fileExtensions.has(".jsx") || ctx.packageJson) languages.add("javascript");
+  if (ctx.fileExtensions.has(".ts") || ctx.fileExtensions.has(".tsx") || ctx.files.has("tsconfig.json")) languages.add("typescript");
+  if (ctx.fileExtensions.has(".py") || ctx.files.has("requirements.txt") || ctx.files.has("pyproject.toml")) languages.add("python");
+  if (
+    ctx.fileExtensions.has(".sh") ||
+    ctx.fileExtensions.has(".bash") ||
+    ctx.files.has("Makefile") ||
+    ctx.files.has("Taskfile.yml") ||
+    ctx.files.has("Taskfile.yaml") ||
+    ctx.files.has("justfile") ||
+    ctx.files.has(".shellcheckrc") ||
+    [...ctx.files].some((file) => file.startsWith("scripts/"))
+  ) {
+    languages.add("shell");
+  }
+  if (ctx.workflowJson) languages.add("workflow");
+  return LANGUAGE_ORDER.filter((language) => languages.has(language));
+}
+
+function detectImportantFiles(ctx: ScanContext): string[] {
+  return [...ctx.files]
+    .sort((a, b) => a.localeCompare(b))
+    .filter((file) => isImportantFile(file))
+    .slice(0, 20);
+}
+
+function isImportantFile(file: string): boolean {
+  const basename = file.split("/").pop() ?? file;
+  if (file.startsWith("scripts/")) return true;
+  if (file.startsWith(".botpress/")) return true;
+  if (/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(file)) return true;
+  if (/^(?:.*\/)?Dockerfile$/i.test(file)) return true;
+  if (/^(?:.*\/)?docker-compose\.ya?ml$/i.test(file)) return true;
+  return /^(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md|Makefile|Taskfile\.ya?ml|justfile|botpress\.config\.json|\.shellcheckrc)$/i.test(basename);
 }
 
 function isStaticSourceFile(relativePath: string): boolean {
-  if (/\.(ts|js|tsx|jsx|py|json|sh|bash)$/i.test(relativePath)) return true;
+  if (/\.(ts|js|tsx|jsx|py|json|ya?ml|sh|bash)$/i.test(relativePath)) return true;
   if (relativePath.startsWith("scripts/") && !(relativePath.split("/").pop() ?? "").includes(".")) return true;
   return false;
 }
 
 type ScanContext = {
-  root: string; files: Set<string>; directories: Set<string>; packageJson: Record<string, unknown> | null; packageDeps: Set<string>; packageScripts: Set<string>; envText: string; sourceText: string; workflowJson: Record<string, unknown> | null; packageManager: "npm" | "pnpm" | "yarn" | "pip" | "unknown";
+  root: string; files: Set<string>; directories: Set<string>; fileExtensions: Set<string>; packageJson: Record<string, unknown> | null; packageDeps: Set<string>; packageScripts: Set<string>; envText: string; sourceText: string; workflowJson: Record<string, unknown> | null; packageManager: "npm" | "pnpm" | "yarn" | "pip" | "unknown";
 };
 
 async function buildContext(workspacePath: string): Promise<ScanContext> {
   const workspaceExists = await pathExists(workspacePath);
-  if (!workspaceExists) return { root: workspacePath, files: new Set(), directories: new Set(), packageJson: null, packageDeps: new Set(), packageScripts: new Set(), envText: "", sourceText: "", workflowJson: null, packageManager: "unknown" };
+  if (!workspaceExists) return { root: workspacePath, files: new Set(), directories: new Set(), fileExtensions: new Set(), packageJson: null, packageDeps: new Set(), packageScripts: new Set(), envText: "", sourceText: "", workflowJson: null, packageManager: "unknown" };
   const files = new Set<string>(); const directories = new Set<string>();
   await walk(workspacePath, workspacePath, files, directories);
+  const fileExtensions = detectFileExtensions(files);
   const packageJson = await readJsonIfExists(path.join(workspacePath, "package.json"));
   const packageDeps = new Set<string>([...Object.keys((packageJson?.dependencies as Record<string, unknown>) ?? {}), ...Object.keys((packageJson?.devDependencies as Record<string, unknown>) ?? {})]);
   const packageScripts = new Set<string>(Object.keys((packageJson?.scripts as Record<string, unknown>) ?? {}));
   const envText = await readTextIfExists(path.join(workspacePath, ".env.example")) + "\n" + await readTextIfExists(path.join(workspacePath, ".env.local"));
-  const sourceFiles = [...files].filter(isStaticSourceFile).slice(0, 80);
+  const sourceFiles = [...files].sort((a, b) => a.localeCompare(b)).filter(isStaticSourceFile).slice(0, 80);
   const sourceText = (await Promise.all(sourceFiles.map((f) => readTextIfExists(path.join(workspacePath, f))))).join("\n");
   const workflowJson = await readJsonIfExists(path.join(workspacePath, "workflow.json"));
   const packageManager = files.has("pnpm-lock.yaml") ? "pnpm" : files.has("yarn.lock") ? "yarn" : files.has("package-lock.json") ? "npm" : files.has("requirements.txt") ? "pip" : "unknown";
-  return { root: workspacePath, files, directories, packageJson, packageDeps, packageScripts, envText, sourceText, workflowJson, packageManager };
+  return { root: workspacePath, files, directories, fileExtensions, packageJson, packageDeps, packageScripts, envText, sourceText, workflowJson, packageManager };
+}
+
+function detectFileExtensions(files: Set<string>): Set<string> {
+  const extensions = new Set<string>();
+  for (const file of files) {
+    const extension = detectFileExtension(file);
+    if (extension && TRACKED_FILE_EXTENSIONS.has(extension)) extensions.add(extension);
+  }
+  return extensions;
+}
+
+function detectFileExtension(file: string): string | null {
+  const basename = file.split("/").pop() ?? file;
+  const extensionMatch = /\.[^.]+$/.exec(basename);
+  return extensionMatch ? extensionMatch[0].toLowerCase() : null;
 }
 
 function matchDetector(detector: BladePackDetector, ctx: ScanContext): string | null { if (detector.kind === "packageDependency") return ctx.packageDeps.has(detector.name) ? `dependency:${detector.name}` : null; if (detector.kind === "packageScript") return ctx.packageScripts.has(detector.name) ? `script:${detector.name}` : null; if (detector.kind === "sourceImport") return new RegExp(detector.pattern, "i").test(ctx.sourceText) ? `pattern:${detector.pattern}` : null; if (detector.kind === "envKey") return new RegExp(detector.pattern, "i").test(ctx.envText + "\n" + ctx.sourceText) ? `env:${detector.pattern}` : null; if (detector.kind === "fileExists" || detector.kind === "knownFilename") return ctx.files.has(detector.path) ? `file:${detector.path}` : null; if (detector.kind === "knownDirectory") return ctx.directories.has(detector.path) ? `dir:${detector.path}` : null; if (detector.kind === "jsonShape") { if (detector.file !== "workflow.json" || !ctx.workflowJson) return null; return detector.keys.every((k) => k in ctx.workflowJson!) ? `json-shape:${detector.keys.join(",")}` : null; } return null; }
