@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import { scanWorkspaceForBladePacks } from "../services/importScan/detector.js";
 import { writeBotbladeMetadata } from "../services/importScan/botbladeMetadata.js";
+import { detectScriptProfiles } from "../services/scriptProfiles/scriptProfileDetector.js";
 
 const fixturesRoot = path.join(
   process.cwd(),
@@ -111,7 +112,7 @@ CLIENT_ID=${sentinelClientIdValue}`,
         id: string;
         source: string;
         runtime: string;
-        command: string;
+        command: string[];
         secretRefs: string[];
       }>;
       secrets: {
@@ -125,10 +126,10 @@ CLIENT_ID=${sentinelClientIdValue}`,
       ...metadata.secrets.optional,
     ];
     const startScriptProfile = metadata.scriptProfiles.find(
-      (profile) => profile.id === "package-json:start",
+      (profile) => profile.id === "package-json:package.json:start",
     );
     const bladePackStartProfile = metadata.scriptProfiles.find(
-      (profile) => profile.id === "blade-pack:start",
+      (profile) => profile.id === "blade-pack:bladepack.commands:start",
     );
     assert.ok(allSecrets.length > 0);
     assert.equal(
@@ -138,14 +139,14 @@ CLIENT_ID=${sentinelClientIdValue}`,
     assert.ok(startScriptProfile);
     assert.equal(startScriptProfile?.source, "package_json");
     assert.equal(startScriptProfile?.runtime, "node");
-    assert.equal(startScriptProfile?.command, "npm run start");
+    assert.deepStrictEqual(startScriptProfile?.command, ["npm", "run", "start"]);
     assert.equal(
       JSON.stringify(startScriptProfile?.secretRefs),
       JSON.stringify(allSecrets.map((secret) => secret.name)),
     );
     assert.ok(bladePackStartProfile);
     assert.equal(bladePackStartProfile?.source, "blade_pack");
-    assert.equal(bladePackStartProfile?.command, "npm start");
+    assert.deepStrictEqual(bladePackStartProfile?.command, ["npm", "start"]);
     assert.equal(metadataText.includes(sentinelTokenValue), false);
     assert.equal(metadataText.includes(sentinelClientIdValue), false);
   } finally {
@@ -218,4 +219,107 @@ test("scored match evidence persists in metadata", async () => {
   } finally {
     await fs.rm(workspace, { recursive: true, force: true });
   }
+});
+
+
+test("script profile detector normalizes Node package scripts and package manager", async () => {
+  const { packageManager, profiles } = await detectScriptProfiles(
+    path.join(fixturesRoot, "node"),
+  );
+  const build = profiles.find((profile) => profile.id === "package-json:package.json:build");
+  const deploy = profiles.find((profile) => profile.id === "package-json:package.json:deploy");
+
+  assert.equal(packageManager, "pnpm");
+  assert.equal(build?.name, "pnpm: build");
+  assert.deepStrictEqual(build?.command, ["pnpm", "run", "build"]);
+  assert.equal(deploy?.requiresConfirmation, true);
+});
+
+
+test("script profile detector keeps unsafe package script names as argv tokens", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-unsafe-script-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  const unsafeScriptName = "lint$(touch /tmp/botblade-pwn)`whoami`";
+
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, "package.json"),
+      JSON.stringify({ scripts: { [unsafeScriptName]: "eslint ." } }),
+      "utf8",
+    );
+
+    const { profiles } = await detectScriptProfiles(workspace);
+    const profile = profiles.find((candidate) =>
+      candidate.command[0] === "npm" &&
+      candidate.command[1] === "run" &&
+      candidate.command[2] === unsafeScriptName,
+    );
+
+    assert.ok(profile);
+    assert.deepStrictEqual(profile?.command, ["npm", "run", unsafeScriptName]);
+
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as {
+      scriptProfiles: Array<{ command: string[] }>;
+    };
+    assert.ok(
+      metadata.scriptProfiles.some(
+        (candidate) =>
+          JSON.stringify(candidate.command) ===
+          JSON.stringify(["npm", "run", unsafeScriptName]),
+      ),
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("script profile detector detects Python entrypoints, tests, and requirements install", async () => {
+  const { profiles } = await detectScriptProfiles(path.join(fixturesRoot, "python"));
+  const main = profiles.find((profile) => profile.id === "file:main.py:start");
+  const pytest = profiles.find((profile) => profile.id === "file:python-tests:pytest");
+  const install = profiles.find((profile) => profile.id === "file:requirements.txt:install");
+
+  assert.deepStrictEqual(main?.command, ["python", "main.py"]);
+  assert.deepStrictEqual(pytest?.command, ["python", "-m", "pytest"]);
+  assert.deepStrictEqual(install?.command, ["python", "-m", "pip", "install", "-r", "requirements.txt"]);
+  assert.equal(install?.requiresConfirmation, true);
+});
+
+test("script profile detector detects shell files under scripts and executable-looking shell files", async () => {
+  const { profiles } = await detectScriptProfiles(path.join(fixturesRoot, "shell"));
+  const script = profiles.find((profile) => profile.id === "file:scripts/build.sh:shell");
+  const repair = profiles.find((profile) => profile.id === "file:repair.bash:shell");
+
+  assert.deepStrictEqual(script?.command, ["bash", "scripts/build.sh"]);
+  assert.deepStrictEqual(repair?.command, ["bash", "repair.bash"]);
+  assert.equal(repair?.requiresConfirmation, true);
+});
+
+test("script profile detector detects common Makefile targets", async () => {
+  const { profiles } = await detectScriptProfiles(path.join(fixturesRoot, "makefile"));
+  const ids = profiles.map((profile) => profile.id);
+  assert.deepStrictEqual(
+    ids.filter((id) => id.startsWith("file:makefile:")),
+    ["file:makefile:build", "file:makefile:deploy", "file:makefile:install", "file:makefile:test"],
+  );
+  assert.deepStrictEqual(
+    profiles.find((profile) => profile.id === "file:makefile:deploy")?.command,
+    ["make", "deploy"],
+  );
+});
+
+test("script profile detector emits n8n workflow metadata-only profiles", async () => {
+  const { profiles } = await detectScriptProfiles(path.join(fixturesRoot, "workflow"));
+  const validate = profiles.find((profile) => profile.id === "file:workflow.json:n8n-validate-metadata");
+  const exportMetadata = profiles.find((profile) => profile.id === "file:workflow.json:n8n-export-metadata");
+
+  assert.deepStrictEqual(validate?.command, ["botblade", "workflow", "validate", "workflow.json"]);
+  assert.deepStrictEqual(exportMetadata?.command, ["botblade", "workflow", "export-metadata", "workflow.json"]);
+  assert.equal(validate?.command.includes("n8n"), false);
+  assert.equal(exportMetadata?.requiresConfirmation, true);
 });
