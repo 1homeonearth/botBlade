@@ -5,6 +5,7 @@ import type { BladePack, BladePackDetector, BladePackRuntime } from "../../blade
 import type { BotProfileCommandPlan, BotProfileScriptProfile, PackageManager } from "../../models/botProfile.js";
 import { gitStatusToMetadata, GitStatusService, type GitStatusMetadata } from "../gitStatusService.js";
 import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js";
+import { generateRepairCards } from "./repairCards.js";
 
 export type DetectorConfidence = "weak" | "possible" | "likely" | "high";
 
@@ -98,21 +99,40 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     secretRefs: [...required, ...optional].map((secret) => secret.name),
   });
   const scriptProfiles = dedupeScriptProfiles(profiles);
+  const detectedLanguages = detectLanguages(ctx);
+  const detectedFrameworks = matches.filter((match) => match.score >= DETECTED_FRAMEWORK_MIN_SCORE).map((match) => match.name);
+  const recommendedPackId = top && top.score >= 40 ? top.id : "unknown";
+  const repairCards = generateRepairCards({
+    recommendedPackId,
+    matches,
+    commandPlan,
+    scriptProfiles,
+    secretRequirements: { required, optional },
+    files: ctx.files,
+    fileExtensions: ctx.fileExtensions,
+    packageJson: ctx.packageJson,
+    packageScripts: ctx.packageScripts,
+    workflowJson: ctx.workflowJson,
+    workflowJsonExists: ctx.workflowJsonExists,
+    workflowJsonParseError: ctx.workflowJsonParseError,
+    detectedLanguages,
+    git,
+  });
   return {
     workspacePath,
-    recommendedPackId: top && top.score >= 40 ? top.id : "unknown",
+    recommendedPackId,
     matches,
     diagnostics: {
       warnings: top && top.score < 60 ? ["Detection confidence is below likely threshold."] : [],
-      repairCards: top ? [] : [{ title: "Unknown project profile", safeAction: "Configure install/build/test/start commands manually and rerun scan." }]
+      repairCards
     },
     fallbackNotes: top ? [] : ["No strong Blade Pack signals found. Open project in editor and configure commands manually."],
     commandPlan,
     scriptProfiles,
     secretRequirements: { required, optional },
     importantFiles: detectImportantFiles(ctx),
-    detectedLanguages: detectLanguages(ctx),
-    detectedFrameworks: matches.filter((match) => match.score >= DETECTED_FRAMEWORK_MIN_SCORE).map((match) => match.name),
+    detectedLanguages,
+    detectedFrameworks,
     permissions: ["read_workspace", "write_workspace"],
     capabilities: ["scan", "diagnose", "run_commands"],
     git,
@@ -228,12 +248,12 @@ function isStaticSourceFile(relativePath: string): boolean {
 }
 
 type ScanContext = {
-  root: string; files: Set<string>; directories: Set<string>; fileExtensions: Set<string>; packageJson: Record<string, unknown> | null; packageDeps: Set<string>; packageScripts: Set<string>; envText: string; sourceText: string; workflowJson: Record<string, unknown> | null; packageManager: "npm" | "pnpm" | "yarn" | "pip" | "unknown";
+  root: string; files: Set<string>; directories: Set<string>; fileExtensions: Set<string>; packageJson: Record<string, unknown> | null; packageDeps: Set<string>; packageScripts: Set<string>; envText: string; sourceText: string; workflowJson: Record<string, unknown> | null; workflowJsonExists: boolean; workflowJsonParseError: boolean; packageManager: "npm" | "pnpm" | "yarn" | "pip" | "unknown";
 };
 
 async function buildContext(workspacePath: string): Promise<ScanContext> {
   const workspaceExists = await pathExists(workspacePath);
-  if (!workspaceExists) return { root: workspacePath, files: new Set(), directories: new Set(), fileExtensions: new Set(), packageJson: null, packageDeps: new Set(), packageScripts: new Set(), envText: "", sourceText: "", workflowJson: null, packageManager: "unknown" };
+  if (!workspaceExists) return { root: workspacePath, files: new Set(), directories: new Set(), fileExtensions: new Set(), packageJson: null, packageDeps: new Set(), packageScripts: new Set(), envText: "", sourceText: "", workflowJson: null, workflowJsonExists: false, workflowJsonParseError: false, packageManager: "unknown" };
   const files = new Set<string>(); const directories = new Set<string>();
   await walk(workspacePath, workspacePath, files, directories);
   const fileExtensions = detectFileExtensions(files);
@@ -243,9 +263,12 @@ async function buildContext(workspacePath: string): Promise<ScanContext> {
   const envText = await readTextIfExists(path.join(workspacePath, ".env.example")) + "\n" + await readTextIfExists(path.join(workspacePath, ".env.local"));
   const sourceFiles = [...files].sort((a, b) => a.localeCompare(b)).filter(isStaticSourceFile).slice(0, 80);
   const sourceText = (await Promise.all(sourceFiles.map((f) => readTextIfExists(path.join(workspacePath, f))))).join("\n");
-  const workflowJson = await readJsonIfExists(path.join(workspacePath, "workflow.json"));
+  const workflowJsonResult = await readJsonFileIfExists(path.join(workspacePath, "workflow.json"));
+  const workflowJson = workflowJsonResult.value;
+  const workflowJsonExists = workflowJsonResult.exists;
+  const workflowJsonParseError = workflowJsonResult.parseError;
   const packageManager = files.has("pnpm-lock.yaml") ? "pnpm" : files.has("yarn.lock") ? "yarn" : files.has("package-lock.json") ? "npm" : files.has("requirements.txt") ? "pip" : "unknown";
-  return { root: workspacePath, files, directories, fileExtensions, packageJson, packageDeps, packageScripts, envText, sourceText, workflowJson, packageManager };
+  return { root: workspacePath, files, directories, fileExtensions, packageJson, packageDeps, packageScripts, envText, sourceText, workflowJson, workflowJsonExists, workflowJsonParseError, packageManager };
 }
 
 function detectFileExtensions(files: Set<string>): Set<string> {
@@ -265,6 +288,7 @@ function detectFileExtension(file: string): string | null {
 
 function matchDetector(detector: BladePackDetector, ctx: ScanContext): string | null { if (detector.kind === "packageDependency") return ctx.packageDeps.has(detector.name) ? `dependency:${detector.name}` : null; if (detector.kind === "packageScript") return ctx.packageScripts.has(detector.name) ? `script:${detector.name}` : null; if (detector.kind === "sourceImport") return new RegExp(detector.pattern, "i").test(ctx.sourceText) ? `pattern:${detector.pattern}` : null; if (detector.kind === "envKey") return new RegExp(detector.pattern, "i").test(ctx.envText + "\n" + ctx.sourceText) ? `env:${detector.pattern}` : null; if (detector.kind === "fileExists" || detector.kind === "knownFilename") return ctx.files.has(detector.path) ? `file:${detector.path}` : null; if (detector.kind === "knownDirectory") return ctx.directories.has(detector.path) ? `dir:${detector.path}` : null; if (detector.kind === "jsonShape") { if (detector.file !== "workflow.json" || !ctx.workflowJson) return null; return detector.keys.every((k) => k in ctx.workflowJson!) ? `json-shape:${detector.keys.join(",")}` : null; } return null; }
 async function walk(root: string, current: string, files: Set<string>, dirs: Set<string>): Promise<void> { const entries = await fs.readdir(current, { withFileTypes: true }); for (const entry of entries) { if (["node_modules", "dist", ".git"].includes(entry.name)) continue; const full = path.join(current, entry.name); const relative = path.relative(root, full).split(path.sep).join("/"); if (entry.isDirectory()) { dirs.add(relative); await walk(root, full, files, dirs); } else if (entry.isFile()) files.add(relative); } }
-async function readJsonIfExists(file: string): Promise<Record<string, unknown> | null> { try { return JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>; } catch { return null; } }
+async function readJsonIfExists(file: string): Promise<Record<string, unknown> | null> { return (await readJsonFileIfExists(file)).value; }
+async function readJsonFileIfExists(file: string): Promise<{ exists: boolean; parseError: boolean; value: Record<string, unknown> | null }> { try { const text = await fs.readFile(file, "utf8"); try { return { exists: true, parseError: false, value: JSON.parse(text) as Record<string, unknown> }; } catch { return { exists: true, parseError: true, value: null }; } } catch { return { exists: false, parseError: false, value: null }; } }
 async function readTextIfExists(file: string): Promise<string> { try { return await fs.readFile(file, "utf8"); } catch { return ""; } }
 async function pathExists(targetPath: string): Promise<boolean> { try { await fs.access(targetPath); return true; } catch { return false; } }

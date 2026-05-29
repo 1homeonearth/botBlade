@@ -769,3 +769,122 @@ test("scan detection deduplicates script profiles by command working directory a
     await fs.rm(workspace, { recursive: true, force: true });
   }
 });
+
+function cardTitles(result: { diagnostics: { repairCards: Array<{ title: string; safeAction: string }> } }): string[] {
+  return result.diagnostics.repairCards.map((card) => card.title);
+}
+
+test("repair cards flag unknown profile, low confidence, absent command profiles, and unavailable Git", async () => {
+  const result = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "unknown"));
+  const titles = cardTitles(result);
+
+  assert.ok(titles.includes("Unknown project profile"));
+  assert.ok(titles.includes("No start/build/test command profile found"));
+  assert.ok(titles.includes("Git metadata unavailable"));
+  assert.equal(
+    result.diagnostics.repairCards.every((card) => !/\b(npm|pip|python|bash|sh|git)\s+(?:install|run|start|test|build|init)\b/i.test(card.safeAction)),
+    true,
+  );
+});
+
+test("repair cards flag low detection confidence from weak scan evidence", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-repair-low-confidence-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "package.json"), JSON.stringify({ name: "weak-node" }), "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.equal(result.recommendedPackId, "unknown");
+    assert.ok(cardTitles(result).includes("Low detection confidence"));
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("repair cards flag missing package.json scripts for Node projects", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-repair-node-scripts-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "package.json"), JSON.stringify({ scripts: { start: "node index.js" } }), "utf8");
+    await fs.writeFile(path.join(workspace, "index.js"), "console.log(process.version)\n", "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+    const card = result.diagnostics.repairCards.find((candidate) => candidate.title === "Missing package.json command scripts");
+
+    assert.ok(card);
+    assert.match(card?.evidence ?? "", /build, test/);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("repair cards flag missing Python requirements or pyproject manifest", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-repair-python-manifest-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "main.py"), "import discord\n", "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.ok(cardTitles(result).includes("Missing Python dependency manifest"));
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("repair cards flag missing required secret metadata", async () => {
+  const result = await scanWorkspaceForBladePacks(path.join(fixturesRoot, "discord"));
+  const card = result.diagnostics.repairCards.find((candidate) => candidate.title === "Missing required secret metadata");
+
+  assert.ok(card);
+  assert.match(card?.evidence ?? "", /DISCORD_TOKEN/);
+  assert.equal(JSON.stringify(result.diagnostics.repairCards).includes("DO_NOT_PERSIST"), false);
+});
+
+test("repair cards flag invalid or unsupported n8n workflow shape", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-repair-n8n-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "workflow.json"), JSON.stringify({ nodes: {} }), "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.ok(cardTitles(result).includes("Invalid or unsupported n8n workflow shape"));
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("botblade metadata includes generated repair cards", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-repair-metadata-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "main.py"), "print('repair me')\n", "utf8");
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as {
+      repairCards: Array<{ title: string; safeAction: string }>;
+    };
+
+    assert.ok(metadata.repairCards.some((card) => card.title === "Missing Python dependency manifest"));
+    assert.equal(metadata.repairCards.every((card) => typeof card.safeAction === "string"), true);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});

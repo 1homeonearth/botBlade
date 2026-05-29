@@ -415,6 +415,7 @@ test("profile route preserves stored Git metadata while refreshing current statu
   assert.equal(response.body.git.branch, null);
   assert.deepStrictEqual(response.body.git.remotes, []);
   assert.equal("dirtyFileCount" in response.body.git, false);
+  assert.ok(response.body.repairCards.some((card: { title: string }) => card.title === "Git metadata unavailable"));
 });
 
 test("profile route redacts importSource url credentials", async () => {
