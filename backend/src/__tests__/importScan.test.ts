@@ -82,6 +82,109 @@ test("detects generic-shell from scripts and shell task metadata", async () => {
   assert.ok(result.importantFiles.includes("justfile"));
 });
 
+test("mixed Node Python shell repositories produce deterministic profile signals", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-mixed-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+
+  try {
+    await fs.mkdir(path.join(workspace, "src"), { recursive: true });
+    await fs.mkdir(path.join(workspace, "scripts"), { recursive: true });
+    await fs.mkdir(path.join(workspace, ".github", "workflows"), { recursive: true });
+    await fs.mkdir(path.join(workspace, ".botpress"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, "package.json"),
+      JSON.stringify({
+        name: "mixed-bot",
+        scripts: { start: "node src/index.ts" },
+        dependencies: { "@botpress/client": "^1.0.0" },
+        devDependencies: { typescript: "^5.0.0" },
+      }),
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspace, "src", "index.ts"), "console.log(process.env.PORT);\n", "utf8");
+    await fs.writeFile(path.join(workspace, "main.py"), "print('hello')\n", "utf8");
+    await fs.writeFile(path.join(workspace, "requirements.txt"), "pytest\n", "utf8");
+    await fs.writeFile(path.join(workspace, "scripts", "deploy.sh"), "#!/usr/bin/env bash\necho deploy\n", "utf8");
+    await fs.writeFile(path.join(workspace, "Dockerfile"), "FROM node:22-alpine\n", "utf8");
+    await fs.writeFile(path.join(workspace, "docker-compose.yml"), "services: {}\n", "utf8");
+    await fs.writeFile(path.join(workspace, ".github", "workflows", "ci.yml"), "name: ci\n", "utf8");
+    await fs.writeFile(path.join(workspace, "Makefile"), "test:\n\techo test\n", "utf8");
+    await fs.writeFile(path.join(workspace, "Taskfile.yml"), "version: '3'\n", "utf8");
+    await fs.writeFile(path.join(workspace, "justfile"), "test:\n\techo test\n", "utf8");
+    await fs.writeFile(path.join(workspace, "botpress.config.json"), "{}\n", "utf8");
+    await fs.writeFile(path.join(workspace, ".botpress", "bot.json"), "{}\n", "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.deepStrictEqual(result.detectedLanguages, ["javascript", "typescript", "python", "shell"]);
+    assert.deepStrictEqual(result.detectedFrameworks, [
+      "Generic Node Project",
+      "Botpress Bot-as-Code",
+      "Generic Python Project",
+    ]);
+    assert.equal(
+      result.matches.find((match) => match.id === "generic-shell")?.score,
+      15,
+    );
+    assert.deepStrictEqual(
+      result.importantFiles.filter((file) =>
+        [
+          ".botpress/bot.json",
+          ".github/workflows/ci.yml",
+          "Dockerfile",
+          "Makefile",
+          "Taskfile.yml",
+          "botpress.config.json",
+          "docker-compose.yml",
+          "justfile",
+          "package.json",
+          "requirements.txt",
+          "scripts/deploy.sh",
+        ].includes(file),
+      ),
+      [
+        ".botpress/bot.json",
+        ".github/workflows/ci.yml",
+        "botpress.config.json",
+        "docker-compose.yml",
+        "Dockerfile",
+        "justfile",
+        "Makefile",
+        "package.json",
+        "requirements.txt",
+        "scripts/deploy.sh",
+        "Taskfile.yml",
+      ],
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("make automation remains supplemental when a language manifest is present", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-manifest-make-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(path.join(workspace, "pyproject.toml"), "[project]\nname = \"python-bot\"\n", "utf8");
+    await fs.writeFile(path.join(workspace, "Makefile"), "test:\n\techo test\n", "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.equal(result.matches[0]?.id, "generic-python");
+    assert.equal(result.matches.find((match) => match.id === "generic-shell")?.score, 15);
+    assert.deepStrictEqual(result.detectedLanguages, ["python", "shell"]);
+    assert.deepStrictEqual(result.commandPlan.install, ["pip install -r requirements.txt"]);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("detects generic-shell from a standalone Makefile", async () => {
   const result = await scanWorkspaceForBladePacks(
     path.join(fixturesRoot, "makefile"),
