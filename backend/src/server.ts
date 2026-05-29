@@ -20,7 +20,7 @@ import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
 import { scanAndGenerateBotbladeMetadata } from "./services/importScan/index.js";
-import { ImportStore } from "./services/imports/index.js";
+import { ImportStore, knownImportTemplateIds } from "./services/imports/index.js";
 import { ScriptProfileService } from "./services/scriptProfiles/scriptProfileService.js";
 import { SqlitePersistence } from "./persistence/sqlitePersistence.js";
 
@@ -325,7 +325,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     }
   }
 
-  const importIdMatch = path.match(/^\/api\/imports\/(?!git$|zip$|folder$)([^/]+)$/);
+  const importIdMatch = path.match(/^\/api\/imports\/(?!git$|zip$|folder$|workflow-json$|template$)([^/]+)$/);
   if (importIdMatch) {
     if (method !== "GET") return writeJson(res, 404, { error: { code: "NOT_FOUND", message: "Route not found.", details: {}, requestId } });
     const record = importStore.get(importIdMatch[1]);
@@ -357,6 +357,42 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     const record = await importStore.createAndRun({ type: "zip", archivePath: body.archivePath }, body.workspacePath, auditService, actor.id, requestId);
     if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
       const project = projectStore.create({ name: body.projectName?.trim() || projectNameFromArchivePath(body.archivePath), slug: uniqueProjectSlug(body.projectName ?? body.archivePath), description: `Imported from ${body.archivePath}` });
+      importStore.attachManagedProject(record.id, { id: project.id, slug: project.slug });
+      const workspace = fileService.workspace(project.id);
+      const fs = await import("node:fs/promises");
+      await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+      await copyDirectory(record.workspacePath, workspace);
+      scriptProfileService.upsertDetected(project.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
+    }
+    return writeJson(res, 201, record);
+  }
+
+  if (method === "POST" && path === "/api/imports/workflow-json") {
+    const body = await readJson(req) as { workflowPath?: string; workflowJson?: unknown; workspacePath?: string; projectName?: string };
+    if (!body?.workspacePath || (!body.workflowPath && body.workflowJson === undefined)) throw new RequestValidationError([{ field: "workflowPath|workflowJson|workspacePath", message: "workflowPath or workflowJson and workspacePath are required." }]);
+    const record = await importStore.createAndRun({ type: "workflow_json", workflowPath: body.workflowPath, workflowJson: body.workflowJson }, body.workspacePath, auditService, actor.id, requestId);
+    if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
+      const name = body.projectName?.trim() || (body.workflowPath ? projectNameFromArchivePath(body.workflowPath) : "Imported Workflow JSON");
+      const slugSeed = body.projectName ?? body.workflowPath ?? name;
+      const project = projectStore.create({ name, slug: uniqueProjectSlug(slugSeed), description: body.workflowPath ? `Imported workflow JSON from ${body.workflowPath}` : "Imported workflow JSON from request body" });
+      importStore.attachManagedProject(record.id, { id: project.id, slug: project.slug });
+      const workspace = fileService.workspace(project.id);
+      const fs = await import("node:fs/promises");
+      await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+      await copyDirectory(record.workspacePath, workspace);
+      scriptProfileService.upsertDetected(project.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
+    }
+    return writeJson(res, 201, record);
+  }
+
+  if (method === "POST" && path === "/api/imports/template") {
+    const body = await readJson(req) as { templateId?: string; workspacePath?: string; projectName?: string };
+    if (!body?.templateId || !body?.workspacePath) throw new RequestValidationError([{ field: "templateId|workspacePath", message: "templateId and workspacePath are required." }]);
+    const record = await importStore.createAndRun({ type: "template", templateId: body.templateId }, body.workspacePath, auditService, actor.id, requestId);
+    if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
+      const project = projectStore.create({ name: body.projectName?.trim() || templateProjectName(body.templateId), slug: uniqueProjectSlug(body.projectName ?? body.templateId), description: `Imported first-party template ${body.templateId}` });
       importStore.attachManagedProject(record.id, { id: project.id, slug: project.slug });
       const workspace = fileService.workspace(project.id);
       const fs = await import("node:fs/promises");
@@ -531,6 +567,11 @@ function decodePathParam(value: string, field: string): string {
   } catch {
     throw { statusCode: 400, code: "INVALID_REQUEST_URL", message: `${field} must be URL-encoded.`, details: { field } };
   }
+}
+
+function templateProjectName(templateId: string): string {
+  if (!knownImportTemplateIds().includes(templateId)) return "Imported Template";
+  return templateId.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : part).join(" ");
 }
 
 function projectNameFromArchivePath(archivePath: string): string {

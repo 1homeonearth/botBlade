@@ -163,6 +163,18 @@ Returns file metadata plus `content`. Path traversal outside the workspace is bl
 
 Body: `{ "content": "..." }`. Writes and returns file metadata plus content.
 
+## Imports
+
+Import validation is static-only: BotBlade materializes or copies input into a managed workspace and scans files without executing imported code.
+
+### `POST /api/imports/workflow-json`
+
+Body: `{ "workspacePath": "/tmp/imports", "workflowPath": "/path/to/workflow.json" }` or `{ "workspacePath": "/tmp/imports", "workflowJson": { "nodes": [], "connections": {} } }`. The workflow is validated as JSON, capped at 512 KiB, written into the managed workspace as `workflow.json`, and scanned. Invalid or oversized workflow JSON returns an import record in `blocked_by_policy` with security-card details.
+
+### `POST /api/imports/template`
+
+Body: `{ "workspacePath": "/tmp/imports", "templateId": "n8n-empty-workflow" }`. Only first-party template IDs in the backend allowlist are materialized and scanned; unknown template IDs are blocked before scanning.
+
 ## Secrets
 
 ### `GET /api/secrets`

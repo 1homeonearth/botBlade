@@ -15,7 +15,7 @@ const DEFAULT_POLICY: ZipPolicy = {
   maxTotalUncompressedBytes: 100 * 1024 * 1024
 };
 
-export type ZipViolationCode = "ARCHIVE_NOT_FOUND"|"ARCHIVE_TOO_LARGE"|"ENTRY_COUNT_EXCEEDED"|"ENTRY_TOO_LARGE"|"TOTAL_UNCOMPRESSED_TOO_LARGE"|"PATH_TRAVERSAL"|"ABSOLUTE_PATH"|"DRIVE_PREFIX"|"UNSUPPORTED_ENTRY_TYPE"|"SYMLINK_ENTRY"|"ZIP_READ_ERROR"|"ZIP_RUNTIME_UNAVAILABLE";
+export type ZipViolationCode = "ARCHIVE_NOT_FOUND"|"ARCHIVE_TOO_LARGE"|"ENTRY_COUNT_EXCEEDED"|"ENTRY_TOO_LARGE"|"TOTAL_UNCOMPRESSED_TOO_LARGE"|"PATH_TRAVERSAL"|"ABSOLUTE_PATH"|"DRIVE_PREFIX"|"UNSUPPORTED_ENTRY_TYPE"|"SYMLINK_ENTRY"|"ZIP_READ_ERROR"|"ZIP_RUNTIME_UNAVAILABLE"|"WORKFLOW_JSON_NOT_FOUND"|"WORKFLOW_JSON_NOT_FILE"|"WORKFLOW_JSON_TOO_LARGE"|"WORKFLOW_JSON_SOURCE_REQUIRED"|"WORKFLOW_JSON_INVALID"|"TEMPLATE_ID_NOT_ALLOWED";
 export interface ZipViolation { code: ZipViolationCode; entryPath?: string; detail: string }
 export interface ValidatedZipEntry { archivePath: string; normalizedPath: string; size: number }
 export interface ZipValidationResult { ok: boolean; violations: ZipViolation[]; extractionPlan: ValidatedZipEntry[]; totalUncompressedBytes: number }
