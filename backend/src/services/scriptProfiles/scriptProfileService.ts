@@ -11,7 +11,7 @@ export interface CreateScriptProfileInput {
   description?: string;
   source?: ScriptProfileSource;
   runtime: ScriptProfileRuntime;
-  command?: string[];
+  command: string[];
   workingDirectory?: string;
   envRefs?: string[];
   secretRefs?: string[];
@@ -29,6 +29,8 @@ export interface ScriptProfileAuditContext {
 
 const allowedSources = new Set<ScriptProfileSource>(["package_json", "file", "blade_pack", "repair_card", "user", "codex"]);
 const allowedRuntimes = new Set<ScriptProfileRuntime>(["node", "python", "shell", "powershell", "docker", "workflow", "custom"]);
+const maxTimeoutSeconds = 86_400;
+const secretRefPattern = /^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/;
 
 export class ScriptProfileService {
   private readonly profiles = new Map<string, ScriptProfileMetadata>();
@@ -61,7 +63,7 @@ export class ScriptProfileService {
       description: parsed.description,
       source: parsed.source ?? "user",
       runtime: parsed.runtime,
-      command: parsed.command ?? [],
+      command: parsed.command,
       workingDirectory: parsed.workingDirectory ?? ".",
       envRefs: parsed.envRefs ?? [],
       secretRefs: parsed.secretRefs ?? [],
@@ -169,17 +171,20 @@ function parseScriptProfileInput(input: unknown, partial: boolean): CreateScript
     else problems.push({ field: "source", message: "Source must be supported." });
   }
   if ("description" in object) output.description = optionalString(object.description, "description", problems);
-  if ("command" in object) output.command = stringArray(object.command, "command", problems);
-  if ("workingDirectory" in object) output.workingDirectory = stringField(object.workingDirectory, "workingDirectory", problems);
+  if (!partial || "command" in object) output.command = nonEmptyStringArray(object.command, "command", problems);
+  if ("workingDirectory" in object) {
+    const workingDirectory = stringField(object.workingDirectory, "workingDirectory", problems);
+    if (workingDirectory !== undefined && isProjectRelativeDirectory(workingDirectory)) output.workingDirectory = normalizeProjectRelativeDirectory(workingDirectory);
+    else if (workingDirectory !== undefined) problems.push({ field: "workingDirectory", message: "workingDirectory must be a project-relative path." });
+  }
   if ("envRefs" in object) output.envRefs = stringArray(object.envRefs, "envRefs", problems);
-  if ("secretRefs" in object) output.secretRefs = stringArray(object.secretRefs, "secretRefs", problems);
-  if ("timeoutSeconds" in object) output.timeoutSeconds = positiveInteger(object.timeoutSeconds, "timeoutSeconds", problems);
+  if ("secretRefs" in object) output.secretRefs = secretRefArray(object.secretRefs, "secretRefs", problems);
+  if ("timeoutSeconds" in object) output.timeoutSeconds = boundedInteger(object.timeoutSeconds, "timeoutSeconds", 1, maxTimeoutSeconds, problems);
   if ("requiresConfirmation" in object) {
     if (typeof object.requiresConfirmation === "boolean") output.requiresConfirmation = object.requiresConfirmation;
     else problems.push({ field: "requiresConfirmation", message: "requiresConfirmation must be a boolean." });
   }
   if ("tags" in object) output.tags = stringArray(object.tags, "tags", problems);
-  if (output.secretRefs?.some((ref) => looksLikeSecretValue(ref))) problems.push({ field: "secretRefs", message: "secretRefs must contain secret reference IDs, not secret values." });
   if (problems.length > 0) throw new RequestValidationError(problems);
   return output as CreateScriptProfileInput | UpdateScriptProfileInput;
 }
@@ -209,9 +214,28 @@ function stringArray(value: unknown, field: string, problems: { field: string; m
   return value.map((item) => item.trim()).filter(Boolean);
 }
 
-function positiveInteger(value: unknown, field: string, problems: { field: string; message: string }[]): number | undefined {
-  if (Number.isInteger(value) && typeof value === "number" && value > 0) return value;
-  problems.push({ field, message: `${field} must be a positive integer.` });
+function nonEmptyStringArray(value: unknown, field: string, problems: { field: string; message: string }[]): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || item.trim().length === 0)) {
+    problems.push({ field, message: `${field} must be an array of non-empty strings.` });
+    return undefined;
+  }
+  return value.map((item) => item.trim());
+}
+
+function secretRefArray(value: unknown, field: string, problems: { field: string; message: string }[]): string[] | undefined {
+  const refs = nonEmptyStringArray(value, field, problems);
+  if (!refs) return undefined;
+  const invalidRefs = refs.filter((ref) => !secretRefPattern.test(ref) || looksLikeSecretValue(ref));
+  if (invalidRefs.length > 0) {
+    problems.push({ field, message: `${field} must contain secret reference IDs or names, not secret values.` });
+    return undefined;
+  }
+  return refs;
+}
+
+function boundedInteger(value: unknown, field: string, min: number, max: number, problems: { field: string; message: string }[]): number | undefined {
+  if (Number.isInteger(value) && typeof value === "number" && value >= min && value <= max) return value;
+  problems.push({ field, message: `${field} must be an integer between ${min} and ${max}.` });
   return undefined;
 }
 
@@ -219,7 +243,19 @@ function withoutUndefined(input: Record<string, unknown>): Record<string, unknow
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
+function isProjectRelativeDirectory(value: string): boolean {
+  if (value.includes("\0") || value.includes("\\") || /^[A-Za-z]:/.test(value) || value.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+  const segments = value.split("/").filter((segment) => segment.length > 0 && segment !== ".");
+  if (segments.includes("..")) return false;
+  const normalized = normalizeProjectRelativeDirectory(value);
+  return normalized === "." || (!normalized.startsWith("../") && normalized !== "..");
+}
+
+function normalizeProjectRelativeDirectory(value: string): string {
+  return value.split("/").filter((segment) => segment.length > 0 && segment !== ".").join("/") || ".";
+}
+
 function looksLikeSecretValue(value: string): boolean {
   if (value.startsWith("secret_")) return false;
-  return createHash("sha256").update(value).digest("hex").length > 0 && /(?:token|secret|password|api[_-]?key)|[A-Za-z0-9_-]{32,}/i.test(value);
+  return createHash("sha256").update(value).digest("hex").length > 0 && /(?:=|^sk-|^gh[pousr]_|^xox[baprs]-|[A-Za-z0-9_.-]{32,})/i.test(value);
 }

@@ -30,6 +30,15 @@ export class ImportStore {
   constructor(private readonly persistence?: ImportStorePersistence) { for (const record of persistence?.loadImportRecords() ?? []) this.records.set(record.id, record); }
   get(id: string): ImportRecord | undefined { return this.records.get(id); }
 
+  attachManagedProject(id: string, managedProject: { id: string; slug: string }): ImportRecord | undefined {
+    const record = this.records.get(id);
+    if (!record) return undefined;
+    record.managedProject = managedProject;
+    record.updatedAt = new Date().toISOString();
+    this.save(record);
+    return record;
+  }
+
   async createAndRun(source: ImportSource, workspacePath: string, auditService: AuditService, actorId: string, requestId: string): Promise<ImportRecord> {
     const now = new Date().toISOString();
     const id = `import_${randomUUID()}`;
