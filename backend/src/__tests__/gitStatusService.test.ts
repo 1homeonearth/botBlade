@@ -38,6 +38,23 @@ test("git status service returns dirty summary for modified repo", async () => {
 });
 
 
+
+test("git status static safe mode does not mark all scanned files dirty", async () => {
+  const dir = await tempDir("botblade-git-static-clean");
+  execFileSync("git", ["-C", dir, "init"]);
+  await fs.writeFile(path.join(dir, "README.md"), "hello\n", "utf8");
+  execFileSync("git", ["-C", dir, "add", "."]);
+  execFileSync("git", ["-C", dir, "-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "init"]);
+
+  const status = await new GitStatusService().readStatusStaticSafe(dir, new Set(["README.md", "package.json"]));
+
+  assert.equal(status.available, true);
+  assert.equal(status.clean, true);
+  assert.equal(status.dirtyFileCount, 0);
+  assert.equal(status.changedFiles.length, 0);
+  assert.equal(status.note, "static git metadata only; changes not evaluated");
+});
+
 test("git status service redacts remote URLs before returning metadata", async () => {
   const dir = await tempDir("botblade-git-remote-redaction");
   execFileSync("git", ["-C", dir, "init"]);

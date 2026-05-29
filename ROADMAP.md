@@ -24,6 +24,7 @@
 - Add capability prompts and project-level policy visibility.
 
 ## Phase 4: Mobile IDE and Git UX uplift
+- Detect, preview, and persist per-project script profiles as metadata-only command plans; Phase 4 does not execute detected commands.
 - Command palette actions for common bot tasks.
 - File search, outlines, and logs/terminal drawer ergonomics.
 - Git branch/divergence status, staged hunks, and guided conflict handling.

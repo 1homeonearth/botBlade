@@ -311,8 +311,8 @@ test("scan detection includes redacted Git branch status and remote metadata", a
     const detection = await scanWorkspaceForBladePacks(workspace);
 
     assert.equal(detection.git.branch, "main");
-    assert.equal(detection.git.status, "dirty");
-    assert.equal(detection.git.dirtyFileCount, 2);
+    assert.equal(detection.git.status, "unknown");
+    assert.equal("dirtyFileCount" in detection.git, false);
     assert.equal(detection.git.remotes[0]?.name, "origin");
     assert.equal(detection.git.remotes[0]?.url?.includes("user:pass"), false);
     assert.equal(detection.git.remotes[0]?.url?.includes("abc123"), false);

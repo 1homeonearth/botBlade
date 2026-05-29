@@ -127,6 +127,25 @@ class LocalProjectRepository(private val context: Context) {
         return ProjectImportResult("Registered ${projectRoot.name} as a workspace folder project.", summaryFor(projectRoot))
     }
 
+    fun registerRootWorkspace(folderUri: Uri): ProjectImportResult {
+        val projectRoot = createProjectRoot(folderUri.lastPathSegment?.substringAfterLast(':') ?: "root-workspace")
+        writeReadme(
+            projectRoot,
+            "# ${projectRoot.name}\n\nThis BotBlade project anchors a selected repository/workspace root.\n\nRoot URI: $folderUri\n\nBenefits: stable relative paths, monorepo-aware scans, Git root alignment, backup/restore anchors, and clearer audit boundaries. This is a metadata registration lane; it does not request Android superuser privileges or run commands.\n",
+        )
+        writeMetadata(
+            projectRoot = projectRoot,
+            name = projectRoot.name,
+            sourceType = "root_folder",
+            status = "Registered root workspace",
+            extra = mapOf(
+                "folderUri" to folderUri.toString(),
+                "rootBenefits" to "stable-relative-paths,monorepo-scans,git-root-alignment,backup-anchors,audit-boundaries",
+            ),
+        )
+        return ProjectImportResult("Registered ${projectRoot.name} as a root workspace anchor.", summaryFor(projectRoot))
+    }
+
     fun repairWorkspace(folderUri: Uri): ProjectImportResult {
         val projectRoot = createProjectRoot(folderUri.lastPathSegment?.substringAfterLast(':') ?: "repaired-workspace")
         val repairReport = "BotBlade repair shell created.\n\nSource URI: $folderUri\n\nGenerated metadata, README, and project registration.\nNext: open Editor, run Scan, then add missing secrets.\n"
@@ -140,6 +159,21 @@ class LocalProjectRepository(private val context: Context) {
             extra = mapOf("folderUri" to folderUri.toString()),
         )
         return ProjectImportResult("Created repair shell ${projectRoot.name} and added it to Projects.", summaryFor(projectRoot))
+    }
+
+    fun repairRootWorkspace(folderUri: Uri): ProjectImportResult {
+        val projectRoot = createProjectRoot(folderUri.lastPathSegment?.substringAfterLast(':') ?: "root-repair-workspace")
+        val repairReport = "BotBlade root repair shell created.\n\nRoot URI: $folderUri\n\nBenefits: preserve one top-level scan boundary, map nested apps/packages, align Git metadata to the repository root, and keep repair cards tied to the workspace anchor. This does not request Android superuser privileges or execute repair commands.\nNext: open Editor, run Scan, review findings, then add missing secrets.\n"
+        File(projectRoot, "BOTBLADE_ROOT_REPAIR_REPORT.txt").writeText(repairReport)
+        writeReadme(projectRoot, "# ${projectRoot.name}\n\n$repairReport")
+        writeMetadata(
+            projectRoot = projectRoot,
+            name = projectRoot.name,
+            sourceType = "root_repair",
+            status = "Root repair shell ready",
+            extra = mapOf("folderUri" to folderUri.toString()),
+        )
+        return ProjectImportResult("Created root repair shell ${projectRoot.name} and added it to Projects.", summaryFor(projectRoot))
     }
 
     private fun createProjectRoot(rawName: String): File {

@@ -38,15 +38,14 @@ export class GitStatusService {
       if (!gitStat.isDirectory()) throw new Error("Workspace does not contain a .git directory.");
       const branch = await this.currentBranchStatic(gitDir);
       const remotes = await this.remotesStatic(gitDir);
-      const dirtyFileCount = projectFiles.size;
       return {
         available: true,
         branch,
         remotes,
-        clean: dirtyFileCount === 0,
-        dirtyFileCount,
+        clean: true,
+        dirtyFileCount: 0,
         changedFiles: [],
-        note: "static git metadata only",
+        note: projectFiles.size > 0 ? "static git metadata only; changes not evaluated" : "static git metadata only",
       };
     } catch {
       return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
@@ -147,12 +146,13 @@ export class GitStatusService {
 }
 
 export function gitStatusToMetadata(summary: GitStatusSummary): GitStatusMetadata {
+  const changesNotEvaluated = summary.note === "static git metadata only; changes not evaluated";
   const metadata: GitStatusMetadata = {
     branch: summary.branch,
-    status: summary.available ? (summary.clean ? "clean" : "dirty") : "unknown",
+    status: summary.available && !changesNotEvaluated ? (summary.clean ? "clean" : "dirty") : "unknown",
     remotes: summary.remotes,
   };
-  if (summary.available && summary.note !== "too many changed files to display") {
+  if (summary.available && !changesNotEvaluated && summary.note !== "too many changed files to display") {
     metadata.dirtyFileCount = summary.dirtyFileCount;
   }
   return metadata;

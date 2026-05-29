@@ -539,6 +539,13 @@ test("script profile routes validate command, paths, secrets, timeout, runtime, 
   assert.equal(missingCommand.statusCode, 400);
   assert.ok(missingCommand.body.error.details.problems.some((problem: { field: string }) => problem.field === "command"));
 
+  const validCommandWithEquals = await request("POST", `/api/projects/${projectId}/script-profiles`, {
+    ...validProfile,
+    name: "Serve bot",
+    command: ["node", "server.js", "--mode=production", "--port=3000", "NODE_ENV=production"],
+  });
+  assert.equal(validCommandWithEquals.statusCode, 201);
+
   const valid = await request("POST", `/api/projects/${projectId}/script-profiles`, validProfile);
   assert.equal(valid.statusCode, 201);
 
