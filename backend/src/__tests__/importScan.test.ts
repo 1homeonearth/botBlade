@@ -888,3 +888,32 @@ test("botblade metadata includes generated repair cards", async () => {
     await fs.rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("static import scan ignores symlinked project paths and keeps profiles project-relative", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-symlink-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  const outside = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-symlink-outside-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(path.join(workspace, "scripts"), { recursive: true });
+    await fs.mkdir(outside, { recursive: true });
+    await fs.writeFile(path.join(outside, "escaped.sh"), "#!/usr/bin/env bash\necho escaped\n", "utf8");
+    await fs.symlink(path.join(outside, "escaped.sh"), path.join(workspace, "scripts", "escaped.sh"));
+    await fs.writeFile(path.join(workspace, "scripts", "safe.sh"), "#!/usr/bin/env bash\necho safe\n", "utf8");
+
+    const result = await scanWorkspaceForBladePacks(workspace);
+
+    assert.ok(result.importantFiles.includes("scripts/safe.sh"));
+    assert.equal(result.importantFiles.includes("scripts/escaped.sh"), false);
+    assert.ok(result.scriptProfiles.some((profile) => profile.command.includes("scripts/safe.sh")));
+    assert.equal(result.scriptProfiles.some((profile) => profile.command.includes("scripts/escaped.sh")), false);
+    assert.ok(result.scriptProfiles.every((profile) => profile.workingDirectory === "." || !profile.workingDirectory.startsWith("..")));
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});

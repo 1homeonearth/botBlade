@@ -4,6 +4,7 @@ import { BLADE_PACKS } from "../../bladepacks/packs.js";
 import type { BladePack, BladePackDetector, BladePackRuntime } from "../../bladepacks/schema.js";
 import type { BotProfileCommandPlan, BotProfileScriptProfile, PackageManager } from "../../models/botProfile.js";
 import { gitStatusToMetadata, GitStatusService, type GitStatusMetadata } from "../gitStatusService.js";
+import { normalizeProjectRelativePath } from "../security/projectPaths.js";
 import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js";
 import { generateRepairCards } from "./repairCards.js";
 
@@ -92,7 +93,7 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
   };
   const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
   const optional = (selectedPack?.secrets ?? []).filter((s) => !s.required).map((s) => ({ name: s.name, required: false, configured: false }));
-  const git = gitStatusToMetadata(await new GitStatusService().readStatusSafe(workspacePath));
+  const git = gitStatusToMetadata(await new GitStatusService().readStatusStaticSafe(workspacePath, ctx.files));
   const { packageManager, profiles } = await detectScriptProfiles(workspacePath, {
     commandPlan,
     selectedPack,
@@ -177,8 +178,7 @@ function scriptProfileDedupeKey(profile: BotProfileScriptProfile): string {
 }
 
 function normalizeWorkingDirectory(workingDirectory: string): string {
-  const normalized = workingDirectory.trim().replace(/\\/g, "/").replace(/\/+$/g, "");
-  return normalized === "" ? "." : normalized;
+  return normalizeProjectRelativePath(workingDirectory, { allowRoot: true }).path ?? ".";
 }
 
 function scoreToConfidence(score: number): DetectorConfidence { if (score >= 80) return "high"; if (score >= 60) return "likely"; if (score >= 40) return "possible"; return "weak"; }
@@ -287,7 +287,21 @@ function detectFileExtension(file: string): string | null {
 }
 
 function matchDetector(detector: BladePackDetector, ctx: ScanContext): string | null { if (detector.kind === "packageDependency") return ctx.packageDeps.has(detector.name) ? `dependency:${detector.name}` : null; if (detector.kind === "packageScript") return ctx.packageScripts.has(detector.name) ? `script:${detector.name}` : null; if (detector.kind === "sourceImport") return new RegExp(detector.pattern, "i").test(ctx.sourceText) ? `pattern:${detector.pattern}` : null; if (detector.kind === "envKey") return new RegExp(detector.pattern, "i").test(ctx.envText + "\n" + ctx.sourceText) ? `env:${detector.pattern}` : null; if (detector.kind === "fileExists" || detector.kind === "knownFilename") return ctx.files.has(detector.path) ? `file:${detector.path}` : null; if (detector.kind === "knownDirectory") return ctx.directories.has(detector.path) ? `dir:${detector.path}` : null; if (detector.kind === "jsonShape") { if (detector.file !== "workflow.json" || !ctx.workflowJson) return null; return detector.keys.every((k) => k in ctx.workflowJson!) ? `json-shape:${detector.keys.join(",")}` : null; } return null; }
-async function walk(root: string, current: string, files: Set<string>, dirs: Set<string>): Promise<void> { const entries = await fs.readdir(current, { withFileTypes: true }); for (const entry of entries) { if (["node_modules", "dist", ".git"].includes(entry.name)) continue; const full = path.join(current, entry.name); const relative = path.relative(root, full).split(path.sep).join("/"); if (entry.isDirectory()) { dirs.add(relative); await walk(root, full, files, dirs); } else if (entry.isFile()) files.add(relative); } }
+async function walk(root: string, current: string, files: Set<string>, dirs: Set<string>): Promise<void> {
+  const entries = await fs.readdir(current, { withFileTypes: true });
+  for (const entry of entries) {
+    if (["node_modules", "dist", ".git"].includes(entry.name)) continue;
+    if (entry.isSymbolicLink()) continue;
+    const full = path.join(current, entry.name);
+    const relativeResult = normalizeProjectRelativePath(path.relative(root, full).split(path.sep).join("/"), { allowRoot: false });
+    if (!relativeResult.ok || !relativeResult.path) continue;
+    const relative = relativeResult.path;
+    if (entry.isDirectory()) {
+      dirs.add(relative);
+      await walk(root, full, files, dirs);
+    } else if (entry.isFile()) files.add(relative);
+  }
+}
 async function readJsonIfExists(file: string): Promise<Record<string, unknown> | null> { return (await readJsonFileIfExists(file)).value; }
 async function readJsonFileIfExists(file: string): Promise<{ exists: boolean; parseError: boolean; value: Record<string, unknown> | null }> { try { const text = await fs.readFile(file, "utf8"); try { return { exists: true, parseError: false, value: JSON.parse(text) as Record<string, unknown> }; } catch { return { exists: true, parseError: true, value: null }; } } catch { return { exists: false, parseError: false, value: null }; } }
 async function readTextIfExists(file: string): Promise<string> { try { return await fs.readFile(file, "utf8"); } catch { return ""; } }

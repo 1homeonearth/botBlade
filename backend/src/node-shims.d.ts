@@ -74,11 +74,13 @@ declare module "node:fs/promises" {
   export function readFile(path: string, encoding: string): Promise<string>;
   export function readdir(path: string, options?: { withFileTypes?: boolean }): Promise<Dirent[]>;
   export function stat(path: string): Promise<{ size: number; mtime: Date; isFile(): boolean; isDirectory(): boolean }>;
+  export function lstat(path: string): Promise<{ size: number; mtime: Date; isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean }>;
   export function access(path: string): Promise<void>;
   export function rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
   export function rename(oldPath: string, newPath: string): Promise<void>;
   export function unlink(path: string): Promise<void>;
-  export interface Dirent { name: string; isDirectory(): boolean; isFile(): boolean; }
+  export function symlink(target: string, path: string): Promise<void>;
+  export interface Dirent { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean; }
 }
 
 declare module "node:path" {
