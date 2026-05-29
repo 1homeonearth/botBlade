@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import * as path from "node:path";
 import { BLADE_PACKS } from "../../bladepacks/packs.js";
 import type { BladePack, BladePackDetector, BladePackRuntime } from "../../bladepacks/schema.js";
-import type { BotProfileCommandPlan } from "../../models/botProfile.js";
+import type { BotProfileCommandPlan, BotProfileScriptProfile, PackageManager } from "../../models/botProfile.js";
+import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js";
 
 export type DetectorConfidence = "weak" | "possible" | "likely" | "high";
 
@@ -31,6 +32,7 @@ export type ScanDetectionResult = {
   diagnostics: ScanDiagnostics;
   fallbackNotes: string[];
   commandPlan: BotProfileCommandPlan;
+  scriptProfiles: BotProfileScriptProfile[];
   secretRequirements: { required: ScanSecretRequirement[]; optional: ScanSecretRequirement[] };
   importantFiles: string[];
   detectedLanguages: string[];
@@ -38,6 +40,7 @@ export type ScanDetectionResult = {
   permissions: string[];
   capabilities: string[];
   git: { branch: string | null; status: "clean" | "dirty" | "unknown"; remotes: Array<{ name: string; url: string | null }> };
+  packageManager: PackageManager;
 };
 
 export async function scanWorkspaceForBladePacks(workspacePath: string): Promise<ScanDetectionResult> {
@@ -81,6 +84,12 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
   };
   const required = (selectedPack?.secrets ?? []).filter((s) => s.required).map((s) => ({ name: s.name, required: true, configured: false }));
   const optional = (selectedPack?.secrets ?? []).filter((s) => !s.required).map((s) => ({ name: s.name, required: false, configured: false }));
+  const { packageManager, profiles } = await detectScriptProfiles(workspacePath, {
+    commandPlan,
+    selectedPack,
+    secretRefs: [...required, ...optional].map((secret) => secret.name),
+  });
+  const scriptProfiles = dedupeScriptProfiles(profiles);
   return {
     workspacePath,
     recommendedPackId: top && top.score >= 40 ? top.id : "unknown",
@@ -91,14 +100,39 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     },
     fallbackNotes: top ? [] : ["No strong Blade Pack signals found. Open project in editor and configure commands manually."],
     commandPlan,
+    scriptProfiles,
     secretRequirements: { required, optional },
     importantFiles: [...ctx.files].filter((f) => /(package\.json|requirements\.txt|pyproject\.toml|workflow\.json|README\.md)$/i.test(f)).slice(0, 20),
     detectedLanguages: top?.id.includes("python") ? ["python"] : ["javascript", "typescript"],
     detectedFrameworks: top ? [top.name] : [],
     permissions: ["read_workspace", "write_workspace"],
     capabilities: ["scan", "diagnose", "run_commands"],
-    git: { branch: null, status: "unknown", remotes: [] }
+    git: { branch: null, status: "unknown", remotes: [] },
+    packageManager
   };
+}
+
+function dedupeScriptProfiles(profiles: BotProfileScriptProfile[]): BotProfileScriptProfile[] {
+  const seen = new Set<string>();
+  return profiles.filter((profile) => {
+    const key = scriptProfileDedupeKey(profile);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function scriptProfileDedupeKey(profile: BotProfileScriptProfile): string {
+  return JSON.stringify({
+    command: profile.command.map((token) => token.trim()).filter(Boolean),
+    workingDirectory: normalizeWorkingDirectory(profile.workingDirectory),
+    source: profile.source,
+  });
+}
+
+function normalizeWorkingDirectory(workingDirectory: string): string {
+  const normalized = workingDirectory.trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+  return normalized === "" ? "." : normalized;
 }
 
 function scoreToConfidence(score: number): DetectorConfidence { if (score >= 80) return "high"; if (score >= 60) return "likely"; if (score >= 40) return "possible"; return "weak"; }

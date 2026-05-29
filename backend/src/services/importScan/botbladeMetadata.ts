@@ -5,7 +5,6 @@ import {
   BOT_PROFILE_SCHEMA_VERSION,
   type BotProfile,
 } from "../../models/botProfile.js";
-import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js";
 import type { ScanDetectionResult } from "./detector.js";
 
 export async function writeBotbladeMetadata(
@@ -21,19 +20,7 @@ export async function writeBotbladeMetadata(
         );
   const selectedPack = BLADE_PACKS.find((pack) => pack.id === selected?.id);
   const generatedAt = new Date().toISOString();
-  const secretRefs = [
-    ...detection.secretRequirements.required,
-    ...detection.secretRequirements.optional,
-  ].map((secret) => secret.name);
-  const { packageManager, profiles: scriptProfiles } = await detectScriptProfiles(
-    workspacePath,
-    {
-      commandPlan: detection.commandPlan,
-      selectedPack,
-      secretRefs,
-      timestamp: generatedAt,
-    },
-  );
+  const scriptProfiles = detection.scriptProfiles;
   const metadata: BotProfile = {
     schemaVersion: BOT_PROFILE_SCHEMA_VERSION,
     generatedBy: "botblade",
@@ -50,7 +37,7 @@ export async function writeBotbladeMetadata(
       type: selectedPack?.runtime.type ?? "unknown",
       version:
         selectedPack?.runtime.versionRange?.replace(">=", "") ?? "unknown",
-      packageManager,
+      packageManager: detection.packageManager,
       detectedLanguages: detection.detectedLanguages,
       detectedFrameworks: detection.detectedFrameworks,
     },

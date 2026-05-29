@@ -15,6 +15,24 @@ const fixturesRoot = path.join(
   "import-scan",
 );
 
+async function copyFixture(fixtureName: string, targetPath: string): Promise<void> {
+  await copyDirectory(path.join(fixturesRoot, fixtureName), targetPath);
+}
+
+async function copyDirectory(sourcePath: string, targetPath: string): Promise<void> {
+  await fs.mkdir(targetPath, { recursive: true });
+  const entries = await fs.readdir(sourcePath, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourceEntryPath = path.join(sourcePath, entry.name);
+    const targetEntryPath = path.join(targetPath, entry.name);
+    if (entry.isDirectory()) {
+      await copyDirectory(sourceEntryPath, targetEntryPath);
+    } else if (entry.isFile()) {
+      await fs.writeFile(targetEntryPath, await fs.readFile(sourceEntryPath, "utf8"), "utf8");
+    }
+  }
+}
+
 test("detects discord-js from package dependency", async () => {
   const result = await scanWorkspaceForBladePacks(
     path.join(fixturesRoot, "discord"),
@@ -322,4 +340,201 @@ test("script profile detector emits n8n workflow metadata-only profiles", async 
   assert.deepStrictEqual(exportMetadata?.command, ["botblade", "workflow", "export-metadata", "workflow.json"]);
   assert.equal(validate?.command.includes("n8n"), false);
   assert.equal(exportMetadata?.requiresConfirmation, true);
+});
+
+test("scan metadata persists package script profiles from detection", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-node-persist-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await copyFixture("node", workspace);
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as {
+      runtime: { packageManager: string };
+      scriptProfiles: Array<{ id: string; source: string; command: string[] }>;
+    };
+
+    assert.equal(metadata.runtime.packageManager, "pnpm");
+    assert.deepStrictEqual(
+      metadata.scriptProfiles.find(
+        (profile) => profile.id === "package-json:package.json:build",
+      )?.command,
+      ["pnpm", "run", "build"],
+    );
+    assert.equal(
+      metadata.scriptProfiles.find(
+        (profile) => profile.id === "package-json:package.json:deploy",
+      )?.source,
+      "package_json",
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("scan metadata persists Python script profiles from detection", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-python-persist-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await copyFixture("python", workspace);
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as {
+      scriptProfiles: Array<{ id: string; source: string; command: string[] }>;
+    };
+
+    assert.deepStrictEqual(
+      metadata.scriptProfiles.find((profile) => profile.id === "file:main.py:start")
+        ?.command,
+      ["python", "main.py"],
+    );
+    assert.deepStrictEqual(
+      metadata.scriptProfiles.find(
+        (profile) => profile.id === "file:requirements.txt:install",
+      )?.command,
+      ["python", "-m", "pip", "install", "-r", "requirements.txt"],
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("scan metadata persists shell script profiles from detection", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-shell-persist-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await copyFixture("shell", workspace);
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as {
+      scriptProfiles: Array<{ id: string; source: string; command: string[] }>;
+    };
+
+    assert.deepStrictEqual(
+      metadata.scriptProfiles.find(
+        (profile) => profile.id === "file:scripts/build.sh:shell",
+      )?.command,
+      ["bash", "scripts/build.sh"],
+    );
+    assert.deepStrictEqual(
+      metadata.scriptProfiles.find((profile) => profile.id === "file:repair.bash:shell")
+        ?.command,
+      ["bash", "repair.bash"],
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("scan metadata persists Blade Pack command profiles from detection", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-blade-pack-persist-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await copyFixture("discord", workspace);
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8")) as {
+      scriptProfiles: Array<{ id: string; source: string; command: string[] }>;
+    };
+
+    assert.deepStrictEqual(
+      detection.scriptProfiles.find(
+        (profile) => profile.id === "blade-pack:bladepack.commands:start",
+      )?.command,
+      ["npm", "start"],
+    );
+    assert.deepStrictEqual(
+      metadata.scriptProfiles.find(
+        (profile) => profile.id === "blade-pack:bladepack.commands:start",
+      )?.command,
+      ["npm", "start"],
+    );
+    assert.equal(
+      metadata.scriptProfiles.find(
+        (profile) => profile.id === "blade-pack:bladepack.commands:start",
+      )?.source,
+      "blade_pack",
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("static import scan skips node_modules dist and git directories", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-skip-dirs-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(path.join(workspace, "node_modules", "discord.js"), {
+      recursive: true,
+    });
+    await fs.mkdir(path.join(workspace, "dist"), { recursive: true });
+    await fs.mkdir(path.join(workspace, ".git"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, "node_modules", "package.json"),
+      JSON.stringify({ scripts: { start: "node ignored.js" } }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspace, "node_modules", "discord.js", "package.json"),
+      JSON.stringify({ name: "discord.js" }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspace, "dist", "index.js"),
+      "import { App } from '@slack/bolt';",
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspace, ".git", "config"), "ignored", "utf8");
+
+    const detection = await scanWorkspaceForBladePacks(workspace);
+
+    assert.equal(detection.recommendedPackId, "unknown");
+    assert.deepStrictEqual(detection.importantFiles, []);
+    assert.equal(
+      detection.scriptProfiles.some((profile) =>
+        profile.command.includes("ignored.js"),
+      ),
+      false,
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("scan detection deduplicates script profiles by command working directory and source", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-dedupe-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  try {
+    await fs.mkdir(path.join(workspace, ".botpress"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, "package.json"),
+      JSON.stringify({ dependencies: { "@botpress": "latest" } }),
+      "utf8",
+    );
+
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    const duplicateBladePackBuildCommands = detection.scriptProfiles.filter(
+      (profile) =>
+        profile.source === "blade_pack" &&
+        profile.workingDirectory === "." &&
+        JSON.stringify(profile.command) === JSON.stringify(["npm", "run", "build"]),
+    );
+
+    assert.equal(detection.recommendedPackId, "botpress");
+    assert.equal(duplicateBladePackBuildCommands.length, 1);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
 });
