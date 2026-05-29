@@ -7,6 +7,7 @@ import { scanAndGenerateBotbladeMetadata } from "../importScan/index.js";
 import type { ImportStorePersistence } from "../persistence.js";
 import type { BotProfileScriptProfile } from "../../models/botProfile.js";
 import { extractZipFromPlan, validateZipArchive, type ZipViolation, type ZipViolationCode } from "./zipSecurity.js";
+import { normalizeProjectRelativePath } from "../security/projectPaths.js";
 
 export type ImportSource =
   | { type: "git"; repoUrl: string; ref?: string }
@@ -189,7 +190,12 @@ export class ImportStore {
     }
     await mkdir(record.workspacePath, { recursive: true });
     for (const [relativePath, content] of Object.entries(template.files)) {
-      const target = path.resolve(record.workspacePath, relativePath);
+      const normalized = normalizeProjectRelativePath(relativePath, { allowRoot: false });
+      if (!normalized.ok || !normalized.path) {
+        this.blockTemplatePolicy(record, source.templateId, auditService, actorId, requestId);
+        throw new Error("blocked_by_policy");
+      }
+      const target = path.resolve(record.workspacePath, normalized.path);
       if (!target.startsWith(path.resolve(record.workspacePath) + path.sep)) {
         this.blockTemplatePolicy(record, source.templateId, auditService, actorId, requestId);
         throw new Error("blocked_by_policy");

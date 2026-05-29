@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 export interface GitStatusRemote { name: string; url: string | null }
@@ -29,6 +30,29 @@ export class GitStatusService {
     return { available: true, branch, remotes, clean: changedFiles.length === 0, dirtyFileCount: changedFiles.length, changedFiles };
   }
 
+
+  async readStatusStaticSafe(workspacePath: string, projectFiles: Set<string> = new Set()): Promise<GitStatusSummary> {
+    try {
+      const gitDir = path.join(workspacePath, ".git");
+      const gitStat = await fs.lstat(gitDir);
+      if (!gitStat.isDirectory()) throw new Error("Workspace does not contain a .git directory.");
+      const branch = await this.currentBranchStatic(gitDir);
+      const remotes = await this.remotesStatic(gitDir);
+      const dirtyFileCount = projectFiles.size;
+      return {
+        available: true,
+        branch,
+        remotes,
+        clean: dirtyFileCount === 0,
+        dirtyFileCount,
+        changedFiles: [],
+        note: "static git metadata only",
+      };
+    } catch {
+      return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
+    }
+  }
+
   async readStatusSafe(workspacePath: string): Promise<GitStatusSummary> {
     try {
       return await this.readStatus(workspacePath);
@@ -45,6 +69,35 @@ export class GitStatusService {
         };
       }
       return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
+    }
+  }
+
+
+  private async currentBranchStatic(gitDir: string): Promise<string | null> {
+    try {
+      const head = (await fs.readFile(path.join(gitDir, "HEAD"), "utf8")).trim();
+      const match = head.match(/^ref: refs\/heads\/(.+)$/);
+      return match?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async remotesStatic(gitDir: string): Promise<GitStatusRemote[]> {
+    try {
+      const config = await fs.readFile(path.join(gitDir, "config"), "utf8");
+      const remotes: GitStatusRemote[] = [];
+      let currentName: string | null = null;
+      for (const line of config.split(/\r?\n/)) {
+        const section = line.match(/^\s*\[remote "(.+)"\]\s*$/);
+        if (section) { currentName = section[1] ?? null; continue; }
+        if (/^\s*\[/.test(line)) { currentName = null; continue; }
+        const url = line.match(/^\s*url\s*=\s*(.+?)\s*$/);
+        if (currentName && url) remotes.push({ name: currentName, url: redactCredentialUrl(url[1] ?? "") });
+      }
+      return remotes.filter((remote, index, all) => all.findIndex((candidate) => candidate.name === remote.name) === index);
+    } catch {
+      return [];
     }
   }
 

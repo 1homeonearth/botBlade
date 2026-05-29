@@ -3,6 +3,7 @@ import type { AuditService } from "../auditService.js";
 import type { ScriptProfileStorePersistence } from "../persistence.js";
 import { RequestValidationError } from "../projectStore.js";
 import type { BotProfileScriptProfile, ScriptProfileRuntime, ScriptProfileSource } from "../../models/botProfile.js";
+import { normalizeProjectRelativePath } from "../security/projectPaths.js";
 
 export type ScriptProfileMetadata = BotProfileScriptProfile & { projectId: string };
 
@@ -106,13 +107,21 @@ export class ScriptProfileService {
 
   upsertDetected(projectId: string, detectedProfiles: BotProfileScriptProfile[], context: ScriptProfileAuditContext): ScriptProfileMetadata[] {
     const timestamp = new Date().toISOString();
-    const upserted = detectedProfiles.map((detected) => {
+    const safeDetectedProfiles = detectedProfiles.filter((detected) =>
+      normalizeProjectRelativePath(detected.workingDirectory, { allowRoot: true }).ok &&
+      detected.command.length > 0 &&
+      detected.command.every((token) => typeof token === "string" && token.trim() && !looksLikeSecretValue(token)),
+    );
+    const upserted = safeDetectedProfiles.map((detected) => {
+      const normalizedWorkingDirectory = normalizeProjectRelativePath(detected.workingDirectory, { allowRoot: true }).path ?? ".";
       const id = detected.id.startsWith(`${projectId}:`) ? detected.id : `${projectId}:${detected.id}`;
       const existing = this.profiles.get(id);
       const profile: ScriptProfileMetadata = {
         ...detected,
         id,
         projectId,
+        command: detected.command.map((token) => token.trim()),
+        workingDirectory: normalizedWorkingDirectory,
         createdAt: existing?.createdAt ?? detected.createdAt ?? timestamp,
         updatedAt: timestamp,
       };
@@ -171,11 +180,18 @@ function parseScriptProfileInput(input: unknown, partial: boolean): CreateScript
     else problems.push({ field: "source", message: "Source must be supported." });
   }
   if ("description" in object) output.description = optionalString(object.description, "description", problems);
-  if (!partial || "command" in object) output.command = nonEmptyStringArray(object.command, "command", problems);
+  if (!partial || "command" in object) {
+    const command = nonEmptyStringArray(object.command, "command", problems);
+    if (command && command.some((token) => looksLikeSecretValue(token))) problems.push({ field: "command", message: "command must not contain secret values; use secretRefs instead." });
+    else if (command) output.command = command;
+  }
   if ("workingDirectory" in object) {
     const workingDirectory = stringField(object.workingDirectory, "workingDirectory", problems);
-    if (workingDirectory !== undefined && isProjectRelativeDirectory(workingDirectory)) output.workingDirectory = normalizeProjectRelativeDirectory(workingDirectory);
-    else if (workingDirectory !== undefined) problems.push({ field: "workingDirectory", message: "workingDirectory must be a project-relative path." });
+    if (workingDirectory !== undefined) {
+      const normalized = normalizeProjectRelativePath(workingDirectory, { allowRoot: true });
+      if (normalized.ok) output.workingDirectory = normalized.path;
+      else problems.push({ field: "workingDirectory", message: "workingDirectory must be a normalized project-relative path that does not escape the workspace." });
+    }
   }
   if ("envRefs" in object) output.envRefs = stringArray(object.envRefs, "envRefs", problems);
   if ("secretRefs" in object) output.secretRefs = secretRefArray(object.secretRefs, "secretRefs", problems);
@@ -241,18 +257,6 @@ function boundedInteger(value: unknown, field: string, min: number, max: number,
 
 function withoutUndefined(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
-}
-
-function isProjectRelativeDirectory(value: string): boolean {
-  if (value.includes("\0") || value.includes("\\") || /^[A-Za-z]:/.test(value) || value.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
-  const segments = value.split("/").filter((segment) => segment.length > 0 && segment !== ".");
-  if (segments.includes("..")) return false;
-  const normalized = normalizeProjectRelativeDirectory(value);
-  return normalized === "." || (!normalized.startsWith("../") && normalized !== "..");
-}
-
-function normalizeProjectRelativeDirectory(value: string): string {
-  return value.split("/").filter((segment) => segment.length > 0 && segment !== ".").join("/") || ".";
 }
 
 function looksLikeSecretValue(value: string): boolean {

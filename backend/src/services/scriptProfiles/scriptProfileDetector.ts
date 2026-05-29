@@ -8,6 +8,7 @@ import type {
   ScriptProfileRuntime,
   ScriptProfileSource,
 } from "../../models/botProfile.js";
+import { normalizeProjectRelativePath } from "../security/projectPaths.js";
 
 export type ScriptProfileDetectorOptions = {
   commandPlan?: BotProfileCommandPlan;
@@ -351,7 +352,7 @@ async function listWorkspaceFiles(workspacePath: string): Promise<WorkspaceFile[
 }
 
 async function walk(root: string, current: string, files: WorkspaceFile[]): Promise<void> {
-  let entries: Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean }>;
+  let entries: Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean; isSymbolicLink: () => boolean }>;
   try {
     entries = await fs.readdir(current, { withFileTypes: true });
   } catch {
@@ -360,8 +361,10 @@ async function walk(root: string, current: string, files: WorkspaceFile[]): Prom
   entries.sort((a, b) => a.name.localeCompare(b.name));
   for (const entry of entries) {
     if ([".git", "node_modules", ".venv", "dist", "build"].includes(entry.name)) continue;
+    if (entry.isSymbolicLink()) continue;
     const absolutePath = path.join(current, entry.name);
     const relativePath = toProjectRelativePath(root, absolutePath);
+    if (!relativePath) continue;
     if (entry.isDirectory()) {
       await walk(root, absolutePath, files);
     } else if (entry.isFile()) {
@@ -472,9 +475,10 @@ function slugSegment(value: string): string {
     .replace(/\/+$/g, "");
 }
 
-function toProjectRelativePath(root: string, absolutePath: string): string {
-  return path.relative(root, absolutePath).replace(/\\/g, "/");
+function toProjectRelativePath(root: string, absolutePath: string): string | null {
+  return normalizeProjectRelativePath(path.relative(root, absolutePath).replace(/\\/g, "/"), { allowRoot: false }).path ?? null;
 }
+
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

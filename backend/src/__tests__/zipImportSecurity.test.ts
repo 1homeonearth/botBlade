@@ -72,3 +72,22 @@ test("zip validator enforces total uncompressed size limit", async () => {
   assert.equal(result.ok, false);
   assert.ok(result.violations.some((v) => v.code === "TOTAL_UNCOMPRESSED_TOO_LARGE"));
 });
+
+test("zip validator rejects oversized normalized paths", async () => {
+  const dir = path.join(tmpdir(), `botblade-zip-long-path-${randomUUID()}`);
+  await fsPromises.mkdir(dir, { recursive: true });
+  const zipPath = path.join(dir, "long-path.zip");
+  const longPath = `${"a".repeat(520)}.txt`;
+  const script = `import zipfile, sys\nwith zipfile.ZipFile(sys.argv[1], 'w', compression=zipfile.ZIP_DEFLATED) as z:\n z.writestr(sys.argv[2], 'x')`;
+  await new Promise<void>((resolve, reject) => {
+    (childProcess as any).execFile("python3", ["-c", script, zipPath, longPath], (error: any) => {
+      if (error) return reject(error);
+      resolve();
+    });
+  });
+
+  const result = await validateZipArchive(zipPath);
+
+  assert.equal(result.ok, false);
+  assert.ok(result.violations.some((violation) => violation.code === "PATH_TOO_LONG"));
+});
