@@ -15,7 +15,7 @@ import { GitStatusService, gitStatusToMetadata, redactCredentialUrl } from "./se
 import { LocalProcessRuntimeService } from "./services/localProcessRuntimeService.js";
 import { handleFileOperationRoute, handleFolderOperationRoute } from "./services/fileOperationRoutes.js";
 import { ProjectFileService } from "./services/projectFiles.js";
-import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUpdateProjectInput, ProjectStore, RequestValidationError } from "./services/projectStore.js";
+import { DuplicateSlugError, parseCreateProjectInput, parseToggleAction, parseUpdateProjectInput, ProjectStore, RequestValidationError, slugify } from "./services/projectStore.js";
 import { redactSecrets } from "./services/redaction.js";
 import { parseCreateSecretInput, parseRotateSecretInput, parseUpdateSecretInput, SecretStore } from "./services/secretStore.js";
 import { validateProject } from "./services/projectValidation.js";
@@ -341,7 +341,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const repoNameFromUrl = body.repoUrl.split("/").filter(Boolean).pop() ?? "imported-project";
       const repoName = repoNameFromUrl.endsWith(".git") ? repoNameFromUrl.slice(0, -4) : repoNameFromUrl;
       const project = projectStore.create({ name: body.projectName?.trim() || repoName, slug: repoName, description: `Imported from ${body.repoUrl}` });
-      record.managedProject = { id: project.id, slug: project.slug };
+      importStore.attachManagedProject(record.id, { id: project.id, slug: project.slug });
       const workspace = fileService.workspace(project.id);
       const fs = await import("node:fs/promises");
       await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
@@ -352,11 +352,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     return writeJson(res, 201, record);
   }
   if (method === "POST" && path === "/api/imports/zip") {
-    const body = await readJson(req) as { archivePath?: string; workspacePath?: string };
+    const body = await readJson(req) as { archivePath?: string; workspacePath?: string; projectName?: string };
     if (!body?.archivePath || !body?.workspacePath) throw new RequestValidationError([{ field: "archivePath|workspacePath", message: "archivePath and workspacePath are required." }]);
     const record = await importStore.createAndRun({ type: "zip", archivePath: body.archivePath }, body.workspacePath, auditService, actor.id, requestId);
     if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
-      scriptProfileService.upsertDetected(record.managedProject?.id ?? record.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
+      const project = projectStore.create({ name: body.projectName?.trim() || projectNameFromArchivePath(body.archivePath), slug: uniqueProjectSlug(body.projectName ?? body.archivePath), description: `Imported from ${body.archivePath}` });
+      importStore.attachManagedProject(record.id, { id: project.id, slug: project.slug });
+      const workspace = fileService.workspace(project.id);
+      const fs = await import("node:fs/promises");
+      await fs.mkdir(pathModule.dirname(workspace), { recursive: true });
+      await fs.rm(workspace, { recursive: true, force: true });
+      await copyDirectory(record.workspacePath, workspace);
+      scriptProfileService.upsertDetected(project.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
     }
     return writeJson(res, 201, record);
   }
@@ -368,14 +375,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (!body?.folderPath || !body?.workspacePath) throw new RequestValidationError([{ field: "folderPath|workspacePath", message: "folderPath and workspacePath are required." }]);
     const record = await importStore.createAndRun({ type: "folder", folderPath: body.folderPath }, body.workspacePath, auditService, actor.id, requestId);
     if (record.state !== "failed" && record.state !== "blocked" && record.state !== "blocked_by_policy") {
-      scriptProfileService.upsertDetected(record.managedProject?.id ?? record.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
+      if (record.managedProject) scriptProfileService.upsertDetected(record.managedProject.id, record.detectedScriptProfiles ?? [], { actorId: actor.id, requestId });
     }
     return writeJson(res, 201, record);
   }
 
-  const scriptProfilesMatch = path.match(/^\/api\/projects\/([^/]+)\/script-profiles(?:\/([^/]+))?$/);
+  const scriptProfilesMatch = path.match(/^\/api\/projects\/([^/]+)\/script-profiles(?:\/(.+))?$/);
   if (scriptProfilesMatch) {
-    const [, projectId, profileId] = scriptProfilesMatch;
+    const [, projectId, encodedProfileId] = scriptProfilesMatch;
+    const profileId = encodedProfileId === undefined ? undefined : decodePathParam(encodedProfileId, "scriptProfileId");
     assertProjectAccess(actor, projectId);
     if (!projectStore.get(projectId)) throw notFoundProject(projectId);
     if (method === "GET" && !profileId) return writeJson(res, 200, { scriptProfiles: scriptProfileService.list(projectId) });
@@ -388,7 +396,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
       const profile = scriptProfileService.create(projectId, await readJson(req), { actorId: actor.id, requestId });
       return writeJson(res, 201, profile);
     }
-    if ((method === "PATCH" || method === "PUT") && profileId) {
+    if (method === "PATCH" && profileId) {
       const profile = scriptProfileService.update(projectId, profileId, await readJson(req), { actorId: actor.id, requestId });
       if (!profile) throw { statusCode: 404, code: "NOT_FOUND", message: `Script profile '${profileId}' was not found.`, details: {} };
       return writeJson(res, 200, profile);
@@ -396,7 +404,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     if (method === "DELETE" && profileId) {
       const deleted = scriptProfileService.delete(projectId, profileId, { actorId: actor.id, requestId });
       if (!deleted) throw { statusCode: 404, code: "NOT_FOUND", message: `Script profile '${profileId}' was not found.`, details: {} };
-      return writeJson(res, 204, {});
+      res.statusCode = 204;
+      res.end();
+      return;
     }
   }
 
@@ -513,6 +523,32 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, requestI
     }
   }
   throw { statusCode: 404, code: "NOT_FOUND", message: "Route not found.", details: {} };
+}
+
+function decodePathParam(value: string, field: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw { statusCode: 400, code: "INVALID_REQUEST_URL", message: `${field} must be URL-encoded.`, details: { field } };
+  }
+}
+
+function projectNameFromArchivePath(archivePath: string): string {
+  const base = basenamePath(archivePath).replace(/\.[^.]+$/, "").trim();
+  return base || "Imported ZIP Project";
+}
+
+function basenamePath(value: string): string {
+  return value.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? value;
+}
+
+function uniqueProjectSlug(value: string): string {
+  const base = slugify(basenamePath(value).replace(/\.[^.]+$/, "") || value);
+  const existingSlugs = new Set(projectStore.list().map((project) => project.slug));
+  let candidate = base;
+  let suffix = 2;
+  while (existingSlugs.has(candidate)) candidate = `${base}-${suffix++}`;
+  return candidate;
 }
 
 async function copyDirectory(from: string, to: string): Promise<void> {

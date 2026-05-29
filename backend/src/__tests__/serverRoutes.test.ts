@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 process.env.NODE_ENV = "test";
@@ -42,6 +44,27 @@ async function request(method: Method, url: string, body?: unknown, options: { t
 
 function reqHeader(headers: Record<string, string | string[]>, name: string, value: string | string[]): void {
   headers[name] = value;
+}
+
+function pythonAvailable(): boolean {
+  try {
+    execFileSync("python3", ["--version"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function createZipFixture(entries: Record<string, string>): Promise<{ zipPath: string; workspaceRoot: string }> {
+  const dir = path.join(tmpdir(), `botblade-server-routes-zip-${randomUUID()}`);
+  await fs.mkdir(dir, { recursive: true });
+  const zipPath = path.join(dir, "fixture.zip");
+  const script = `import json, sys, zipfile
+entries=json.loads(sys.argv[2])
+with zipfile.ZipFile(sys.argv[1], 'w', compression=zipfile.ZIP_DEFLATED) as z:
+    [z.writestr(name, content) for name, content in entries.items()]`;
+  execFileSync("python3", ["-c", script, zipPath, JSON.stringify(entries)]);
+  return { zipPath, workspaceRoot: path.join(dir, "workspace") };
 }
 
 test("health route returns ok", async () => {
@@ -410,4 +433,167 @@ test("profile route redacts importSource url credentials", async () => {
   const url = response.body.project.importSource.url as string;
   assert.equal(url.includes("abc123"), false);
   assert.equal(url.includes("access_token=[REDACTED]"), true);
+});
+
+test("script profile routes enforce project auth and CRUD profiles", async () => {
+  const createdProject = await request("POST", "/api/projects", { name: "Script Profile Routes" });
+  const projectId = createdProject.body.id as string;
+
+  const unauthenticated = await request("GET", `/api/projects/${projectId}/script-profiles`, undefined, { unauthenticated: true });
+  assert.equal(unauthenticated.statusCode, 401);
+  assert.equal(unauthenticated.body.error.code, "AUTHENTICATION_REQUIRED");
+
+  process.env.BOTBLADE_AUTH_TOKENS = JSON.stringify([
+    { token: "admin-token", actorId: "admin_user", roles: ["admin"], projectIds: ["*"] },
+    { token: "wrong-project-token", actorId: "wrong_project_user", roles: ["member"], projectIds: ["project_other"] },
+  ]);
+
+  const denied = await request("GET", `/api/projects/${projectId}/script-profiles`, undefined, { token: "wrong-project-token" });
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.body.error.code, "PROJECT_ACCESS_DENIED");
+
+  const created = await request("POST", `/api/projects/${projectId}/script-profiles`, {
+    name: "Validate bot",
+    source: "user",
+    runtime: "node",
+    command: ["npm", "run", "validate"],
+    workingDirectory: "packages/bot",
+    secretRefs: ["secret_discord_token", "DISCORD_TOKEN"],
+    timeoutSeconds: 600,
+    tags: ["validate"],
+  });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.body.projectId, projectId);
+  assert.deepStrictEqual(created.body.command, ["npm", "run", "validate"]);
+  assert.equal(created.body.workingDirectory, "packages/bot");
+
+  const listed = await request("GET", `/api/projects/${projectId}/script-profiles`);
+  assert.equal(listed.statusCode, 200);
+  assert.ok(listed.body.scriptProfiles.some((profile: { id: string }) => profile.id === created.body.id));
+
+  const fetched = await request("GET", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(created.body.id)}`);
+  assert.equal(fetched.statusCode, 200);
+  assert.equal(fetched.body.id, created.body.id);
+
+  const patched = await request("PATCH", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(created.body.id)}`, {
+    runtime: "shell",
+    command: ["bash", "scripts/validate.sh"],
+    workingDirectory: ".",
+    timeoutSeconds: 900,
+  });
+  assert.equal(patched.statusCode, 200);
+  assert.equal(patched.body.runtime, "shell");
+  assert.deepStrictEqual(patched.body.command, ["bash", "scripts/validate.sh"]);
+  assert.equal(patched.body.timeoutSeconds, 900);
+
+  const unsupportedPut = await request("PUT", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(created.body.id)}`, { name: "Blocked" });
+  assert.equal(unsupportedPut.statusCode, 404);
+
+  const deleted = await request("DELETE", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(created.body.id)}`);
+  assert.equal(deleted.statusCode, 204);
+  assert.equal(deleted.body, null);
+});
+
+test("script profile routes validate command, paths, secrets, timeout, runtime, and source", async () => {
+  const createdProject = await request("POST", "/api/projects", { name: "Script Profile Validation" });
+  const projectId = createdProject.body.id as string;
+  const validProfile = {
+    name: "Build bot",
+    source: "user",
+    runtime: "node",
+    command: ["npm", "run", "build"],
+    workingDirectory: ".",
+    secretRefs: ["secret_build_token"],
+    timeoutSeconds: 300,
+  };
+
+  const cases: Array<{ body: Record<string, unknown>; fields: string[] }> = [
+    { body: { ...validProfile, command: "npm run build" }, fields: ["command"] },
+    { body: { ...validProfile, command: ["npm", ""] }, fields: ["command"] },
+    { body: { ...validProfile, workingDirectory: "../outside" }, fields: ["workingDirectory"] },
+    { body: { ...validProfile, workingDirectory: "/tmp/project" }, fields: ["workingDirectory"] },
+    { body: { ...validProfile, workingDirectory: "src/../outside" }, fields: ["workingDirectory"] },
+    { body: { ...validProfile, secretRefs: ["sk-1234567890abcdefghijklmnopqrstuvwxyz"] }, fields: ["secretRefs"] },
+    { body: { ...validProfile, secretRefs: ["token=value"] }, fields: ["secretRefs"] },
+    { body: { ...validProfile, timeoutSeconds: 0 }, fields: ["timeoutSeconds"] },
+    { body: { ...validProfile, timeoutSeconds: 86_401 }, fields: ["timeoutSeconds"] },
+    { body: { ...validProfile, runtime: "bun" }, fields: ["runtime"] },
+    { body: { ...validProfile, source: "uploaded" }, fields: ["source"] },
+  ];
+
+  for (const invalidCase of cases) {
+    const response = await request("POST", `/api/projects/${projectId}/script-profiles`, invalidCase.body);
+    assert.equal(response.statusCode, 400, `expected validation failure for ${invalidCase.fields.join(",")}`);
+    assert.equal(response.body.error.code, "VALIDATION_FAILED");
+    const problemFields = response.body.error.details.problems.map((problem: { field: string }) => problem.field);
+    for (const field of invalidCase.fields) assert.ok(problemFields.includes(field), `expected ${field} problem in ${problemFields.join(",")}`);
+  }
+
+  const missingCommand = await request("POST", `/api/projects/${projectId}/script-profiles`, { name: "No command", runtime: "node" });
+  assert.equal(missingCommand.statusCode, 400);
+  assert.ok(missingCommand.body.error.details.problems.some((problem: { field: string }) => problem.field === "command"));
+
+  const valid = await request("POST", `/api/projects/${projectId}/script-profiles`, validProfile);
+  assert.equal(valid.statusCode, 201);
+
+  const invalidPatch = await request("PATCH", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}`, { command: [] });
+  assert.equal(invalidPatch.statusCode, 400);
+  assert.ok(invalidPatch.body.error.details.problems.some((problem: { field: string }) => problem.field === "command"));
+
+  const noRunRoute = await request("POST", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}/run`, {});
+  assert.equal(noRunRoute.statusCode, 404);
+
+  const noLogsRoute = await request("GET", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}/logs`);
+  assert.equal(noLogsRoute.statusCode, 404);
+
+  const noCancelRoute = await request("POST", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}/cancel`, {});
+  assert.equal(noCancelRoute.statusCode, 404);
+});
+
+test("script profile detail routes decode detected profile IDs containing slashes", async () => {
+  const createdProject = await request("POST", "/api/projects", { name: "Slash Profile IDs" });
+  const projectId = createdProject.body.id as string;
+
+  const createdScript = await request("POST", `/api/projects/${projectId}/files`, { path: "scripts/deploy.sh", content: "#!/usr/bin/env bash\necho deploy\n" });
+  assert.equal(createdScript.statusCode, 201);
+
+  const scan = await request("POST", `/api/projects/${projectId}/scan`, {});
+  assert.equal(scan.statusCode, 200);
+
+  const listed = await request("GET", `/api/projects/${projectId}/script-profiles`);
+  assert.equal(listed.statusCode, 200);
+  const slashProfile = listed.body.scriptProfiles.find((profile: { id: string }) => profile.id.includes("scripts/deploy.sh"));
+  assert.ok(slashProfile);
+  assert.equal(slashProfile.id.includes("/"), true);
+
+  const encodedId = encodeURIComponent(slashProfile.id);
+  const fetched = await request("GET", `/api/projects/${projectId}/script-profiles/${encodedId}`);
+  assert.equal(fetched.statusCode, 200);
+  assert.equal(fetched.body.id, slashProfile.id);
+
+  const patched = await request("PATCH", `/api/projects/${projectId}/script-profiles/${encodedId}`, { tags: ["deploy", "review"] });
+  assert.equal(patched.statusCode, 200);
+  assert.deepStrictEqual(patched.body.tags, ["deploy", "review"]);
+
+  const deleted = await request("DELETE", `/api/projects/${projectId}/script-profiles/${encodedId}`);
+  assert.equal(deleted.statusCode, 204);
+});
+
+test("successful zip imports attach detected script profiles to a managed project", async () => {
+  if (!pythonAvailable()) return;
+  const { zipPath, workspaceRoot } = await createZipFixture({
+    "package.json": JSON.stringify({ scripts: { start: "node index.js" } }),
+    "index.js": "console.log('hello');\n",
+  });
+
+  const imported = await request("POST", "/api/imports/zip", { archivePath: zipPath, workspacePath: workspaceRoot, projectName: "ZIP Managed Profiles" });
+  assert.equal(imported.statusCode, 201);
+  assert.equal(imported.body.source.type, "zip");
+  assert.ok(imported.body.managedProject?.id, "zip import should return a managed project");
+  assert.ok(imported.body.managedProject.id !== imported.body.id);
+
+  const listed = await request("GET", `/api/projects/${imported.body.managedProject.id}/script-profiles`);
+  assert.equal(listed.statusCode, 200);
+  assert.ok(listed.body.scriptProfiles.length > 0);
+  assert.ok(listed.body.scriptProfiles.every((profile: { projectId: string }) => profile.projectId === imported.body.managedProject.id));
 });
