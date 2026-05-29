@@ -37,11 +37,12 @@ class MainActivity : AppCompatActivity() {
     private var binder: BotEngineService.LocalBinder? = null
     private var selectedDestination by mutableStateOf(BotBladeDestination.Dashboard)
     private var shellReady = false
+    private var pendingDestination: BotBladeDestination? = null
 
     private val runtimePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         val denied = results.filterValues { granted -> !granted }.keys
         if (denied.isNotEmpty()) {
-            Toast.makeText(this, "BotBlade could not enable Downloads log mirroring for: ${denied.joinToString()}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "BotBlade could not enable requested runtime permissions for: ${denied.joinToString()}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -64,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             StartupDiagnostics.mark("main_activity_on_create_start")
             ApiConfig.initialize(this)
+            pendingDestination = destinationFromIntent(intent)
             requestRuntimePermissionsIfNeeded()
             installComposeShell(savedInstanceState)
             window.decorView.post { StartupDiagnostics.mark("first_render") }
@@ -72,8 +74,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val destination = destinationFromIntent(intent) ?: BotBladeDestination.Dashboard
+        if (shellReady) openDestination(destination) else pendingDestination = destination
+    }
+
+    private fun destinationFromIntent(intent: Intent?): BotBladeDestination? = when (intent?.getStringExtra(EXTRA_DESTINATION)) {
+        DESTINATION_DASHBOARD -> BotBladeDestination.Dashboard
+        DESTINATION_PROJECTS -> BotBladeDestination.Projects
+        DESTINATION_EDITOR -> BotBladeDestination.Editor
+        DESTINATION_DEPLOYMENTS -> BotBladeDestination.Deployments
+        DESTINATION_SETTINGS -> BotBladeDestination.Settings
+        else -> null
+    }
+
     private fun installComposeShell(savedInstanceState: Bundle?) {
-        val shouldOpenDashboard = savedInstanceState == null
+        val shouldOpenInitialDestination = savedInstanceState == null
         setContent {
             val runtimeOnline by BotEngineBindingState.serviceRunning.collectAsState()
             BotBladeTheme(useDynamicColor = isDynamicColorEnabled(this)) {
@@ -84,8 +102,9 @@ class MainActivity : AppCompatActivity() {
                     onDestinationSelected = ::openDestination,
                     contentReady = {
                         shellReady = true
-                        if (shouldOpenDashboard && supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
-                            openDestination(BotBladeDestination.Dashboard)
+                        if (shouldOpenInitialDestination && supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
+                            openDestination(pendingDestination ?: BotBladeDestination.Dashboard)
+                            pendingDestination = null
                         }
                     },
                 )
@@ -183,5 +202,15 @@ class MainActivity : AppCompatActivity() {
             binder = null
             BotEngineBindingState.serviceRunning.value = null
         }
+    }
+
+    companion object {
+        const val EXTRA_DESTINATION = "com.princess.botblade.extra.DESTINATION"
+        const val EXTRA_OPEN_RUNTIME_PANEL = "com.princess.botblade.extra.OPEN_RUNTIME_PANEL"
+        const val DESTINATION_DASHBOARD = "dashboard"
+        const val DESTINATION_PROJECTS = "projects"
+        const val DESTINATION_EDITOR = "editor"
+        const val DESTINATION_DEPLOYMENTS = "deployments"
+        const val DESTINATION_SETTINGS = "settings"
     }
 }
