@@ -109,8 +109,7 @@ export class ScriptProfileService {
     const timestamp = new Date().toISOString();
     const safeDetectedProfiles = detectedProfiles.filter((detected) =>
       normalizeProjectRelativePath(detected.workingDirectory, { allowRoot: true }).ok &&
-      detected.command.length > 0 &&
-      detected.command.every((token) => typeof token === "string" && token.trim() && !looksLikeSecretValue(token)),
+      isSafeScriptProfileCommand(detected.command),
     );
     const upserted = safeDetectedProfiles.map((detected) => {
       const normalizedWorkingDirectory = normalizeProjectRelativePath(detected.workingDirectory, { allowRoot: true }).path ?? ".";
@@ -182,7 +181,7 @@ function parseScriptProfileInput(input: unknown, partial: boolean): CreateScript
   if ("description" in object) output.description = optionalString(object.description, "description", problems);
   if (!partial || "command" in object) {
     const command = nonEmptyStringArray(object.command, "command", problems);
-    if (command && command.some((token) => looksLikeSecretValue(token))) problems.push({ field: "command", message: "command must not contain secret values; use secretRefs instead." });
+    if (command && !isSafeScriptProfileCommand(command)) problems.push({ field: "command", message: "command must not contain secret values; use secretRefs instead." });
     else if (command) output.command = command;
   }
   if ("workingDirectory" in object) {
@@ -259,7 +258,11 @@ function withoutUndefined(input: Record<string, unknown>): Record<string, unknow
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
-function looksLikeSecretValue(value: string): boolean {
+export function isSafeScriptProfileCommand(command: unknown): command is string[] {
+  return Array.isArray(command) && command.length > 0 && command.every((token) => typeof token === "string" && token.trim() && !looksLikeSecretValue(token));
+}
+
+export function looksLikeSecretValue(value: string): boolean {
   const trimmed = value.trim();
   if (trimmed.startsWith("secret_")) return false;
   const assignment = trimmed.match(/^([^=]{1,128})=(.+)$/);
@@ -270,10 +273,11 @@ function looksLikeSecretValue(value: string): boolean {
     return explicitSecretPattern.test(assignedValue);
   }
 
-  return explicitSecretPattern.test(trimmed);
+  return explicitSecretPattern.test(trimmed) || rawTokenLikePattern.test(trimmed);
 }
 
 const explicitSecretPattern = /^(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]{16,}|xox[baprs]-[A-Za-z0-9-]{16,}|[A-Za-z0-9_.-]{48,})$/i;
+const rawTokenLikePattern = /^(?=.{32,}$)(?=.*[A-Za-z0-9])[A-Za-z0-9_.-]+$/;
 const sensitiveKeyPattern = /(?:token|secret|password|passwd|api[_-]?key|auth|credential)/i;
 
 function isSensitiveKey(key: string): boolean {

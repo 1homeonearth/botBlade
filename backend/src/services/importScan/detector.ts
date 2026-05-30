@@ -5,6 +5,7 @@ import type { BladePack, BladePackDetector, BladePackRuntime } from "../../blade
 import type { BotProfileCommandPlan, BotProfileScriptProfile, PackageManager } from "../../models/botProfile.js";
 import { gitStatusToMetadata, GitStatusService, type GitStatusMetadata } from "../gitStatusService.js";
 import { normalizeProjectRelativePath } from "../security/projectPaths.js";
+import { isSafeScriptProfileCommand } from "../scriptProfiles/scriptProfileService.js";
 import { detectScriptProfiles } from "../scriptProfiles/scriptProfileDetector.js";
 import { generateRepairCards } from "./repairCards.js";
 
@@ -99,7 +100,7 @@ export async function scanWorkspaceForBladePacks(workspacePath: string): Promise
     selectedPack,
     secretRefs: [...required, ...optional].map((secret) => secret.name),
   });
-  const scriptProfiles = dedupeScriptProfiles(profiles);
+  const scriptProfiles = dedupeScriptProfiles(profiles.filter((profile) => isSafeScriptProfileCommand(profile.command)));
   const detectedLanguages = detectLanguages(ctx);
   const detectedFrameworks = matches.filter((match) => match.score >= DETECTED_FRAMEWORK_MIN_SCORE).map((match) => match.name);
   const recommendedPackId = top && top.score >= 40 ? top.id : "unknown";

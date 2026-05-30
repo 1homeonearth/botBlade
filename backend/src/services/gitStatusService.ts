@@ -19,6 +19,7 @@ export interface GitStatusSummary {
   dirtyFileCount: number;
   changedFiles: GitChangedFileSummary[];
   note?: string;
+  statusEvaluated?: boolean;
 }
 
 export class GitStatusService {
@@ -27,7 +28,7 @@ export class GitStatusService {
     const branch = this.currentBranch(workspacePath);
     const remotes = this.remotes(workspacePath);
     const changedFiles = this.changedFiles(workspacePath);
-    return { available: true, branch, remotes, clean: changedFiles.length === 0, dirtyFileCount: changedFiles.length, changedFiles };
+    return { available: true, branch, remotes, clean: changedFiles.length === 0, dirtyFileCount: changedFiles.length, changedFiles, statusEvaluated: true };
   }
 
 
@@ -42,13 +43,14 @@ export class GitStatusService {
         available: true,
         branch,
         remotes,
-        clean: true,
+        clean: false,
         dirtyFileCount: 0,
         changedFiles: [],
         note: projectFiles.size > 0 ? "static git metadata only; changes not evaluated" : "static git metadata only",
+        statusEvaluated: false,
       };
     } catch {
-      return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
+      return { available: false, branch: null, remotes: [], clean: false, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable", statusEvaluated: false };
     }
   }
 
@@ -65,9 +67,10 @@ export class GitStatusService {
           dirtyFileCount: 1,
           changedFiles: [],
           note: "too many changed files to display",
+          statusEvaluated: true,
         };
       }
-      return { available: false, branch: null, remotes: [], clean: true, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable" };
+      return { available: false, branch: null, remotes: [], clean: false, dirtyFileCount: 0, changedFiles: [], note: "git metadata unavailable", statusEvaluated: false };
     }
   }
 
@@ -146,7 +149,7 @@ export class GitStatusService {
 }
 
 export function gitStatusToMetadata(summary: GitStatusSummary): GitStatusMetadata {
-  const changesNotEvaluated = summary.note === "static git metadata only; changes not evaluated";
+  const changesNotEvaluated = summary.statusEvaluated === false || summary.note === "static git metadata only; changes not evaluated" || summary.note === "static git metadata only";
   const metadata: GitStatusMetadata = {
     branch: summary.branch,
     status: summary.available && !changesNotEvaluated ? (summary.clean ? "clean" : "dirty") : "unknown",

@@ -527,6 +527,47 @@ test("script profile detector keeps unsafe package script names as argv tokens",
   }
 });
 
+
+
+test("scan detection drops script profiles containing raw secret-like command tokens", async () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    `botblade-import-scan-secret-profile-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+  const rawTokenScriptName = "abcdefghijklmnopqrstuvwxyz123456";
+
+  try {
+    await fs.mkdir(workspace, { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, "package.json"),
+      JSON.stringify({
+        scripts: {
+          [rawTokenScriptName]: "node leaked.js",
+          serve: "node server.js --mode=production",
+        },
+      }),
+      "utf8",
+    );
+
+    const detection = await scanWorkspaceForBladePacks(workspace);
+    assert.equal(
+      detection.scriptProfiles.some((profile) => profile.command.includes(rawTokenScriptName)),
+      false,
+    );
+    assert.ok(
+      detection.scriptProfiles.some(
+        (profile) => JSON.stringify(profile.command) === JSON.stringify(["npm", "run", "serve"]),
+      ),
+    );
+
+    const metadataPath = await writeBotbladeMetadata(workspace, detection);
+    const metadataText = await fs.readFile(metadataPath, "utf8");
+    assert.equal(metadataText.includes(rawTokenScriptName), false);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("script profile detector detects Python entrypoints, tests, and requirements install", async () => {
   const { profiles } = await detectScriptProfiles(path.join(fixturesRoot, "python"));
   const main = profiles.find((profile) => profile.id === "file:main.py:start");

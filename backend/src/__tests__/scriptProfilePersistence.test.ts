@@ -77,3 +77,48 @@ test("script profiles persist across SQLite restarts and record audits", () => {
   assert.equal(thirdProfiles.get(projectId, detected.id)?.runtime, "node");
   assert.equal(thirdAudit.list(projectId).some((event) => event.action === "script.profile.delete"), true);
 });
+
+
+test("script profile validation rejects raw command secrets but keeps metadata-only commands and secretRefs", () => {
+  const profiles = new ScriptProfileService();
+  const projectId = "project_command_validation";
+  const context = { actorId: "tester", requestId: "req_command_validation" };
+  const rawToken = "abcdefghijklmnopqrstuvwxyz123456";
+
+  assertValidationError(() => profiles.create(projectId, { name: "Raw token", runtime: "node", command: ["node", rawToken] }, context));
+  assertValidationError(() => profiles.create(projectId, { name: "Assigned token", runtime: "node", command: ["node", "TOKEN=value"] }, context));
+
+  const valid = profiles.create(projectId, {
+    name: "Serve",
+    runtime: "node",
+    command: ["node", "server.js", "--mode=production"],
+    secretRefs: ["secret_deploy_api_key"],
+  }, context);
+  assert.deepStrictEqual(valid.command, ["node", "server.js", "--mode=production"]);
+  assert.deepStrictEqual(valid.secretRefs, ["secret_deploy_api_key"]);
+
+  assertValidationError(() => profiles.update(projectId, valid.id, { command: ["node", "password=value"] }, context));
+});
+
+test("detected script profiles with raw secret-like command tokens are dropped", () => {
+  const profiles = new ScriptProfileService();
+  const projectId = "project_detected_validation";
+  const safe = detectedProfile({ id: "package-json:package.json:start" });
+  const unsafeRaw = detectedProfile({ id: "package-json:package.json:unsafe-raw", command: ["node", "abcdefghijklmnopqrstuvwxyz123456"] });
+  const unsafeAssignment = detectedProfile({ id: "package-json:package.json:unsafe-assignment", command: ["node", "--api-key=value"] });
+
+  const upserted = profiles.upsertDetected(projectId, [safe, unsafeRaw, unsafeAssignment], { actorId: "tester", requestId: "req_detect_validation" });
+
+  assert.deepStrictEqual(upserted.map((profile) => profile.id), ["project_detected_validation:package-json:package.json:start"]);
+  assert.equal(profiles.list(projectId).length, 1);
+});
+
+function assertValidationError(action: () => unknown): void {
+  try {
+    action();
+  } catch (error) {
+    assert.equal(error instanceof Error ? error.name : undefined, "RequestValidationError");
+    return;
+  }
+  assert.ok(false, "Expected RequestValidationError");
+}
