@@ -25,6 +25,7 @@ import com.princess.botblade.backend.BotEngineService
 import com.princess.botblade.data.api.ApiConfig
 import com.princess.botblade.data.repository.LocalProjectRepository
 import com.princess.botblade.data.store.ActiveProjectStore
+import com.princess.botblade.ui.dashboard.DashboardFragment
 import com.princess.botblade.ui.deployments.DeploymentsFragment
 import com.princess.botblade.ui.logs.LogsFragment
 import com.princess.botblade.ui.shell.BotBladeAppShell
@@ -66,6 +67,7 @@ class MainActivity : AppCompatActivity() {
             ApiConfig.initialize(this)
             requestRuntimePermissionsIfNeeded()
             installComposeShell(savedInstanceState)
+            handleNavigationIntent(intent)
             window.decorView.post { StartupDiagnostics.mark("first_render") }
         }.onFailure { error ->
             showStartupFallback(error)
@@ -84,8 +86,10 @@ class MainActivity : AppCompatActivity() {
                     onDestinationSelected = ::openDestination,
                     contentReady = {
                         shellReady = true
-                        if (shouldOpenDashboard && supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
-                            openDestination(BotBladeDestination.Dashboard)
+                        if (supportFragmentManager.findFragmentById(R.id.fragment_container) == null) {
+                            if (!handleNavigationIntent(intent) && shouldOpenDashboard) {
+                                openDestination(selectedDestination)
+                            }
                         }
                     },
                 )
@@ -114,6 +118,20 @@ class MainActivity : AppCompatActivity() {
         selectedDestination = destination
         if (!shellReady) return
         showFragmentSafely { destination.createFragment() }
+    }
+
+    fun handleNavigationIntent(intent: Intent?): Boolean {
+        val launchIntent = intent ?: return false
+        val destination = launchIntent.getStringExtra(EXTRA_DESTINATION)
+        val opensDashboard = destination == DESTINATION_DASHBOARD || launchIntent.action == ACTION_OPEN_DASHBOARD
+        if (!opensDashboard) return false
+
+        val openRuntimePanel = launchIntent.getBooleanExtra(EXTRA_OPEN_RUNTIME_PANEL, false)
+        selectedDestination = BotBladeDestination.Dashboard
+        if (shellReady) {
+            showFragmentSafely { DashboardFragment.newInstance(openRuntimePanel = openRuntimePanel) }
+        }
+        return true
     }
 
     private fun showFragmentSafely(factory: () -> Fragment): Boolean =
@@ -168,11 +186,24 @@ class MainActivity : AppCompatActivity() {
         showFragmentSafely { LogsFragment() }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNavigationIntent(intent)
+    }
+
     override fun onStart() {
         super.onStart()
         runCatching {
             bindService(Intent(this, BotEngineService::class.java), connection, BIND_AUTO_CREATE)
         }
+    }
+
+    companion object {
+        const val ACTION_OPEN_DASHBOARD = "com.princess.botblade.action.OPEN_DASHBOARD"
+        const val EXTRA_DESTINATION = "com.princess.botblade.extra.DESTINATION"
+        const val EXTRA_OPEN_RUNTIME_PANEL = "com.princess.botblade.extra.OPEN_RUNTIME_PANEL"
+        const val DESTINATION_DASHBOARD = "dashboard"
     }
 
     override fun onStop() {
