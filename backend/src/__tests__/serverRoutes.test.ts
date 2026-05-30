@@ -518,7 +518,13 @@ test("script profile routes validate command, paths, secrets, timeout, runtime, 
     { body: { ...validProfile, workingDirectory: "src\\scripts" }, fields: ["workingDirectory"] },
     { body: { ...validProfile, workingDirectory: "src/../outside" }, fields: ["workingDirectory"] },
     { body: { ...validProfile, workingDirectory: `${"a".repeat(513)}` }, fields: ["workingDirectory"] },
+    { body: { ...validProfile, command: ["node", "abcdefghijklmnopqrstuvwxyz123456"] }, fields: ["command"] },
     { body: { ...validProfile, command: ["node", "--token=sk-1234567890abcdefghijklmnopqrstuvwxyz"] }, fields: ["command"] },
+    { body: { ...validProfile, command: ["node", "TOKEN=value"] }, fields: ["command"] },
+    { body: { ...validProfile, command: ["node", "--api-key=value"] }, fields: ["command"] },
+    { body: { ...validProfile, command: ["node", "password=value"] }, fields: ["command"] },
+    { body: { ...validProfile, command: ["node", "auth=value"] }, fields: ["command"] },
+    { body: { ...validProfile, command: ["node", "credential=value"] }, fields: ["command"] },
     { body: { ...validProfile, secretRefs: ["sk-1234567890abcdefghijklmnopqrstuvwxyz"] }, fields: ["secretRefs"] },
     { body: { ...validProfile, secretRefs: ["token=value"] }, fields: ["secretRefs"] },
     { body: { ...validProfile, timeoutSeconds: 0 }, fields: ["timeoutSeconds"] },
@@ -552,6 +558,10 @@ test("script profile routes validate command, paths, secrets, timeout, runtime, 
   const invalidPatch = await request("PATCH", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}`, { command: [] });
   assert.equal(invalidPatch.statusCode, 400);
   assert.ok(invalidPatch.body.error.details.problems.some((problem: { field: string }) => problem.field === "command"));
+
+  const rawSecretPatch = await request("PATCH", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}`, { command: ["node", "abcdefghijklmnopqrstuvwxyz123456"] });
+  assert.equal(rawSecretPatch.statusCode, 400);
+  assert.ok(rawSecretPatch.body.error.details.problems.some((problem: { field: string }) => problem.field === "command"));
 
   const noRunRoute = await request("POST", `/api/projects/${projectId}/script-profiles/${encodeURIComponent(valid.body.id)}/run`, {});
   assert.equal(noRunRoute.statusCode, 404);

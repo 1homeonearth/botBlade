@@ -120,7 +120,18 @@ export class AuditService implements AuditServicePort {
 }
 
 export function redactMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(redactSecrets(JSON.stringify(metadata))) as Record<string, unknown>;
+  return JSON.parse(redactSecrets(JSON.stringify(dropCommandArrays(metadata)))) as Record<string, unknown>;
+}
+
+function dropCommandArrays(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => dropCommandArrays(item));
+  if (!value || typeof value !== "object") return value;
+  const output: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if ((key === "command" || key === "commands") && Array.isArray(entry)) continue;
+    output[key] = dropCommandArrays(entry);
+  }
+  return output;
 }
 
 function positiveInteger(value: number | undefined): number | undefined {
