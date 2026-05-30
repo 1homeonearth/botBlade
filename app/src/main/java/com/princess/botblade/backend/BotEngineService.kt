@@ -134,8 +134,12 @@ class BotEngineService : Service() {
     }
 
     private fun postCrashStopNotification() {
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            CRASH_NOTIFICATION_ID,
+            dashboardIntent(),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.app_name))
@@ -184,12 +188,29 @@ class BotEngineService : Service() {
 
     private fun notifyState(active: Boolean) { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(active)) }
 
-    private fun buildNotification(active: Boolean): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setSmallIcon(R.mipmap.ic_launcher)
-        .setContentTitle(getString(R.string.app_name))
-        .setContentText(if (active) "BotBlade is running" else "BotBlade is stopped")
-        .setOngoing(true)
-        .build()
+    private fun buildNotification(active: Boolean): Notification {
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            NOTIFICATION_ID,
+            dashboardIntent(),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(if (active) "BotBlade is running — tap for runtime controls." else "BotBlade is stopped — tap for logs and controls.")
+            .setContentIntent(pendingIntent)
+            .setOngoing(active)
+            .setAutoCancel(!active)
+            .build()
+    }
+
+    private fun dashboardIntent(): Intent = Intent(this, MainActivity::class.java).apply {
+        action = MainActivity.ACTION_OPEN_DASHBOARD
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        putExtra(MainActivity.EXTRA_DESTINATION, MainActivity.DESTINATION_DASHBOARD)
+        putExtra(MainActivity.EXTRA_OPEN_RUNTIME_PANEL, true)
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

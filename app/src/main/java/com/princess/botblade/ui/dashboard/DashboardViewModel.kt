@@ -20,6 +20,8 @@ import okhttp3.WebSocketListener
 
 data class DashboardControlState(val running: Boolean, val canStart: Boolean, val canStop: Boolean, val canRestart: Boolean)
 
+data class DashboardMessage(val text: String, val isError: Boolean = false)
+
 class DashboardViewModel(private val repository: DashboardRepository = DashboardRepository()) : ViewModel() {
     private val client = OkHttpClient()
     private var ws: WebSocket? = null
@@ -29,14 +31,15 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
     val status = _status.asStateFlow()
     private val _controls = MutableStateFlow(DashboardControlState(false, true, false, false))
     val controls: StateFlow<DashboardControlState> = _controls.asStateFlow()
+    private val _message = MutableStateFlow<DashboardMessage?>(null)
+    val message: StateFlow<DashboardMessage?> = _message.asStateFlow()
 
     init {
         viewModelScope.launch {
             BotEngineBindingState.serviceRunning.collectLatest { running ->
                 if (running != null) {
                     val status = if (running) "running" else "stopped"
-                    _status.value = RuntimeStatusResponse("bound", status, running, "Status from bound BotEngineService")
-                    _controls.value = if (running) DashboardControlState(true, false, true, true) else DashboardControlState(false, true, false, false)
+                    updateRuntimeState(RuntimeStatusResponse("bound", status, running, "Status from bound BotEngineService"))
                 }
             }
         }
@@ -46,18 +49,56 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
         if (BotEngineBindingState.serviceRunning.value == null) {
             when (val result = repository.getBotStatus(projectId)) {
                 is ApiResult.Success -> {
-                    _status.value = result.data
-                    val running = result.data.status.equals("running", ignoreCase = true)
-                    _controls.value = if (running) DashboardControlState(true, false, true, true) else DashboardControlState(false, true, false, false)
+                    updateRuntimeState(result.data)
+                    _message.value = DashboardMessage(result.data.message ?: "Runtime status refreshed.")
                 }
-                else -> {}
+                is ApiResult.Error -> {
+                    _message.value = DashboardMessage(result.message, isError = true)
+                    appendLog("Status check failed: ${result.message}")
+                }
+                ApiResult.Loading -> Unit
             }
         }
     }
 
-    fun start() { _logs.value = (_logs.value + "Start requested").takeLast(200) }
-    fun stop() { _logs.value = (_logs.value + "Stop requested").takeLast(200) }
-    fun restart() { _logs.value = (_logs.value + "Restart requested").takeLast(200) }
+    fun start(projectId: String?) = performRuntimeAction(projectId, "start")
+    fun stop(projectId: String?) = performRuntimeAction(projectId, "stop")
+    fun restart(projectId: String?) = performRuntimeAction(projectId, "restart")
+
+    fun clearMessage() { _message.value = null }
+
+    fun markOpenedFromNotification() {
+        _message.value = DashboardMessage("Opened from BotBlade runtime notification. Review controls and recent logs here.")
+        appendLog("Dashboard opened from runtime notification.")
+    }
+
+    private fun performRuntimeAction(projectId: String?, action: String) = viewModelScope.launch {
+        val currentStatus = _status.value?.status
+        appendLog("${action.replaceFirstChar { it.uppercase() }} requested${projectId?.let { " for workspace $it" } ?: ""}.")
+        when (val result = repository.runtimeAction(projectId, action, currentStatus)) {
+            is ApiResult.Success -> {
+                updateRuntimeState(result.data)
+                val message = result.data.message ?: "Runtime ${result.data.status}."
+                _message.value = DashboardMessage(message)
+                appendLog("Runtime ${action} result: ${result.data.status}${result.data.message?.let { " — $it" } ?: ""}")
+            }
+            is ApiResult.Error -> {
+                _message.value = DashboardMessage(result.message, isError = true)
+                appendLog("Runtime ${action} failed: ${result.message}")
+            }
+            ApiResult.Loading -> Unit
+        }
+    }
+
+    private fun updateRuntimeState(status: RuntimeStatusResponse) {
+        _status.value = status
+        val running = status.running || status.status.equals("running", ignoreCase = true)
+        _controls.value = if (running) DashboardControlState(true, false, true, true) else DashboardControlState(false, true, false, false)
+    }
+
+    private fun appendLog(line: String) {
+        _logs.value = (_logs.value + line).takeLast(200)
+    }
 
     fun connectLogs() {
         if (ws != null) return
@@ -66,9 +107,12 @@ class DashboardViewModel(private val repository: DashboardRepository = Dashboard
             .replaceFirst("https://", "wss://") + "/logs"
         ws = client.newWebSocket(Request.Builder().url(logsUrl).build(), object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
-                _logs.value = (_logs.value + text).takeLast(200)
+                appendLog(text)
             }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { ws = null }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                ws = null
+                appendLog("Live log connection unavailable: ${t.message ?: "unknown error"}")
+            }
         })
     }
 
